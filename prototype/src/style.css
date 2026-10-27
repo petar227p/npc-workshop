@@ -1,0 +1,67 @@
+:root {
+  --bg: #1d1a17;
+  --panel: #2a2520;
+  --panel-2: #342e27;
+  --line: #4a4036;
+  --text: #f1e7d6;
+  --muted: #a8998a;
+  --accent: #e8a547;
+  --ok: #8cc56a;
+  --bad: #e06a5a;
+  --told: #7fb2e0;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.4 Inter, system-ui, sans-serif; }
+#app { display: flex; height: 100vh; }
+#stage { flex: 1; display: flex; flex-direction: column; min-width: 0; padding: 12px; gap: 6px; }
+#game { flex: 1; min-height: 0; border-radius: 8px; overflow: hidden; border: 2px solid var(--line); }
+.hint { margin: 0; color: var(--muted); font-size: 12px; text-align: center; }
+#side { width: 360px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px 12px 12px 0; overflow-y: auto; }
+h1, h2 { font-family: 'Pixelify Sans', monospace; margin: 0; }
+h1 { font-size: 22px; color: var(--accent); }
+h2 { font-size: 15px; margin-bottom: 8px; }
+.hud-row { display: flex; gap: 12px; align-items: center; margin-top: 4px; font-family: 'Pixelify Sans', monospace; }
+.hud-row #skip { margin-left: auto; }
+button { font: inherit; background: var(--accent); color: #2a1a05; border: 0; border-radius: 6px; padding: 5px 10px; cursor: pointer; font-weight: 600; }
+button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
+button:disabled { opacity: .5; cursor: default; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.muted { color: var(--muted); }
+kbd { background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-family: 'Pixelify Sans'; }
+.portrait { width: 48px; height: 48px; image-rendering: pixelated; background-image: url(/assets/dungeon/tilemap_packed.png); background-size: 576px 528px; background-color: var(--panel-2); border-radius: 6px; flex-shrink: 0; }
+.chat-head { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
+#chat-name { font-family: 'Pixelify Sans'; font-size: 17px; }
+.tag { font-size: 11px; color: var(--muted); }
+#messages { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.msg { padding: 6px 9px; border-radius: 8px; max-width: 90%; }
+.msg.npc { background: var(--panel-2); align-self: flex-start; }
+.msg.you { background: #4a3a22; align-self: flex-end; }
+#chat-form { display: flex; gap: 6px; }
+#chat-input { flex: 1; min-width: 0; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font: inherit; }
+.contract { background: #3b3226; border: 1px dashed var(--accent); border-radius: 8px; padding: 8px; align-self: stretch; }
+.contract .title { font-family: 'Pixelify Sans'; color: var(--accent); font-size: 16px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 6px 0; text-align: center; }
+.stats div { background: var(--bg); border-radius: 4px; padding: 3px; font-size: 12px; }
+.stats b { display: block; font-size: 15px; }
+.contract .actions { display: flex; gap: 6px; margin-top: 6px; }
+#knowledge { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+#knowledge li { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.chip { font-size: 11px; padding: 1px 7px; border-radius: 10px; white-space: nowrap; }
+.chip.none { background: var(--panel-2); color: var(--muted); }
+.chip.witnessed { background: #2f4526; color: var(--ok); }
+.chip.told { background: #233648; color: var(--told); }
+.rumour { font-size: 11px; color: var(--muted); font-style: italic; }
+.item { display: flex; gap: 10px; align-items: center; }
+.item .portrait { width: 64px; height: 64px; background-size: 768px 704px; }
+.log-panel { flex: 1; min-height: 140px; }
+#log { margin: 0; padding: 0; list-style: none; font-size: 12px; display: flex; flex-direction: column-reverse; gap: 3px; }
+#log li { border-left: 3px solid var(--line); padding-left: 6px; }
+#log li.event { border-color: var(--accent); }
+#log li.memory { border-color: var(--told); }
+#log li.reject { border-color: var(--bad); }
+#log time { color: var(--muted); margin-right: 4px; font-family: 'Pixelify Sans'; }
+@media (max-width: 900px) {
+  #app { flex-direction: column; height: auto; }
+  #game { height: 60vh; flex: none; }
+  #side { width: auto; padding: 0 12px 12px; }
+}

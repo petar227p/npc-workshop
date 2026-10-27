@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The Blacksmith</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <main id="app">
+      <section id="stage">
+        <div id="game"></div>
+        <p class="hint">Move: WASD / arrows · Talk: E · Leave: Esc</p>
+      </section>
+      <aside id="side">
+        <header class="hud">
+          <h1>The Blacksmith</h1>
+          <div class="hud-row">
+            <span id="clock"></span>
+            <span id="gold"></span>
+            <button id="skip" title="Advance the clock one hour">+1 hour ⏩</button>
+          </div>
+        </header>
+
+        <section class="panel" id="chat-panel">
+          <div id="chat-empty" class="muted">Walk up to someone and press <kbd>E</kbd>.</div>
+          <div id="chat" hidden>
+            <div class="chat-head">
+              <div id="portrait" class="portrait"></div>
+              <div>
+                <div id="chat-name"></div>
+                <div class="tag">mock dialogue · Muse Spark plugs in here</div>
+              </div>
+            </div>
+            <div id="messages"></div>
+            <form id="chat-form">
+              <input id="chat-input" autocomplete="off" placeholder="Say something…" />
+              <button>Send</button>
+            </form>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Who knows about your sword?</h2>
+          <ul id="knowledge"></ul>
+        </section>
+
+        <section class="panel" id="inv-panel" hidden>
+          <h2>Inventory</h2>
+          <div id="inventory"></div>
+        </section>
+
+        <section class="panel log-panel">
+          <h2>Event log</h2>
+          <ol id="log"></ol>
+        </section>
+      </aside>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "id": "smith",
+  "name": "Brann",
+  "verbs": ["SAY", "PROPOSE_CONTRACT", "COUNTER_OFFER", "REFUSE", "START_WORK"],
+  "model_verbs": ["SAY", "PROPOSE_CONTRACT", "COUNTER_OFFER", "REFUSE"],
+  "facts": ["clock", "purse", "stock", "catalogue", "price_floor", "open_offers"],
+  "perception_radius": 4,
+  "cue": "Reply to the customer's last words.",
+  "fallbacks": {
+    "rejected": "Hm. Let me think that through properly. Ask me again.",
+    "unavailable": "The fire needs tending. Come back in a moment."
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "blacksmith",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p shared && tsc -p server && tsc -p web && tsc -p scripts",
+    "smith-demo": "tsx scripts/smith-demo.ts",
+    "latency-test": "tsx scripts/latency-test.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}

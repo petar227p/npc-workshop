@@ -1,0 +1,44 @@
+import type { World } from '../engine';
+import { describe } from './facts';
+
+const HISTORY_EVENTS = 24;
+
+// The conversation between one NPC and one customer, rebuilt from the event log rather than kept as chat state.
+export function historyFor(npcId: string, name: string): (world: World, customer: string) => string {
+  return (world, customer) => {
+    // Accepts, work and deliveries are about a contract; only this NPC's own sales belong in its history.
+    const sold = (id: string) => world.contracts[id]?.seller === npcId;
+    const lines: string[] = [];
+    for (const e of world.events) {
+      switch (e.type) {
+        case 'SAID': {
+          // Only this NPC and this customer: another villager's line must not read as the customer's words.
+          const speaker = e.actor === npcId ? name : e.actor === customer ? 'Customer' : null;
+          // JSON-quoted, so a customer's quotes and newlines can't forge ledger lines or the NPC's words.
+          if (speaker) lines.push(`${speaker}: ${JSON.stringify(e.data.text)}`);
+          break;
+        }
+        case 'CONTRACT_PROPOSED':
+          if (e.actor === npcId && e.data.customer === customer) {
+            lines.push(
+              `[${name} offered ${e.data.contract.contract_id}${e.data.replaces ? ` (replacing ${e.data.replaces})` : ''}: ${describe(e.data.contract)}]`,
+            );
+          }
+          break;
+        case 'CONTRACT_REFUSED':
+          if (e.actor === npcId && e.target === customer) lines.push(`[${name} refused${e.data.contract_id ? ` and withdrew ${e.data.contract_id}` : ' the request'}]`);
+          break;
+        case 'CONTRACT_ACCEPTED':
+          if (e.actor === customer && sold(e.data.contract_id)) lines.push(`[Customer accepted ${e.data.contract_id} and paid ${e.data.price} gold]`);
+          break;
+        case 'WORK_STARTED':
+          if (e.target === customer && sold(e.data.contract_id)) lines.push(`[Work began on ${e.data.contract_id}, ready at hour ${e.data.due_tick}]`);
+          break;
+        case 'ITEM_DELIVERED':
+          if (e.target === customer && sold(e.data.contract_id)) lines.push(`[${e.data.item.item_name} (${e.data.contract_id}) was handed to the customer at hour ${e.tick}]`);
+          break;
+      }
+    }
+    return lines.slice(-HISTORY_EVENTS).join('\n') || '(nothing yet)';
+  };
+}

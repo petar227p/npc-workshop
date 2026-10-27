@@ -1,0 +1,1 @@
+{ "name": "@blacksmith/shared", "private": true, "type": "module", "main": "src/index.ts", "dependencies": { "zod": "^3.24.0" } }
