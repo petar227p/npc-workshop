@@ -1,10 +1,11 @@
-import type { EngineEvent, ItemArt, StateView } from '@blacksmith/shared';
+import type { ContractView, EngineEvent, ItemArt, MadeToOrderView, StateView } from '@blacksmith/shared';
 import { clockText } from './api';
+import { goodName, nameOf } from './Chat';
 
 type ForgeProps = { view: StateView; disabled: boolean; onSkip: (ticks: number) => void; onReset: () => void };
 
 export function Forge({ view, disabled, onSkip, onReset }: ForgeProps) {
-  const jobs = view.contracts.filter((c) => c.status === 'in_progress');
+  const jobs = view.contracts.filter((c): c is MadeToOrderView => c.kind === 'made_to_order' && c.status === 'in_progress');
   const nextDue = Math.min(...jobs.map((j) => j.due_tick ?? Infinity));
   return (
     <section className="panel">
@@ -50,27 +51,43 @@ export function Forge({ view, disabled, onSkip, onReset }: ForgeProps) {
   );
 }
 
+// Each seller's unreserved stock, from the ledger.
 export function Stock({ view }: { view: StateView }) {
   return (
-    <section className="panel">
-      <h2>Brann's stock</h2>
-      <ul className="stock">
-        {Object.entries(view.materials).map(([m, n]) => (
-          <li key={m} className={n <= 0 ? 'muted' : ''}>
-            <span>{m.replace('_', ' ')}</span>
-            <b>{n}</b>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <>
+      {view.shops.map((shop) => (
+        <section key={shop.id} className="panel">
+          <h2>{shop.name}'s stock</h2>
+          <ul className="stock">
+            {Object.entries(shop.stock).map(([m, n]) => (
+              <li key={m} className={n <= 0 ? 'muted' : ''}>
+                <span>{goodName(m)}</span>
+                <b>{n}</b>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </>
   );
 }
 
 export function Inventory({ view }: { view: StateView }) {
-  if (view.items.length === 0) return null;
+  const goods = Object.entries(view.goods).filter(([, n]) => n > 0);
+  if (view.items.length === 0 && goods.length === 0) return null;
   return (
     <section className="panel">
       <h2>Your gear</h2>
+      {goods.length > 0 && (
+        <ul className="stock">
+          {goods.map(([g, n]) => (
+            <li key={g}>
+              <span>{goodName(g)}</span>
+              <b>{n}</b>
+            </li>
+          ))}
+        </ul>
+      )}
       {view.items.map((i) => (
         <div key={i.item_id} className="item">
           <ItemPicture name={i.item_name} art={view.art[i.contract_id]} />
@@ -104,7 +121,7 @@ export function Ledger({ view }: { view: StateView }) {
         {rows.map((e) => (
           <li key={e.id} className={kind(e)}>
             <time>{clockText(e.tick).split(' · ')[1]}</time>
-            <span>{describe(e)}</span>
+            <span>{describe(e, view)}</span>
           </li>
         ))}
       </ol>
@@ -118,16 +135,20 @@ function kind(e: EngineEvent) {
   return 'event';
 }
 
-function describe(e: EngineEvent): string {
+const offered = (c: ContractView | Extract<EngineEvent, { type: 'CONTRACT_PROPOSED' }>['data']['contract']) =>
+  c.kind === 'made_to_order' ? `${c.item_name}, ${c.price} gold, ${c.delivery_ticks} h` : `${c.qty} × ${goodName(c.good)}, ${c.price} gold`;
+
+function describe(e: EngineEvent, view: StateView): string {
+  const who = nameOf(view, e.actor);
   switch (e.type) {
-    case 'CONTRACT_PROPOSED': {
-      const c = e.data.contract;
-      return `${c.contract_id} offered: ${c.item_name}, ${c.price} gold, ${c.delivery_ticks} h${e.data.replaces ? ` (replaces ${e.data.replaces})` : ''}`;
-    }
+    case 'CONTRACT_PROPOSED':
+      return `${who} offered ${e.data.contract.contract_id}: ${offered(e.data.contract)}${e.data.replaces ? ` (replaces ${e.data.replaces})` : ''}`;
     case 'CONTRACT_REFUSED':
-      return e.data.contract_id ? `${e.data.contract_id} withdrawn` : 'Order refused';
+      return e.data.contract_id ? `${who} withdrew ${e.data.contract_id}` : `${who} refused the order`;
     case 'CONTRACT_ACCEPTED':
-      return `${e.data.contract_id} accepted: ${e.data.price} gold paid, materials reserved`;
+      return `${e.data.contract_id} accepted: ${e.data.price} gold paid to ${nameOf(view, e.target ?? '')}`;
+    case 'GOODS_DELIVERED':
+      return `${e.data.contract_id} handed over by ${who}: ${e.data.qty} × ${goodName(e.data.good)}`;
     case 'WORK_STARTED':
       return `${e.data.contract_id} work started, due ${clockText(e.data.due_tick)}`;
     case 'ITEM_DELIVERED':

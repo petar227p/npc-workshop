@@ -1,9 +1,10 @@
 // Live run of the core loop against the real smith model. Calls are recorded to logs/<session>.jsonl.
 // npm run smith-demo           (real API)
 // REPLAY=logs/x.jsonl npm run smith-demo   (plays a recorded run back)
-import { createWorld, type EngineEvent, type World } from '../server/src/engine';
+import { isMadeToOrder, type EngineEvent, type World } from '../server/src/engine';
 import { playerAccepts, playerSays, skipTime } from '../server/src/game';
 import { createModels } from '../server/src/models';
+import { newVillage } from '../server/src/npcs';
 
 const session = `demo-${new Date().toISOString().replace(/[:.]/g, '-')}`;
 const { smith } = createModels(session);
@@ -14,10 +15,10 @@ let cost = 0;
 function show(events: EngineEvent[]) {
   for (const e of events) {
     if (e.type === 'SAID') console.log(`  ${e.actor === 'smith' ? 'Brann' : 'You  '}: ${e.data.text}`);
-    else if (e.type === 'CONTRACT_PROPOSED') {
+    else if (e.type === 'CONTRACT_PROPOSED' && e.data.contract.kind === 'made_to_order') {
       const c = e.data.contract;
       console.log(`  [offer ${c.contract_id}] ${c.item_name} (${c.item_type}) dmg ${c.stats.damage} / wt ${c.stats.weight} / dur ${c.stats.durability}`);
-      console.log(`    materials ${JSON.stringify(c.materials_used)}, ${c.price} gold, ${c.delivery_ticks} h. "${c.smith_remarks}"`);
+      console.log(`    materials ${JSON.stringify(c.materials_used)}, ${c.price} gold, ${c.delivery_ticks} h. "${c.remarks}"`);
     } else if (e.type === 'ACTION_REJECTED') console.log(`  [rejected ${e.data.verb ?? '?'}] ${e.data.reason}`);
     else if (e.type === 'ITEM_DELIVERED') console.log(`  [delivered at hour ${e.tick}] ${JSON.stringify(e.data.item.stats)}`);
     else console.log(`  [${e.type}]`);
@@ -39,9 +40,9 @@ async function say(world: World, text: string): Promise<World> {
   return r.world;
 }
 
-const openOffer = (w: World) => Object.values(w.contracts).find((c) => c.status === 'proposed');
+const openOffer = (w: World) => Object.values(w.contracts).filter(isMadeToOrder).find((c) => c.status === 'proposed');
 
-let w = createWorld();
+let w = newVillage();
 w = await say(w, "Good morning. I'd like a sword shaped like a hammerhead shark: broad head, heavy at the tip. I've got about 150 gold.");
 if (!openOffer(w)) w = await say(w, 'Sounds good. What would that cost me?');
 

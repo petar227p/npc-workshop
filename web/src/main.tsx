@@ -42,6 +42,7 @@ function ForgePage() {
   const [view, setView] = useState<StateView | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [talkTo, setTalkTo] = useState('smith');
 
   useEffect(() => {
     api.state().then(setView, (e: Error) => setError(e.message));
@@ -70,7 +71,7 @@ function ForgePage() {
 
   const say = async (text: string) => {
     setPending(text);
-    await run(api.say(text));
+    await run(api.say(text, talkTo));
     setPending(null);
   };
 
@@ -80,7 +81,7 @@ function ForgePage() {
   return (
     <div className="cols">
       <div className="main-col">
-        <Chat view={view} pending={pending} onSay={say} onAccept={(id) => run(api.accept(id))} />
+        <Chat view={view} talkTo={talkTo} onTalkTo={setTalkTo} pending={pending} onSay={say} onAccept={(id) => run(api.accept(id))} />
         {error && (
           <div className="error" role="alert">
             {error}

@@ -77,7 +77,7 @@ describe('artPrompt', () => {
 });
 
 describe('studio', () => {
-  const contract = { contract_id: 'c_001', item_name: 'Hammerhead Blade', item_type: 'sword', description: 'A broad blade.', stats: { damage: 14, weight: 6, durability: 70 }, materials_used: { iron: 3 }, price: 120, delivery_ticks: 8, smith_remarks: '' };
+  const contract = { kind: 'made_to_order' as const, contract_id: 'c_001', item_name: 'Hammerhead Blade', item_type: 'sword', description: 'A broad blade.', stats: { damage: 14, weight: 6, durability: 70 }, materials_used: { iron: 3 }, price: 120, delivery_ticks: 8, remarks: '' };
   const owner = (): ArtOwner => ({ art: new Map(), artRenders: 0 });
 
   it('renders once per contract and reports rendering, then ready', async () => {

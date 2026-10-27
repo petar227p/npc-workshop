@@ -6,10 +6,9 @@ import { getCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
 import type { NpcModel } from '../agents/npc';
 import { artView, createStudio, type StudioLimits } from '../art';
-import { createWorld } from '../engine';
 import { playerAccepts, playerSays, skipTime } from '../game';
 import type { ImageClient } from '../models/image';
-import { NPC_FILES, type NpcFiles } from '../npcs';
+import { NAMES, NPC_FILES, NPCS, newVillage, smith as brann, type NpcFiles } from '../npcs';
 import { busyMessage, createSessionStore, guestSession, toView, type Session, type SessionLimits } from '../sessions';
 import { mountEditor, type BenchLimits } from './editor';
 
@@ -21,7 +20,7 @@ const MAX_EDITOR_BODY_BYTES = 64 * 1024;
 const SMITH_UNAVAILABLE = "Brann isn't at the forge right now. Try again later.";
 const ART_FILE = /^([0-9a-f-]{36})\.png$/;
 
-const SayBody = z.object({ text: z.string().max(MAX_SAY_LENGTH) });
+const SayBody = z.object({ text: z.string().max(MAX_SAY_LENGTH), npc: z.string().optional() }); // npc: who the player talks to; Brann by default
 const AcceptBody = z.object({ contract_id: z.string() });
 const TickBody = z.object({ ticks: z.number().int().min(1).max(MAX_SKIP) });
 
@@ -78,7 +77,7 @@ export function createApi(deps: ApiDeps) {
 
   const respond = (c: Context<Env>, r: Omit<ActionResponse, 'view'>) => {
     const s = c.get('session');
-    return c.json({ ...r, view: toView(s.world, s.busy !== null, s.art) } satisfies ActionResponse);
+    return c.json({ ...r, view: toView(s.world, s.busy !== null, s.art, NAMES) } satisfies ActionResponse);
   };
   // A missing key or bad config is the server's problem: say so plainly, log the cause, change nothing.
   const modelFor = (s: Session): NpcModel | null => {
@@ -108,7 +107,7 @@ export function createApi(deps: ApiDeps) {
 
   app.get('/api/state', (c) => {
     const s = c.get('session');
-    return c.json(toView(s.world, s.busy !== null, s.art));
+    return c.json(toView(s.world, s.busy !== null, s.art, NAMES));
   });
 
   // Polled by the page while a picture renders; only the pictures, so a poll can't overwrite a newer world.
@@ -125,7 +124,9 @@ export function createApi(deps: ApiDeps) {
   app.post('/api/say', async (c) => {
     const s = c.get('session');
     const parsed = await body(c, SayBody);
-    if (!parsed.success) return c.json({ error: `expected { text } of at most ${MAX_SAY_LENGTH} characters` }, 400);
+    if (!parsed.success) return c.json({ error: `expected { text, npc? } with text of at most ${MAX_SAY_LENGTH} characters` }, 400);
+    const npc = parsed.data.npc === undefined ? brann : NPCS.find((n) => n.id === parsed.data.npc);
+    if (!npc) return c.json({ error: `there's nobody called '${parsed.data.npc}' in the village` }, 400);
     if (s.busy) return busy(c);
 
     const smith = modelFor(s);
@@ -133,7 +134,7 @@ export function createApi(deps: ApiDeps) {
 
     s.busy = 'forge';
     try {
-      const r = await playerSays(s.world, parsed.data.text, smith);
+      const r = await playerSays(s.world, parsed.data.text, smith, npc);
       s.world = r.world;
       if ('attempts' in r) return respond(c, { ok: true, reason: null, outcome: r.outcome, events: r.events });
       return respond(c, { ok: r.ok, reason: r.reason, outcome: null, events: r.events });
@@ -167,7 +168,7 @@ export function createApi(deps: ApiDeps) {
   app.post('/api/reset', (c) => {
     const s = c.get('session');
     if (s.busy) return busy(c);
-    s.world = createWorld();
+    s.world = newVillage();
     s.art = new Map();
     return respond(c, { ok: true, reason: null, outcome: null, events: [] });
   });

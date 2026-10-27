@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import type { ContractView, StateView } from '@blacksmith/shared';
 import type { NpcModel } from './agents/npc';
 import { artView, type Gallery } from './art';
-import { availableMaterials, createWorld, type World } from './engine';
+import { availableStock, type World } from './engine';
+import { newVillage } from './npcs';
 import type { ImageClient } from './models/image';
 
 // One world per browser, in memory. `busy` locks the world while the smith is thinking, so a tick or an
@@ -34,7 +35,7 @@ export const busyMessage = (s: Session) => BUSY[s.busy ?? 'forge'];
 
 const newSession = (id: string, lastSeen: number): Session => ({
   id,
-  world: createWorld(),
+  world: newVillage(),
   bench: null,
   busy: null,
   benchTurns: 0,
@@ -100,14 +101,18 @@ export function createSessionStore(limits: SessionLimits = {}) {
 
 const VIEW_EVENTS = 300;
 
-export function toView(world: World, busy: boolean, art: Gallery = new Map(), customer = 'player'): StateView {
+// `names` labels each seller's stock; an actor without one is shown by its id.
+export function toView(world: World, busy: boolean, art: Gallery = new Map(), names: Record<string, string> = {}, customer = 'player'): StateView {
   const contracts: ContractView[] = Object.values(world.contracts)
     .filter((c) => c.customer === customer)
-    .map(({ customer: _c, seller: _s, proposed_tick: _p, ...c }) => c);
+    .map(({ customer: _c, proposed_tick: _p, location: _l, ...c }) => c);
   return {
     tick: world.tick,
     gold: world.gold[customer] ?? 0,
-    materials: availableMaterials(world),
+    goods: { ...(world.stock[customer] ?? {}) },
+    shops: Object.keys(world.stock)
+      .filter((id) => id !== customer)
+      .map((id) => ({ id, name: names[id] ?? id, stock: availableStock(world, id) })),
     contracts,
     items: world.items.filter((i) => i.owner === customer),
     events: world.events.slice(-VIEW_EVENTS),

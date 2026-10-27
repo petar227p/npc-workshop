@@ -1,4 +1,4 @@
-import { createEngine } from '../engine';
+import { createEngine, createWorld, type World } from '../engine';
 import { npcFiles, toNpc } from './load';
 import { player } from './player';
 
@@ -8,6 +8,11 @@ export const NPCS = NPC_FILES.list().map(toNpc);
 export const ACTORS = [player, ...NPCS];
 
 export const { act } = createEngine(ACTORS);
+
+// A fresh village world: every actor's starting purse and stock.
+export const newVillage = (): World => createWorld(ACTORS);
+// Display names by actor id, for views.
+export const NAMES: Record<string, string> = Object.fromEntries(NPCS.map((n) => [n.id, n.name]));
 
 const found = NPCS.find((n) => n.id === 'smith');
 if (!found) throw new Error('npcs/smith.json is missing');

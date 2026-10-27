@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { NpcDraftSchema, NpcFileSchema, type NpcDraft } from '@blacksmith/shared';
+import { NpcDraftSchema, NpcFileSchema, type Catalogue, type ModelVerb, type NpcDraft } from '@blacksmith/shared';
 import * as flat from '../agents/flat';
 import { verbs } from '../engine';
 import { factsFor } from './facts';
@@ -16,8 +16,14 @@ export const NPC_DIRS: NpcDirs = {
   prompts: new URL('../../../prompts/', import.meta.url),
 };
 
-const LEDGER = { SAY: verbs.SAY, PROPOSE_CONTRACT: verbs.PROPOSE_CONTRACT, COUNTER_OFFER: verbs.COUNTER_OFFER, REFUSE: verbs.REFUSE, ACCEPT: verbs.ACCEPT, START_WORK: verbs.START_WORK };
-const MODEL = { SAY: flat.SAY, PROPOSE_CONTRACT: flat.PROPOSE_CONTRACT, COUNTER_OFFER: flat.COUNTER_OFFER, REFUSE: flat.REFUSE };
+const LEDGER = { SAY: verbs.SAY, OFFER: verbs.OFFER, COUNTER_OFFER: verbs.COUNTER_OFFER, REFUSE: verbs.REFUSE, ACCEPT: verbs.ACCEPT, START_WORK: verbs.START_WORK };
+
+// The offer verbs' schemas are built from the NPC's own catalogue.
+function modelVerb(v: ModelVerb, catalogue: Catalogue): flat.FlatVerb {
+  if (v === 'OFFER') return flat.OFFER(catalogue);
+  if (v === 'COUNTER_OFFER') return flat.COUNTER_OFFER(catalogue);
+  return flat[v];
+}
 
 export type Built = { ok: true; npc: NpcDefinition; draft: NpcDraft } | { ok: false; errors: string[] };
 
@@ -32,9 +38,12 @@ export function buildNpc(input: unknown): Built {
       name: d.name,
       prompt: d.persona,
       verbs: d.verbs.map((v) => LEDGER[v]),
-      modelVerbs: d.model_verbs.map((v) => MODEL[v]),
+      location: d.location,
+      catalogue: d.catalogue,
+      start: d.start,
+      modelVerbs: d.model_verbs.map((v) => modelVerb(v, d.catalogue)),
       perception_radius: d.perception_radius,
-      facts: factsFor(d.id, d.facts),
+      facts: factsFor(d.id, d.facts, d.catalogue),
       history: historyFor(d.id, d.name),
       cue: d.cue,
       fallbacks: d.fallbacks,

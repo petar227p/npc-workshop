@@ -1,5 +1,5 @@
 import { commit, type EngineEvent, type EventDraft } from './events';
-import type { World } from './state';
+import { isMadeToOrder, type World } from './state';
 
 // Moves time forward. Deliveries happen here, by code, at their due tick; the item is a copy of the contract.
 export function advance(world: World, ticks: number): { world: World; events: EngineEvent[] } {
@@ -7,6 +7,7 @@ export function advance(world: World, ticks: number): { world: World; events: En
   const to = world.tick + ticks;
 
   const due = Object.values(world.contracts)
+    .filter(isMadeToOrder)
     .filter((c) => c.status === 'in_progress' && c.due_tick !== null && c.due_tick <= to)
     .sort((a, b) => a.due_tick! - b.due_tick! || a.contract_id.localeCompare(b.contract_id));
 
@@ -15,7 +16,7 @@ export function advance(world: World, ticks: number): { world: World; events: En
     tick: c.due_tick!,
     actor: 'clock',
     target: c.customer,
-    location: 'forge',
+    location: c.location,
     witnesses: [],
     data: {
       contract_id: c.contract_id,

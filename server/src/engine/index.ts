@@ -2,13 +2,13 @@ import type { Action } from '@blacksmith/shared';
 import type { ZodError, ZodType } from 'zod';
 import { commit, type EngineEvent } from './events';
 import type { World } from './state';
-import { own, reject, type ActOptions, type Actor, type Verdict } from './validator';
+import { own, placeOf, reject, type ActOptions, type Actor, type Verdict } from './validator';
 
 export { advance } from './clock';
 export { apply, commit, replay, type EngineEvent, type EventDraft } from './events';
 export * from './state';
 export * as verbs from './verbs';
-export { minDeliveryTicks, minPrice, materialCost, type ActOptions, type Actor, type AnyVerbDef, type Verdict, type VerbDef } from './validator';
+export { minDeliveryTicks, minPrice, materialCost, placeOf, type ActOptions, type Actor, type AnyVerbDef, type Verdict, type VerbDef } from './validator';
 
 export type ActResult = { world: World; ok: boolean; reason: string | null; events: EngineEvent[] };
 
@@ -37,16 +37,17 @@ export type Act = (world: World, actor: string, raw: unknown, opts?: ActOptions)
 // A verb the actor doesn't list is rejected before its schema or rule ever runs.
 function check(actors: Actors, world: World, actor: string, raw: unknown, opts: ActOptions): Verdict {
   const verb = verbOf(raw);
-  const def = own(actors, actor)?.verbs.find((v) => v.verb === verb);
-  if (!def) {
-    if (verb === 'DELIVER') return reject('only the forge clock delivers items, once the work is done');
+  const self = own(actors, actor);
+  const def = self?.verbs.find((v) => v.verb === verb);
+  if (!self || !def) {
+    if (verb === 'DELIVER') return reject('only the clock delivers items, once the work is done');
     if (verb === null) return reject(`action: expected a JSON object with an "action" field`);
     return reject(`${actor} may not use ${verb}`);
   }
   // Each definition's schema only ever yields its own verb's action, so its rule can take what it parses.
-  const run = def as unknown as { schema: ZodType<Action>; rule(w: World, a: string, action: Action, o: ActOptions): Verdict };
+  const run = def as unknown as { schema: ZodType<Action>; rule(w: World, a: Actor, action: Action, o: ActOptions): Verdict };
   const parsed = run.schema.safeParse(raw);
-  return parsed.success ? run.rule(world, actor, parsed.data, opts) : reject(parseReason(parsed.error));
+  return parsed.success ? run.rule(world, self, parsed.data, opts) : reject(parseReason(parsed.error));
 }
 
 // The one door into the world for agents and the player: role check → parse → rule → commit.
@@ -69,7 +70,7 @@ export function createEngine(list: readonly Actor[]): { act: Act } {
           tick: world.tick,
           actor,
           target: null,
-          location: 'forge',
+          location: placeOf(own(actors, actor) ?? {}),
           witnesses: [],
           data: { verb: verbOf(raw), reason: verdict.reason, proposed: clip(raw) },
         },

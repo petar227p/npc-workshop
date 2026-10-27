@@ -3,7 +3,7 @@ import * as flat from '../../agents/flat';
 import { npcTurn } from '../../agents/npc';
 import { createEngine, createWorld, verbs } from '../../engine';
 import { mockClient } from '../../models';
-import { ACTORS, defineNpc, smith } from '../index';
+import { ACTORS, defineNpc, NPCS, smith } from '../index';
 
 const npc = (over: Partial<Parameters<typeof defineNpc>[0]> = {}) =>
   defineNpc({
@@ -12,6 +12,7 @@ const npc = (over: Partial<Parameters<typeof defineNpc>[0]> = {}) =>
     name: 'Miller',
     verbs: [verbs.SAY],
     modelVerbs: [flat.SAY],
+    catalogue: {},
     ...over,
   });
 
@@ -25,8 +26,8 @@ describe('actor registry', () => {
     expect(act(createWorld(), 'smith', { action: 'SAY', text: 'hi' }).reason).toMatch(/smith may not use SAY/);
   });
 
-  it('the village has the player and the smith, and nobody may DELIVER', () => {
-    expect(ACTORS.map((a) => a.id)).toEqual(['player', 'smith']);
+  it('the village has the player, the merchant and the smith, and nobody may DELIVER', () => {
+    expect(ACTORS.map((a) => a.id)).toEqual(['player', 'merchant', 'smith']);
     for (const a of ACTORS) expect(a.verbs.map((v) => v.verb)).not.toContain('DELIVER');
   });
 
@@ -36,6 +37,14 @@ describe('actor registry', () => {
 
   it('every NPC must be allowed SAY: its lines and fallbacks go through it', () => {
     expect(() => npc({ verbs: [verbs.REFUSE], modelVerbs: [flat.REFUSE] })).toThrow(/miller: an NPC must be allowed SAY/);
+  });
+
+  it("an offer verb needs a catalogue, and made-to-order work needs START_WORK: no verb without the state behind it", () => {
+    expect(() => npc({ verbs: [verbs.SAY, verbs.OFFER] })).toThrow(/miller: OFFER needs a catalogue with something to sell/);
+    expect(() => npc({ verbs: [verbs.SAY, verbs.COUNTER_OFFER] })).toThrow(/miller: COUNTER_OFFER needs a catalogue/);
+    expect(() => npc({ verbs: [verbs.SAY, verbs.OFFER], catalogue: smith.catalogue })).toThrow(/made-to-order catalogue needs START_WORK/);
+    const stall = { in_stock: { flour: { min_price: 3 } } };
+    expect(npc({ verbs: [verbs.SAY, verbs.OFFER], modelVerbs: [flat.SAY, flat.OFFER(stall)], catalogue: stall }).id).toBe('miller');
   });
 
   it('the id names the model schema, so it must be a plain identifier', () => {
@@ -76,15 +85,40 @@ describe('flatSchema', () => {
 
   it("the smith's schema has every field required and the verb-specific ones nullable", () => {
     const s = smith.schema as { required: string[]; properties: Record<string, { enum?: string[]; anyOf?: unknown[] }> };
-    expect(s.required).toEqual(['action', 'say', 'contract', 'contract_id']);
-    expect(s.properties.action.enum).toEqual(['SAY', 'PROPOSE_CONTRACT', 'COUNTER_OFFER', 'REFUSE']);
+    expect(s.required).toEqual(['action', 'say', 'offer', 'contract_id']);
+    expect(s.properties.action.enum).toEqual(['SAY', 'OFFER', 'COUNTER_OFFER', 'REFUSE']);
     expect(s.properties.contract_id.anyOf).toEqual([{ type: 'string' }, { type: 'null' }]);
+  });
+
+  it("offer enums come from the seller's own catalogue; a seller with both kinds gets one shape per kind", () => {
+    type Shape = { properties: Record<string, { enum?: string[] }> };
+    const offerOf = (schema: Record<string, unknown>) => (schema as { properties: { offer: { anyOf: Shape[] } } }).properties.offer.anyOf;
+    const [forge, none] = offerOf(smith.schema);
+    expect(forge.properties.kind.enum).toEqual(['made_to_order']);
+    expect(forge.properties.item_type.enum).toEqual(['sword', 'dagger', 'axe', 'hammer', 'shield']);
+    expect(none).toEqual({ type: 'null' });
+    const merchant = NPCS.find((n) => n.id === 'merchant')!;
+    const [stall] = offerOf(merchant.schema);
+    expect(stall.properties.kind.enum).toEqual(['in_stock']);
+    expect(stall.properties.good.enum).toEqual(['torch', 'rope', 'rations', 'healing_salve', 'lantern']);
+    const both = offerOf(flat.flatSchema([flat.OFFER({ ...smith.catalogue, ...merchant.catalogue })]));
+    expect(both.map((s) => (s as Shape).properties?.kind?.enum?.[0] ?? 'null')).toEqual(['made_to_order', 'in_stock', 'null']);
+  });
+
+  it('a one-kind seller may leave `kind` out; the flat offer maps onto the terms', () => {
+    const offer = flat.OFFER({ in_stock: { torch: { min_price: 2 } } });
+    expect(offer.toAction({ action: 'OFFER', say: '', offer: { good: 'torch', qty: 2, price: 4, remarks: 'ok' } })).toEqual({
+      action: 'OFFER',
+      terms: { kind: 'in_stock', good: 'torch', qty: 2, price: 4, remarks: 'ok' },
+    });
   });
 
   it('two verbs giving one field different shapes is a definition error, caught when the NPC is defined', () => {
     const clash: flat.FlatVerb = { ...flat.REFUSE, fields: { contract_id: { type: 'integer' } } };
-    expect(() => flat.flatSchema([flat.COUNTER_OFFER, clash])).toThrow(/field 'contract_id' has two shapes/);
-    expect(() => npc({ verbs: [verbs.SAY, verbs.COUNTER_OFFER, verbs.REFUSE], modelVerbs: [flat.COUNTER_OFFER, clash] })).toThrow(
+    const counter = flat.COUNTER_OFFER(smith.catalogue!);
+    expect(() => flat.flatSchema([counter, clash])).toThrow(/field 'contract_id' has two shapes/);
+    const verbsFor = [verbs.SAY, verbs.COUNTER_OFFER, verbs.REFUSE, verbs.START_WORK];
+    expect(() => npc({ verbs: verbsFor, modelVerbs: [counter, clash], catalogue: smith.catalogue })).toThrow(
       /field 'contract_id' has two shapes/,
     );
   });

@@ -26,6 +26,15 @@ export function defineNpc(spec: NpcSpec): NpcDefinition {
   const allowed = new Set<string>(spec.verbs.map((v) => v.verb));
   // Every turn voices its line, and both fallbacks, through SAY.
   if (!allowed.has('SAY')) throw new Error(`${spec.id}: an NPC must be allowed SAY`);
+  // A verb ships only with the state its rule checks: no offers without something to sell, no made-to-order
+  // catalogue without a way to start the work.
+  const sells = Boolean(spec.catalogue?.made_to_order || spec.catalogue?.in_stock);
+  for (const v of ['OFFER', 'COUNTER_OFFER']) {
+    if (allowed.has(v) && !sells) throw new Error(`${spec.id}: ${v} needs a catalogue with something to sell`);
+  }
+  if (spec.catalogue?.made_to_order && !allowed.has('START_WORK')) {
+    throw new Error(`${spec.id}: a made-to-order catalogue needs START_WORK, or accepted work never starts`);
+  }
   for (const v of spec.modelVerbs) {
     if (!allowed.has(v.verb)) throw new Error(`${spec.id}: model verb ${v.verb} isn't in its allowed verbs`);
   }

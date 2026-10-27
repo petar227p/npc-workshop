@@ -12,8 +12,14 @@ export function historyFor(npcId: string, name: string): (world: World, customer
     for (const e of world.events) {
       switch (e.type) {
         case 'SAID': {
-          // Only this NPC and this customer: another villager's line must not read as the customer's words.
-          const speaker = e.actor === npcId ? name : e.actor === customer ? 'Customer' : null;
+          // Only this NPC and this customer, to each other: another villager's line must not read as the customer's
+          // words, and what the customer said to another seller isn't this NPC's business. (No target: said to nobody in particular.)
+          const speaker =
+            e.actor === npcId && (e.target === customer || e.target === null)
+              ? name
+              : e.actor === customer && (e.target === npcId || e.target === null)
+                ? 'Customer'
+                : null;
           // JSON-quoted, so a customer's quotes and newlines can't forge ledger lines or the NPC's words.
           if (speaker) lines.push(`${speaker}: ${JSON.stringify(e.data.text)}`);
           break;
@@ -36,6 +42,9 @@ export function historyFor(npcId: string, name: string): (world: World, customer
           break;
         case 'ITEM_DELIVERED':
           if (e.target === customer && sold(e.data.contract_id)) lines.push(`[${e.data.item.item_name} (${e.data.contract_id}) was handed to the customer at hour ${e.tick}]`);
+          break;
+        case 'GOODS_DELIVERED':
+          if (e.target === customer && sold(e.data.contract_id)) lines.push(`[${e.data.qty} × ${e.data.good} (${e.data.contract_id}) handed to the customer]`);
           break;
       }
     }

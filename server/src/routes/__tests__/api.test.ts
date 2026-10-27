@@ -5,9 +5,10 @@ import { mockClient, mockImageClient, type ChatClient } from '../../models';
 import { clientIpReader, createApi, type ApiDeps } from '../api';
 
 const offer = JSON.stringify({
-  action: 'PROPOSE_CONTRACT',
+  action: 'OFFER',
   say: 'Here is what I can do.',
-  contract: {
+  offer: {
+    kind: 'made_to_order',
     item_name: 'Hammerhead Blade',
     item_type: 'sword',
     description: 'A broad blade shaped like a hammerhead shark',
@@ -18,7 +19,7 @@ const offer = JSON.stringify({
     ],
     price: 120,
     delivery_ticks: 8,
-    smith_remarks: 'Heavy at the head.',
+    remarks: 'Heavy at the head.',
   },
   contract_id: null,
 });
@@ -188,6 +189,42 @@ describe('api', () => {
 
     const skipped = (await b.send('/api/tick', { ticks: 8 })).json as ActionResponse;
     expect(skipped.view.items[0]).toMatchObject({ item_name: 'Hammerhead Blade', stats: { damage: 14, weight: 6, durability: 70 } });
+  });
+
+  it('two sellers in one world: each sale pays its own seller, and the shops show their own stock', async () => {
+    const torches = JSON.stringify({
+      action: 'OFFER',
+      say: 'Three torches, fresh pitch.',
+      offer: { kind: 'in_stock', good: 'torch', qty: 3, price: 9, remarks: 'An hour each.' },
+      contract_id: null,
+    });
+    const { app } = setup(() => mockClient([offer, torches]));
+    const b = browser(app);
+    await b.send('/api/say', { text: 'A hammerhead sword, please.' });
+    const asked = (await b.send('/api/say', { npc: 'merchant', text: 'Three torches.' })).json as ActionResponse;
+    expect(asked.view.contracts.map((c) => [c.contract_id, c.seller])).toEqual([
+      ['c_001', 'smith'],
+      ['c_002', 'merchant'],
+    ]);
+    const bought = (await b.send('/api/accept', { contract_id: 'c_002' })).json as ActionResponse;
+    expect(bought.events.map((e) => [e.type, e.location])).toEqual([
+      ['CONTRACT_ACCEPTED', 'market'],
+      ['GOODS_DELIVERED', 'market'],
+    ]);
+    expect(bought.view.gold).toBe(191);
+    expect(bought.view.goods).toEqual({ torch: 3 });
+    const forged = (await b.send('/api/accept', { contract_id: 'c_001' })).json as ActionResponse;
+    expect(forged.view.gold).toBe(71);
+    const shops = Object.fromEntries(forged.view.shops.map((x) => [x.id, x]));
+    expect(shops.merchant).toMatchObject({ name: 'Mira', stock: { torch: 7 } });
+    expect(shops.smith).toMatchObject({ name: 'Brann', stock: { iron: 9, sharkskin_leather: 1 } });
+    // Nobody else's gold moved: the ledger shows Brann +120 and Mira +9.
+    const accepted = forged.view.events.filter((e) => e.type === 'CONTRACT_ACCEPTED').map((e) => [e.target, e.data]);
+    expect(accepted).toEqual([
+      ['merchant', { contract_id: 'c_002', price: 9 }],
+      ['smith', { contract_id: 'c_001', price: 120 }],
+    ]);
+    expect((await b.send('/api/say', { npc: 'baron', text: 'Hello?' })).status).toBe(400);
   });
 
   it('sessions are isolated', async () => {

@@ -10,9 +10,10 @@ import { createApi, type ApiDeps } from '../api';
 
 const say = (text: string) => JSON.stringify({ action: 'SAY', say: text });
 const offer = JSON.stringify({
-  action: 'PROPOSE_CONTRACT',
+  action: 'OFFER',
   say: 'Here is what I can do.',
-  contract: {
+  offer: {
+    kind: 'made_to_order',
     item_name: 'Hammerhead Blade',
     item_type: 'sword',
     description: 'A broad blade',
@@ -20,7 +21,7 @@ const offer = JSON.stringify({
     materials: [{ material: 'iron', qty: 3 }],
     price: 120,
     delivery_ticks: 8,
-    smith_remarks: 'Heavy at the head.',
+    remarks: 'Heavy at the head.',
   },
   contract_id: null,
 });
@@ -33,6 +34,9 @@ const miller: NpcDraft = {
   model_verbs: ['SAY'],
   facts: ['clock'],
   perception_radius: 3,
+  location: 'mill',
+  start: { gold: 5, stock: {} },
+  catalogue: {},
   cue: 'Reply to the customer.',
   fallbacks: { rejected: 'Eh?', unavailable: 'The wheel is loud. Later.' },
 };
@@ -68,14 +72,14 @@ describe('NPC editor api', () => {
     const r = await setup().send<EditorLibrary>('/api/editor/library');
     expect(r.json.can_save).toBe(false);
     const brann = r.json.npcs.find((n) => n.id === 'smith');
-    expect(brann).toMatchObject({ name: 'Brann', model_verbs: ['SAY', 'PROPOSE_CONTRACT', 'COUNTER_OFFER', 'REFUSE'] });
+    expect(brann).toMatchObject({ name: 'Brann', model_verbs: ['SAY', 'OFFER', 'COUNTER_OFFER', 'REFUSE'] });
     expect(brann?.persona).toMatch(/You voice Brann/);
   });
 
   it('preview returns the generated schema and the facts, or every problem with the draft', async () => {
     const { send } = setup();
     const ok = await send<PreviewResponse>('/api/editor/preview', { npc: miller });
-    expect(ok.json).toMatchObject({ ok: true, facts: 'Hour 0. Jobs on your bench: 0.' });
+    expect(ok.json).toMatchObject({ ok: true, facts: 'Hour 0. Jobs in hand: 0.' });
     expect(ok.json.ok && ok.json.schema).toMatchObject({ required: ['action', 'say'] });
 
     const bad = await send<PreviewResponse>('/api/editor/preview', {
@@ -109,22 +113,25 @@ describe('NPC editor api', () => {
     const { send } = setup([offer, offer]);
     const r = await send<BenchResponse>('/api/editor/bench/say', { npc: miller, text: 'Forge me a sword.' });
     expect(r.json.outcome).toBe('fallback');
-    expect(r.json.attempts.map((a) => a.reason)).toEqual(['miller may not use PROPOSE_CONTRACT', 'miller may not use PROPOSE_CONTRACT']);
+    expect(r.json.attempts.map((a) => a.reason)).toEqual(['miller may not use OFFER', 'miller may not use OFFER']);
     expect(r.json.view.contracts).toEqual([]);
     expect(r.json.events.at(-1)).toMatchObject({ type: 'SAID', actor: 'miller', data: { text: 'Eh?' } });
   });
 
   it('a draft that may offer contracts gets them checked by the same rules, under its own name', async () => {
     const { send } = setup([offer]);
-    const trader = { ...miller, verbs: ['SAY', 'PROPOSE_CONTRACT'], model_verbs: ['SAY', 'PROPOSE_CONTRACT'] };
+    const { catalogue, start } = readDraft('smith');
+    const trader = { ...miller, verbs: ['SAY', 'OFFER', 'START_WORK'], model_verbs: ['SAY', 'OFFER'], catalogue, start };
     const r = await send<BenchResponse>('/api/editor/bench/say', { npc: trader, text: 'A sword.' });
-    expect(r.json.view.contracts).toEqual([expect.objectContaining({ contract_id: 'c_001', price: 120, status: 'proposed' })]);
-    expect(r.json.events.find((e) => e.type === 'CONTRACT_PROPOSED')?.actor).toBe('miller');
+    expect(r.json.view.contracts).toEqual([expect.objectContaining({ contract_id: 'c_001', price: 120, status: 'proposed', seller: 'miller' })]);
+    expect(r.json.events.find((e) => e.type === 'CONTRACT_PROPOSED')).toMatchObject({ actor: 'miller', location: 'mill' });
+    // The bench world gives the draft its own starting stock, shown under its name.
+    expect(r.json.view.shops).toEqual([{ id: 'miller', name: 'Odda', stock: start.stock }]);
   });
 
   it('a broken draft runs nothing, and reset clears the bench', async () => {
     const { send, client } = setup([say('Hello.')]);
-    const broken = await send<BenchResponse>('/api/editor/bench/say', { npc: { ...miller, verbs: ['PROPOSE_CONTRACT'] }, text: 'Hi' });
+    const broken = await send<BenchResponse>('/api/editor/bench/say', { npc: { ...miller, verbs: ['REFUSE'] }, text: 'Hi' });
     expect(broken.json.ok).toBe(false);
     expect(broken.json.errors).toEqual(['miller: an NPC must be allowed SAY']);
     expect(client.requests).toHaveLength(0);

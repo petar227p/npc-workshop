@@ -1,5 +1,5 @@
 import type { EngineEvent } from '@blacksmith/shared';
-import { createWorld, type World } from './state';
+import type { World } from './state';
 
 export type { EngineEvent, EventType } from '@blacksmith/shared';
 
@@ -23,6 +23,7 @@ export function apply(world: World, event: EngineEvent): World {
         status: 'proposed',
         customer,
         seller: event.actor,
+        location: event.location,
         replaces,
         proposed_tick: event.tick,
         due_tick: null,
@@ -35,8 +36,8 @@ export function apply(world: World, event: EngineEvent): World {
     case 'CONTRACT_ACCEPTED': {
       const c = w.contracts[event.data.contract_id];
       c.status = 'accepted';
-      w.gold[c.customer] -= event.data.price;
-      w.gold.smith = (w.gold.smith ?? 0) + event.data.price;
+      w.gold[c.customer] = (w.gold[c.customer] ?? 0) - event.data.price;
+      w.gold[c.seller] = (w.gold[c.seller] ?? 0) + event.data.price;
       break;
     }
     case 'WORK_STARTED': {
@@ -48,8 +49,21 @@ export function apply(world: World, event: EngineEvent): World {
     case 'ITEM_DELIVERED': {
       const c = w.contracts[event.data.contract_id];
       c.status = 'delivered';
-      for (const [m, n] of Object.entries(c.materials_used)) w.materials[m] -= n;
+      if (c.kind === 'made_to_order') {
+        const stock = (w.stock[c.seller] ??= {});
+        for (const [m, n] of Object.entries(c.materials_used)) stock[m] -= n;
+      }
       w.items.push(event.data.item);
+      break;
+    }
+    case 'GOODS_DELIVERED': {
+      const c = w.contracts[event.data.contract_id];
+      const { good, qty } = event.data;
+      c.status = 'delivered';
+      const from = (w.stock[c.seller] ??= {});
+      const to = (w.stock[c.customer] ??= {});
+      from[good] -= qty;
+      to[good] = (to[good] ?? 0) + qty;
       break;
     }
     case 'SAID':
@@ -72,6 +86,7 @@ export function commit(world: World, drafts: EventDraft[]): { world: World; even
   return { world: w, events };
 }
 
-export function replay(events: EngineEvent[], seed: World = createWorld()): World {
+// `seed` is the world the log started from (createWorld with the same actors).
+export function replay(events: EngineEvent[], seed: World): World {
   return events.reduce(apply, seed);
 }
