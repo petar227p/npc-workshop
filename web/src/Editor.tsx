@@ -356,6 +356,17 @@ function Triggers({ triggers, onChange }: { triggers: Trigger[]; onChange: (t: T
   const timer = triggers.find((t): t is Extract<Trigger, { kind: 'every_hours' }> => t.kind === 'every_hours');
   // Always in the same order (spoken to, then the timer), so saved files don't churn.
   const emit = (s: boolean, t: typeof timer) => onChange([...(s ? [{ kind: 'on_spoken_to' } as const] : []), ...(t ? [t] : [])]);
+  // Unticking the timer keeps its hours and cue here, so ticking it again brings them back.
+  const lastTimer = useRef(timer ?? DEFAULT_TIMER);
+  if (timer) lastTimer.current = timer;
+  // The hours as typed: a box being edited may be empty or out of range; only a usable number reaches the draft,
+  // and leaving the box shows the draft's value again.
+  const [hoursText, setHoursText] = useState<string | null>(null);
+  const typeHours = (text: string) => {
+    setHoursText(text);
+    const n = Number(text);
+    if (timer && Number.isInteger(n) && n >= 1 && n <= MAX_TRIGGER_HOURS) emit(spoken, { ...timer, hours: n });
+  };
   return (
     <div className="facts">
       <label className="check">
@@ -365,7 +376,7 @@ function Triggers({ triggers, onChange }: { triggers: Trigger[]; onChange: (t: T
         </span>
       </label>
       <label className="check">
-        <input type="checkbox" checked={timer !== undefined} onChange={(e) => emit(spoken, e.target.checked ? DEFAULT_TIMER : undefined)} />
+        <input type="checkbox" checked={timer !== undefined} onChange={(e) => emit(spoken, e.target.checked ? lastTimer.current : undefined)} />
         <span>
           <b>{TRIGGER_INFO.every_hours.label}</b> <span className="muted">{TRIGGER_INFO.every_hours.description}</span>
         </span>
@@ -377,13 +388,19 @@ function Triggers({ triggers, onChange }: { triggers: Trigger[]; onChange: (t: T
               type="number"
               min={1}
               max={MAX_TRIGGER_HOURS}
-              value={timer.hours}
-              onChange={(e) => emit(spoken, { ...timer, hours: Number.parseInt(e.target.value || '0', 10) })}
+              value={hoursText ?? timer.hours}
+              onChange={(e) => typeHours(e.target.value)}
+              onBlur={() => setHoursText(null)}
             />
           </Field>
           <Field label="Cue on the timer" hint="what it should do, unasked">
             <input value={timer.cue} maxLength={300} onChange={(e) => emit(spoken, { ...timer, cue: e.target.value })} />
           </Field>
+        </div>
+      )}
+      {!spoken && !timer && (
+        <div className="note bad" role="alert">
+          With neither ticked it never acts: it hears what is said to it and stays silent.
         </div>
       )}
     </div>

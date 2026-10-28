@@ -95,7 +95,8 @@ export const EMOTE: FlatVerb = {
   toAction: (out) => ({ action: 'EMOTE', text: typeof out.emote === 'string' ? out.emote.slice(0, MAX_EMOTE_LENGTH) : '' }),
 };
 
-// One shape per kind of gift; goods are an enum of what it may hold. `give_to` null means whoever it's talking to.
+// One shape per kind of gift; goods are an enum of what it may hold. A gift goes to whoever it's talking to: the model
+// is never told anyone's id (the history says "Customer"), so a recipient field would only invite names the ledger refuses.
 export function GIVE(goods: readonly string[]): FlatVerb {
   const shapes = [
     object({ kind: { type: 'string', enum: ['gold'] }, amount: int }),
@@ -104,8 +105,8 @@ export function GIVE(goods: readonly string[]): FlatVerb {
   ];
   return {
     verb: 'GIVE',
-    fields: { gift: { anyOf: shapes }, give_to: str },
-    toAction: (out) => ({ action: 'GIVE', to: out.give_to ?? null, gift: out.gift }),
+    fields: { gift: { anyOf: shapes } },
+    toAction: (out) => ({ action: 'GIVE', to: null, gift: out.gift }),
   };
 }
 

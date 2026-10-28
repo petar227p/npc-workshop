@@ -301,11 +301,13 @@ describe('NPC editor api', () => {
       facts: ['inventory'],
       start: { gold: 5, stock: { flour: 2 } },
     };
-    const gift = JSON.stringify({ action: 'GIVE', say: 'Take it, friend.', gift: { kind: 'good', good: 'flour', qty: 1 }, give_to: null, emote: null });
-    const { send } = setup([gift, JSON.stringify({ action: 'EMOTE', say: '', emote: 'shrugs', gift: null, give_to: null })]);
+    const gift = JSON.stringify({ action: 'GIVE', say: 'Take it, friend.', gift: { kind: 'good', good: 'flour', qty: 1 }, emote: null });
+    const { send } = setup([gift, JSON.stringify({ action: 'EMOTE', say: '', emote: 'shrugs', gift: null })]);
     const preview = await send<PreviewResponse>('/api/editor/preview', { npc: beggar });
     expect(preview.json.ok && preview.json.facts).toBe('Your purse: 5 gold.\nYou have (not promised to a job): flour 2.');
     expect(JSON.stringify(preview.json.ok && preview.json.schema)).toContain('"enum":["flour"]');
+    // No recipient to fill in: the model doesn't know anyone's id, so a gift always goes to whoever it's talking to.
+    expect(Object.keys((preview.json.ok && preview.json.schema.properties) as object)).not.toContain('give_to');
 
     const r = await send<BenchResponse>('/api/editor/bench/say', { npc: beggar, text: 'Spare some flour?' });
     expect(r.json.events.map((e) => e.type)).toEqual(['SAID', 'GIVEN', 'SAID']);
