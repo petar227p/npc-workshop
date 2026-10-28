@@ -77,7 +77,7 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
     const { act } = createEngine([player, built.npc]);
     const said = act(s.bench ?? benchWorld(built.npc), 'player', { action: 'SAY', text: parsed.data.text }, { to: built.npc.id });
     s.bench = said.world;
-    s.busy = 'bench';
+    s.busy = { by: 'bench' };
     try {
       const turn = await npcTurn(built.npc, said.world, model, { act });
       s.bench = turn.world;

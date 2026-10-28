@@ -116,8 +116,13 @@ function Entry({ event: e, view, disabled, onAccept }: { event: EngineEvent; vie
     case 'WORK_STARTED':
       return <div className="note">The hammer rings. Ready at {clockText(e.data.due_tick)}.</div>;
     case 'ITEM_DELIVERED': {
-      const seller = view.contracts.find((c) => c.contract_id === e.data.contract_id)?.seller ?? 'smith';
-      return <div className="note ok">{nameOf(view, seller)} hands you the {e.data.item.item_name}.</div>;
+      // The clock delivers, so the giver is the contract's seller; without the contract, name nobody rather than guess.
+      const seller = view.contracts.find((c) => c.contract_id === e.data.contract_id)?.seller;
+      return (
+        <div className="note ok">
+          {seller ? `${nameOf(view, seller)} hands you` : 'You receive'} the {e.data.item.item_name}.
+        </div>
+      );
     }
     case 'GOODS_DELIVERED':
       return (

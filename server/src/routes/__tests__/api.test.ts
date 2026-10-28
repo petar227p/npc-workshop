@@ -157,6 +157,9 @@ describe('api', () => {
     expect(logged).toHaveBeenCalledWith(expect.stringMatching(/MODEL_API_KEY is not set/));
     const after = (await b.send('/api/state')).json as StateView;
     expect(after).toMatchObject({ busy: false, events: [] });
+    // The message names whoever the player was talking to, at their own place.
+    const mira = await b.send('/api/say', { text: 'Torches?', npc: 'merchant' });
+    expect(mira).toMatchObject({ status: 503, json: { error: "Mira isn't at the market right now. Try again later." } });
     logged.mockRestore();
   });
 
@@ -271,12 +274,33 @@ describe('api', () => {
 
     expect(((await b.send('/api/state')).json as StateView).busy).toBe(true);
     expect((await b.send('/api/tick', { ticks: 1 })).status).toBe(409);
-    expect((await b.send('/api/say', { text: 'hello?' })).status).toBe(409);
+    expect((await b.send('/api/say', { text: 'hello?' })).json).toEqual({ error: 'Brann is still answering.' });
     expect((await b.send('/api/reset', {})).status).toBe(409);
 
     release();
     expect(((await turn).json as ActionResponse).outcome).toBe('acted');
     expect(((await b.send('/api/state')).json as StateView).busy).toBe(false);
+  });
+
+  it('the lock names the NPC who is answering', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const reply = JSON.stringify({ action: 'SAY', say: 'Torches, yes.', offer: null, contract_id: null });
+    const slow: ChatClient = {
+      provider: 'mock',
+      async chat(req) {
+        await gate;
+        return { model: req.model, content: reply, reasoning: null, finish_reason: 'stop', usage: null, latency_ms: 0 };
+      },
+    };
+    const { app } = setup(() => slow);
+    const b = browser(app);
+    await b.send('/api/reset', {});
+    const turn = b.send('/api/say', { text: 'Torches?', npc: 'merchant' });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(await b.send('/api/tick', { ticks: 1 })).toMatchObject({ status: 409, json: { error: 'Mira is still answering.' } });
+    release();
+    expect(((await turn).json as ActionResponse).outcome).toBe('acted');
   });
 
   it('reset starts a fresh world', async () => {

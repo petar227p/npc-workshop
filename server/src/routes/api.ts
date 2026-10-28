@@ -6,6 +6,7 @@ import { getCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
 import type { NpcModel } from '../agents/npc';
 import { artView, createStudio, type StudioLimits } from '../art';
+import { placeOf } from '../engine';
 import { playerAccepts, playerSays, skipTime } from '../game';
 import type { ImageClient } from '../models/image';
 import { NAMES, NPC_FILES, NPCS, newVillage, smith as brann, type NpcFiles } from '../npcs';
@@ -17,7 +18,6 @@ const MAX_SKIP = 48;
 const MAX_BODY_BYTES = 16 * 1024; // the largest real body is a 500-character line
 // An editor draft: a 6000-character persona is up to 36 KB of JSON if every character is escaped (\u0001), plus the short fields.
 const MAX_EDITOR_BODY_BYTES = 64 * 1024;
-const SMITH_UNAVAILABLE = "Brann isn't at the forge right now. Try again later.";
 const ART_FILE = /^([0-9a-f-]{36})\.png$/;
 
 const SayBody = z.object({ text: z.string().max(MAX_SAY_LENGTH), npc: z.string().optional() }); // npc: who the player talks to; Brann by default
@@ -130,9 +130,9 @@ export function createApi(deps: ApiDeps) {
     if (s.busy) return busy(c);
 
     const smith = modelFor(s);
-    if (!smith) return c.json({ error: SMITH_UNAVAILABLE }, 503);
+    if (!smith) return c.json({ error: `${npc.name} isn't at the ${placeOf(npc)} right now. Try again later.` }, 503);
 
-    s.busy = 'forge';
+    s.busy = { by: 'npc', name: npc.name };
     try {
       const r = await playerSays(s.world, parsed.data.text, smith, npc);
       s.world = r.world;
