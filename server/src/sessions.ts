@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { ContractView, StateView } from '@blacksmith/shared';
+import type { ContractView, ModelChoice, StateView } from '@blacksmith/shared';
 import type { NpcModel } from './agents/npc';
 import { artView, type Gallery } from './art';
 import { availableStock, type World } from './engine';
@@ -19,7 +19,7 @@ export type Session = {
   bench: World | null;
   busy: Busy;
   benchTurns: number;
-  smith: NpcModel | null;
+  models: Partial<Record<ModelChoice, NpcModel>>; // made on first use, one per model choice
   art: Gallery;
   artRenders: number;
   artist: ImageClient | null;
@@ -36,7 +36,7 @@ const newSession = (id: string, lastSeen: number): Session => ({
   bench: null,
   busy: null,
   benchTurns: 0,
-  smith: null,
+  models: {},
   art: new Map(),
   artRenders: 0,
   artist: null,

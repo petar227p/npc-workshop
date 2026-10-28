@@ -54,7 +54,7 @@ function browser(app: ReturnType<typeof createApi>, headers: Record<string, stri
 function setup(clientFor: () => ChatClient = () => mockClient([offer]), deps: Partial<ApiDeps> = {}) {
   const made: string[] = [];
   const app = createApi({
-    makeSmith: (id) => {
+    makeModel: (id) => {
       made.push(id);
       return { client: clientFor(), model: 'test' };
     },
@@ -146,7 +146,7 @@ describe('api', () => {
   it('a server without a model key answers 503 with a plain message and changes nothing', async () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     const { app } = setup(undefined, {
-      makeSmith: () => {
+      makeModel: () => {
         throw new Error('MODEL_API_KEY is not set (see .env.example)');
       },
     });

@@ -34,6 +34,7 @@ const miller: NpcDraft = {
   model_verbs: ['SAY'],
   facts: ['clock'],
   perception_radius: 3,
+  model: 'muse_spark_open',
   location: 'mill',
   start: { gold: 5, stock: {} },
   catalogue: {},
@@ -42,7 +43,14 @@ const miller: NpcDraft = {
 };
 
 function setup(replies: string[] = [], deps: Partial<ApiDeps> = {}, client: ChatClient = mockClient(replies)) {
-  const app = createApi({ makeSmith: () => ({ client, model: 'test' }), ...deps });
+  const choices: string[] = []; // which model each new client was made for
+  const app = createApi({
+    makeModel: (_id, choice) => {
+      choices.push(choice);
+      return { client, model: `test-${choice}` };
+    },
+    ...deps,
+  });
   // Each browser keeps its own cookie, so one app can serve several visitors.
   const browser = () => {
     let cookie = '';
@@ -57,7 +65,7 @@ function setup(replies: string[] = [], deps: Partial<ApiDeps> = {}, client: Chat
       return { status: res.status, json: (await res.json()) as T };
     };
   };
-  return { send: browser(), browser, client: client as ChatClient & { requests: ChatRequest[] } };
+  return { send: browser(), browser, choices, client: client as ChatClient & { requests: ChatRequest[] } };
 }
 
 // An empty npcs/ + prompts/ pair in a temp folder, so save tests never touch the repo.
@@ -109,7 +117,19 @@ describe('NPC editor api', () => {
     expect(village.json.events).toEqual([]);
   });
 
-  it("a draft's model can't use a verb the draft doesn't allow; the ledger rejects it and the fallback is said", async () => {
+  it('the bench voices a draft with the model it picked, one client per model per visit', async () => {
+    const { send, client, choices } = setup([say('Flour.'), say('Steel.'), say('More flour.')]);
+    await send('/api/editor/bench/say', { npc: miller, text: 'Hi' });
+    await send('/api/editor/bench/reset', {});
+    await send('/api/editor/bench/say', { npc: { ...miller, model: 'muse_spark' }, text: 'Hi' });
+    await send('/api/editor/bench/say', { npc: miller, text: 'Hi again' });
+    expect(choices).toEqual(['muse_spark_open', 'muse_spark']);
+    expect(client.requests.map((r) => r.model)).toEqual(['test-muse_spark_open', 'test-muse_spark', 'test-muse_spark_open']);
+    const bad = await send<PreviewResponse>('/api/editor/preview', { npc: { ...miller, model: 'gpt' } });
+    expect(bad.json.ok).toBe(false);
+  });
+
+    it("a draft's model can't use a verb the draft doesn't allow; the ledger rejects it and the fallback is said", async () => {
     const { send } = setup([offer, offer]);
     const r = await send<BenchResponse>('/api/editor/bench/say', { npc: miller, text: 'Forge me a sword.' });
     expect(r.json.outcome).toBe('fallback');

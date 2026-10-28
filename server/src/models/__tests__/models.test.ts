@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { REPO_ROOT } from '../../config/env';
-import { createClient, createModels, mockClient, readLog, replayClient, withRecorder, type ChatRequest } from '../index';
+import { createClient, createModel, createModels, mockClient, readLog, replayClient, withRecorder, type ChatRequest } from '../index';
 
 const req: ChatRequest = {
   model: 'm',
@@ -113,6 +113,22 @@ describe('createModels', () => {
     await expect(createModels(session).smith.client.chat(req)).rejects.toThrow(/meta request failed: ECONNRESET/);
     expect(f.calls).toHaveLength(2);
     expect(timeout.mock.calls.map(([ms]) => ms)).toEqual([20_000, 20_000]);
+  });
+
+  it('each model choice needs only its own key, and a Spark Open NPC gets the same turn limits', async () => {
+    vi.stubEnv('MODEL_API_KEY', 'k');
+    vi.stubEnv('BASETEN_API_KEY', '');
+    vi.stubEnv('REPLAY', '');
+    expect(createModel(session, 'muse_spark').model).toBeTruthy();
+    expect(() => createModel(session, 'muse_spark_open')).toThrow(/BASETEN_API_KEY is not set/);
+
+    vi.stubEnv('MODEL_API_KEY', '');
+    vi.stubEnv('BASETEN_API_KEY', 'k');
+    expect(() => createModel(session, 'muse_spark')).toThrow(/MODEL_API_KEY is not set/);
+    const f = fakeFetch([new Error('ECONNRESET'), new Error('ECONNRESET'), new Error('ECONNRESET')]);
+    vi.stubGlobal('fetch', f.fn);
+    await expect(createModel(session, 'muse_spark_open').client.chat(req)).rejects.toThrow(/baseten request failed: ECONNRESET/);
+    expect(f.calls).toHaveLength(2);
   });
 });
 

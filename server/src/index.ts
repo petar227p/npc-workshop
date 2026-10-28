@@ -1,12 +1,12 @@
 import { serve } from '@hono/node-server';
 import { loadEnv } from './config/env';
-import { createArtist, createModels } from './models';
+import { createArtist, createModel } from './models';
 import { clientIpReader, createApi } from './routes/api';
 
 const env = loadEnv();
 // Model clients are made on a session's first message, so the server starts even without keys.
 const app = createApi({
-  makeSmith: (sessionId) => createModels(sessionId).smith,
+  makeModel: (sessionId, choice) => createModel(sessionId, choice),
   makeArtist: () => createArtist(),
   clientIp: clientIpReader(env.TRUST_PROXY_HEADER),
   secureCookie: env.NODE_ENV === 'production',

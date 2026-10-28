@@ -32,6 +32,15 @@ export const FACT_INFO: Record<FactBlock, { label: string; description: string }
   open_offers: { label: 'Open offers', description: 'Its offers to this customer that are still open.' },
 };
 
+// Which model voices an NPC. The server maps each to a provider and model id from its env.
+export const MODEL_CHOICES = ['muse_spark', 'muse_spark_open'] as const;
+export type ModelChoice = (typeof MODEL_CHOICES)[number];
+
+export const MODEL_INFO: Record<ModelChoice, { label: string; description: string }> = {
+  muse_spark: { label: 'Muse Spark', description: 'Meta Model API. The strongest; for sellers who haggle over real money.' },
+  muse_spark_open: { label: 'Muse Spark Open', description: 'Open weights on Baseten. Cheaper per line; for villagers, gossip and chatter.' },
+};
+
 export const MAX_PERSONA_LENGTH = 6000;
 export const NPC_ID_PATTERN = '^[a-z][a-z0-9_]{0,40}$';
 export const RESERVED_IDS = ['player'] as const; // actor ids an NPC can't take
@@ -45,6 +54,7 @@ export type NpcDraft = {
   model_verbs: ModelVerb[];
   facts: FactBlock[];
   perception_radius: number;
+  model: ModelChoice;
   location: string; // the place its events happen at (forge, market…)
   start: Start; // its purse and stock in a new world
   catalogue: Catalogue; // what it sells; empty for an NPC that only talks

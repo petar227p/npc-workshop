@@ -1,4 +1,4 @@
-import { MAX_SAY_LENGTH, type BenchResponse, type EditorLibrary, type PreviewResponse, type SaveResponse } from '@blacksmith/shared';
+import { MAX_SAY_LENGTH, MODEL_INFO, type ModelChoice, type BenchResponse, type EditorLibrary, type PreviewResponse, type SaveResponse } from '@blacksmith/shared';
 import type { Context, Hono } from 'hono';
 import { z } from 'zod';
 import { npcTurn, type NpcModel } from '../agents/npc';
@@ -21,7 +21,7 @@ const BenchSayBody = z.object({ npc: z.unknown(), text: z.string().trim().min(1)
 export type BenchLimits = { perSession?: number; perMinute?: number; now?: () => number };
 const MAX_ATTEMPT_CHARS = 3000;
 
-type Deps = { modelFor: (s: Session) => NpcModel | null; canSave: boolean; files: NpcFiles; limits?: BenchLimits };
+type Deps = { modelFor: (s: Session, choice: ModelChoice) => NpcModel | null; canSave: boolean; files: NpcFiles; limits?: BenchLimits };
 
 // Saving writes into the repo, so only the editor page itself may ask: a JSON body forces a CORS preflight that
 // this server never answers, and browsers mark a request from another site. (Non-browser clients send neither.)
@@ -69,8 +69,8 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
     recent = recent.filter((at) => t - at < 60_000);
     if (recent.length >= perMinute) return c.json({ error: 'The workshop is busy right now. Try again in a minute.' }, 429);
 
-    const model = deps.modelFor(s);
-    if (!model) return c.json({ error: "The model isn't available right now. Try again later." }, 503);
+    const model = deps.modelFor(s, built.npc.model);
+    if (!model) return c.json({ error: `${MODEL_INFO[built.npc.model].label} isn't available right now. Try again later.` }, 503);
 
     recent.push(t);
     s.benchTurns += 1;

@@ -1,4 +1,4 @@
-import { MAX_SAY_LENGTH, type ActionResponse, type ArtResponse } from '@blacksmith/shared';
+import { MAX_SAY_LENGTH, type ActionResponse, type ArtResponse, type ModelChoice } from '@blacksmith/shared';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
@@ -27,7 +27,7 @@ const TickBody = z.object({ ticks: z.number().int().min(1).max(MAX_SKIP) });
 export type Env = { Variables: { session: Session } };
 
 export type ApiDeps = {
-  makeSmith: (sessionId: string) => NpcModel;
+  makeModel: (sessionId: string, choice: ModelChoice) => NpcModel; // the client for an NPC's model choice
   makeArtist?: (sessionId: string) => ImageClient; // Muse Image; without it items keep the placeholder picture
   art?: StudioLimits;
   sessions?: SessionLimits;
@@ -80,18 +80,18 @@ export function createApi(deps: ApiDeps) {
     return c.json({ ...r, view: toView(s.world, s.busy !== null, s.art, NAMES) } satisfies ActionResponse);
   };
   // A missing key or bad config is the server's problem: say so plainly, log the cause, change nothing.
-  const modelFor = (s: Session): NpcModel | null => {
-    if (!s.smith) {
+  const modelFor = (s: Session, choice: ModelChoice): NpcModel | null => {
+    if (!s.models[choice]) {
       try {
-        s.smith = deps.makeSmith(s.id);
+        s.models[choice] = deps.makeModel(s.id, choice);
       } catch (err) {
-        console.error(`smith unavailable: ${(err as Error).message}`);
+        console.error(`${choice} unavailable: ${(err as Error).message}`);
         return null;
       }
     }
-    return s.smith;
+    return s.models[choice] ?? null;
   };
-  // Same as the smith: a missing key only costs the pictures.
+  // Same as an NPC's model: a missing key only costs the pictures.
   const artistFor = (s: Session): ImageClient | null => {
     if (!s.artist && deps.makeArtist) {
       try {
@@ -129,12 +129,12 @@ export function createApi(deps: ApiDeps) {
     if (!npc) return c.json({ error: `there's nobody called '${parsed.data.npc}' in the village` }, 400);
     if (s.busy) return busy(c);
 
-    const smith = modelFor(s);
-    if (!smith) return c.json({ error: `${npc.name} isn't at the ${placeOf(npc).replace(/_/g, ' ')} right now. Try again later.` }, 503);
+    const model = modelFor(s, npc.model);
+    if (!model) return c.json({ error: `${npc.name} isn't at the ${placeOf(npc).replace(/_/g, ' ')} right now. Try again later.` }, 503);
 
     s.busy = { by: 'npc', name: npc.name };
     try {
-      const r = await playerSays(s.world, parsed.data.text, smith, npc);
+      const r = await playerSays(s.world, parsed.data.text, model, npc);
       s.world = r.world;
       if ('attempts' in r) return respond(c, { ok: true, reason: null, outcome: r.outcome, events: r.events });
       return respond(c, { ok: r.ok, reason: r.reason, outcome: null, events: r.events });
