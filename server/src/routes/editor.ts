@@ -1,8 +1,9 @@
-import { MAX_SAY_LENGTH, MODEL_INFO, type ModelChoice, type BenchResponse, type EditorLibrary, type PreviewResponse, type SaveResponse } from '@blacksmith/shared';
+import { MAX_SAY_LENGTH, MAX_TRIGGER_HOURS, MODEL_INFO, type ModelChoice, type BenchResponse, type EditorLibrary, type PreviewResponse, type SaveResponse } from '@blacksmith/shared';
 import type { Context, Hono } from 'hono';
 import { z } from 'zod';
-import { npcTurn, type NpcModel } from '../agents/npc';
-import { createEngine, createWorld, type World } from '../engine';
+import { npcTurn, type Attempt, type NpcModel } from '../agents/npc';
+import { createEngine, createWorld, timedTrigger, type World } from '../engine';
+import { answers, passTime } from '../game';
 import { buildNpc, player, type NpcDefinition, type NpcFiles } from '../npcs';
 import { busyMessage, toView, type Session } from '../sessions';
 import type { Env } from './api';
@@ -14,6 +15,7 @@ import type { Env } from './api';
 const DraftBody = z.object({ npc: z.unknown() });
 const SaveBody = z.object({ npc: z.unknown(), overwrite: z.boolean().optional() });
 const BenchSayBody = z.object({ npc: z.unknown(), text: z.string().trim().min(1).max(MAX_SAY_LENGTH) });
+const BenchTickBody = z.object({ npc: z.unknown(), ticks: z.number().int().min(1).max(MAX_TRIGGER_HOURS) });
 
 // A bench persona is the visitor's own, so on the public site the bench could otherwise be used as a free
 // general-purpose model. Turns are capped per session and per minute across everyone, and the raw model
@@ -40,6 +42,26 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
   const benchView = (s: Session, npc: NpcDefinition | null = null) =>
     toView(s.bench ?? benchWorld(npc), s.busy !== null, undefined, npc ? { [npc.id]: npc.name } : {});
   const busy = (c: Context<Env>) => c.json({ error: busyMessage(c.get('session')) }, 409);
+  const clip = (content: string) => (content.length > MAX_ATTEMPT_CHARS ? `${content.slice(0, MAX_ATTEMPT_CHARS)}… (clipped)` : content);
+  const shown = (attempts: Attempt[]) => attempts.map(({ content, ok, reason, latency_ms }) => ({ content: clip(content), ok, reason, latency_ms }));
+
+  // A bench turn calls the model, so it counts against this visit's quota and everyone's per-minute one.
+  // Gives the model to use, or the refusal to send.
+  const claimTurn = (c: Context<Env>, npc: NpcDefinition): NpcModel | Response => {
+    const s = c.get('session');
+    if (s.benchTurns >= perSession) {
+      return c.json({ error: `That's all ${perSession} test turns for this visit. The forge is still open.` }, 429);
+    }
+    const t = now();
+    recent = recent.filter((at) => t - at < 60_000);
+    if (recent.length >= perMinute) return c.json({ error: 'The workshop is busy right now. Try again in a minute.' }, 429);
+
+    const model = deps.modelFor(s, npc.model);
+    if (!model) return c.json({ error: `${MODEL_INFO[npc.model].label} isn't available right now. Try again later.` }, 503);
+    recent.push(t);
+    s.benchTurns += 1;
+    return model;
+  };
 
   app.get('/api/editor/library', (c) => c.json({ npcs: deps.files.list(), can_save: deps.canSave } satisfies EditorLibrary));
 
@@ -62,32 +84,61 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
     const empty = { outcome: null, attempts: [], events: [] };
     if (!built.ok) return c.json({ ok: false, errors: built.errors, ...empty, view: benchView(s) } satisfies BenchResponse);
 
-    if (s.benchTurns >= perSession) {
-      return c.json({ error: `That's all ${perSession} test turns for this visit. The forge is still open.` }, 429);
-    }
-    const t = now();
-    recent = recent.filter((at) => t - at < 60_000);
-    if (recent.length >= perMinute) return c.json({ error: 'The workshop is busy right now. Try again in a minute.' }, 429);
-
-    const model = deps.modelFor(s, built.npc.model);
-    if (!model) return c.json({ error: `${MODEL_INFO[built.npc.model].label} isn't available right now. Try again later.` }, 503);
-
-    recent.push(t);
-    s.benchTurns += 1;
     const { act } = createEngine([player, built.npc]);
     const said = act(s.bench ?? benchWorld(built.npc), 'player', { action: 'SAY', text: parsed.data.text }, { to: built.npc.id });
+    // Without on_spoken_to the draft hears the line and stays quiet, as it would in the village: no model call.
+    if (!answers(built.npc)) {
+      s.bench = said.world;
+      return c.json({ ok: true, errors: [], outcome: null, attempts: [], events: said.events, view: benchView(s, built.npc) } satisfies BenchResponse);
+    }
+    const model = claimTurn(c, built.npc);
+    if (model instanceof Response) return model;
     s.bench = said.world;
     s.busy = { by: 'bench' };
     try {
       const turn = await npcTurn(built.npc, said.world, model, { act });
       s.bench = turn.world;
-      const clip = (content: string) => (content.length > MAX_ATTEMPT_CHARS ? `${content.slice(0, MAX_ATTEMPT_CHARS)}… (clipped)` : content);
       return c.json({
         ok: true,
         errors: [],
         outcome: turn.outcome,
-        attempts: turn.attempts.map(({ content, ok, reason, latency_ms }) => ({ content: clip(content), ok, reason, latency_ms })),
+        attempts: shown(turn.attempts),
         events: [...said.events, ...turn.events],
+        view: benchView(s, built.npc),
+      } satisfies BenchResponse);
+    } finally {
+      s.busy = null;
+    }
+  });
+
+  // Moves the bench clock, so a draft on a timer can be seen acting on its own. A model call only if its timer comes round.
+  app.post('/api/editor/bench/tick', async (c) => {
+    const s = c.get('session');
+    const parsed = await body(c, BenchTickBody);
+    if (!parsed.success) return c.json({ error: `expected { npc, ticks: 1–${MAX_TRIGGER_HOURS} }` }, 400);
+    if (s.busy) return busy(c);
+
+    const built = buildNpc(parsed.data.npc);
+    if (!built.ok) return c.json({ ok: false, errors: built.errors, outcome: null, attempts: [], events: [], view: benchView(s) } satisfies BenchResponse);
+
+    const world = s.bench ?? benchWorld(built.npc);
+    let model: NpcModel | null = null;
+    if (timedTrigger(built.npc.triggers, world.tick, world.tick + parsed.data.ticks)) {
+      const claimed = claimTurn(c, built.npc);
+      if (claimed instanceof Response) return claimed;
+      model = claimed;
+    }
+    s.busy = { by: 'bench' };
+    try {
+      const { act } = createEngine([player, built.npc]);
+      const r = await passTime(world, parsed.data.ticks, () => model, { npcs: [built.npc], act });
+      s.bench = r.world;
+      return c.json({
+        ok: true,
+        errors: [],
+        outcome: r.outcome,
+        attempts: shown(r.attempts),
+        events: r.events,
         view: benchView(s, built.npc),
       } satisfies BenchResponse);
     } finally {

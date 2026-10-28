@@ -43,6 +43,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .msg.npc { background: var(--panel-2); align-self: flex-start; }
 .msg.you { background: #4a3a22; align-self: flex-end; }
 .msg.thinking { color: var(--muted); font-style: italic; }
+.msg.emote { background: none; color: var(--muted); padding-top: 2px; padding-bottom: 2px; }
 .dots::after { content: ''; animation: dots 1.2s steps(4) infinite; }
 @keyframes dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } }
 @media (prefers-reduced-motion: reduce) { .dots::after { animation: none; content: '…'; } }
@@ -78,6 +79,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .stock { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
 .stock li { display: flex; justify-content: space-between; text-transform: capitalize; }
 .stock b { font-variant-numeric: tabular-nums; }
+.give { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; }
+.give input[type='number'] { width: 4.5em; }
+.give select { max-width: 11em; }
 .item { display: flex; gap: 10px; align-items: center; }
 .item + .item { margin-top: 8px; }
 .item .title { color: var(--accent); }
@@ -127,6 +131,7 @@ input[type='checkbox'] { accent-color: var(--accent); width: 16px; height: 16px;
 .facts { display: flex; flex-direction: column; gap: 6px; }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; cursor: pointer; }
 .check input { margin-top: 2px; flex-shrink: 0; }
+.timer { margin-left: 24px; }
 .errors { margin: 0 0 10px; padding: 8px 12px 8px 26px; background: #3a2220; border: 1px solid var(--bad); border-radius: 8px; color: #f3c4bc; font-size: 13px; }
 .note-box { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; font-size: 13px; margin-bottom: 10px; }
 .bench-messages { height: 340px; flex: none; margin-bottom: 0; }

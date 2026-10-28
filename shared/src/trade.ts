@@ -40,6 +40,14 @@ export type OfferKind = Terms['kind'];
 
 export type Contract = Terms & { contract_id: string };
 
+// Something handed over for nothing: gold, goods from its stock, or a made-to-order item it owns.
+export const GiftSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('gold'), amount: z.number().int().positive() }),
+  z.object({ kind: z.literal('good'), good: z.string(), qty: z.number().int().positive() }),
+  z.object({ kind: z.literal('item'), item_id: z.string() }),
+]);
+export type Gift = z.infer<typeof GiftSchema>;
+
 // Names in a catalogue or stock list: they become enums in the model's schema and keys in the world.
 const NAME = /^[a-z][a-z0-9_]{0,40}$/;
 const name = z.string().regex(NAME, 'names are lowercase letters, digits and _, starting with a letter');

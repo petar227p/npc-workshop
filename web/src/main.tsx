@@ -58,14 +58,19 @@ function ForgePage() {
     return () => clearInterval(timer);
   }, [drawing]);
 
+  // Passing time can wait on NPCs acting on their own, so every action locks the buttons until it's back.
+  const [waiting, setWaiting] = useState(false);
   const run = useCallback(async (p: Promise<ActionResponse>) => {
     setError(null);
+    setWaiting(true);
     try {
       const r = await p;
       setView(r.view);
       if (!r.ok && r.reason) setError(r.reason);
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setWaiting(false);
     }
   }, []);
 
@@ -76,7 +81,7 @@ function ForgePage() {
   };
 
   if (!view) return <div className="loading">{error ?? 'Lighting the forge…'}</div>;
-  const busy = pending !== null;
+  const busy = pending !== null || waiting;
 
   return (
     <div className="cols">
@@ -90,7 +95,7 @@ function ForgePage() {
       </div>
       <aside className="side-col">
         <ForgePanel view={view} disabled={busy} onSkip={(n) => run(api.tick(n))} onReset={() => run(api.reset())} />
-        <Inventory view={view} />
+        <Inventory view={view} disabled={busy} onGive={(to, gift) => run(api.give(to, gift))} />
         <Stock view={view} />
         <Ledger view={view} />
       </aside>

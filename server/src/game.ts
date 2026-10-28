@@ -1,12 +1,21 @@
 import { npcTurn, type NpcModel, type TurnResult } from './agents/npc';
-import { advance, type ActResult, type EngineEvent, type World } from './engine';
-import { act, smith, type NpcDefinition } from './npcs';
+import { advance, type Act, type ActResult, type EngineEvent, type World } from './engine';
+import { act, NPCS, smith, type NpcDefinition } from './npcs';
+import { runTriggers, type TownDeps, type TownResult } from './town';
 
 // What the player can do. Routes call these; each returns the new world plus the events it produced.
 
+// An NPC without the on_spoken_to trigger hears the line (it's in the log) but never answers it.
+export const answers = (npc: NpcDefinition) => npc.triggers.some((t) => t.kind === 'on_spoken_to');
+
+// The line alone, with no reply: for an NPC that doesn't answer when spoken to.
+export function playerSpeaks(world: World, text: string, npc: NpcDefinition): ActResult {
+  return act(world, 'player', { action: 'SAY', text }, { to: npc.id });
+}
+
 export async function playerSays(world: World, text: string, model: NpcModel, npc: NpcDefinition = smith): Promise<TurnResult | ActResult> {
-  const said = act(world, 'player', { action: 'SAY', text }, { to: npc.id });
-  if (!said.ok) return said;
+  const said = playerSpeaks(world, text, npc);
+  if (!said.ok || !answers(npc)) return said;
   const turn = await npcTurn(npc, said.world, model);
   return { ...turn, events: [...said.events, ...turn.events] };
 }
@@ -22,6 +31,23 @@ export function playerAccepts(world: World, contractId: string): ActResult {
   return { ...started, events: [...accepted.events, ...started.events] };
 }
 
+// `gift` is checked by the engine like any proposal, so a malformed one is logged as a rejection.
+export function playerGives(world: World, to: string, gift: unknown): ActResult {
+  return act(world, 'player', { action: 'GIVE', to, gift }, { to });
+}
+
 export function skipTime(world: World, ticks: number): { world: World; events: EngineEvent[] } {
   return advance(world, ticks);
+}
+
+// The clock moves, then any NPC whose timer came round acts on its own (capped per tick; see town/).
+export async function passTime(
+  world: World,
+  ticks: number,
+  modelFor: TownDeps['modelFor'],
+  opts: { npcs?: readonly NpcDefinition[]; act?: Act; cap?: number } = {},
+): Promise<TownResult> {
+  const moved = advance(world, ticks);
+  const town = await runTriggers(moved.world, world.tick, opts.npcs ?? NPCS, { act: opts.act ?? act, modelFor, cap: opts.cap });
+  return { ...town, events: [...moved.events, ...town.events] };
 }

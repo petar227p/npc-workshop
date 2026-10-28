@@ -39,6 +39,7 @@ const miller: NpcDraft = {
   location: 'mill',
   start: { gold: 5, stock: {} },
   catalogue: {},
+  triggers: [{ kind: 'on_spoken_to' }],
   cue: 'Reply to the customer.',
   fallbacks: { rejected: 'Eh?', unavailable: 'The wheel is loud. Later.' },
 };
@@ -248,5 +249,63 @@ describe('NPC editor api', () => {
     expect((await send<{ error: string }>('/api/say', { text: 'hello?' })).json.error).toBe('The workshop bench is still answering.');
     release();
     expect((await turn).json.outcome).toBe('acted');
+  });
+
+  it('a draft on a timer acts on the bench when its hours come round, and only then calls the model', async () => {
+    const crier: NpcDraft = { ...miller, triggers: [{ kind: 'every_hours', hours: 6, cue: 'Call out the news.' }] };
+    const { send, client } = setup([say('Hear ye! Flour is cheap today.')]);
+    const early = await send<BenchResponse>('/api/editor/bench/tick', { npc: crier, ticks: 5 });
+    expect(early.json.events.map((e) => e.type)).toEqual(['CLOCK_ADVANCED']);
+    expect(client.requests).toHaveLength(0);
+
+    const due = await send<BenchResponse>('/api/editor/bench/tick', { npc: crier, ticks: 1 });
+    expect(due.json).toMatchObject({ ok: true, outcome: 'acted' });
+    expect(due.json.events.map((e) => [e.type, e.actor, e.target])).toEqual([
+      ['CLOCK_ADVANCED', 'clock', null],
+      ['TRIGGER_FIRED', 'miller', null],
+      ['SAID', 'miller', null],
+    ]);
+    expect(client.requests[0].messages.at(-1)?.content).toMatch(/Call out the news\.$/);
+    expect(due.json.view.tick).toBe(6);
+  });
+
+  it('a draft that does not answer when spoken to hears the line and makes no call', async () => {
+    const { send, client } = setup([say('never used')]);
+    const r = await send<BenchResponse>('/api/editor/bench/say', { npc: { ...miller, triggers: [] }, text: 'Hello?' });
+    expect(r.json).toMatchObject({ ok: true, outcome: null });
+    expect(r.json.events.map((e) => [e.type, e.actor])).toEqual([['SAID', 'player']]);
+    expect(client.requests).toHaveLength(0);
+  });
+
+  it('a draft without triggers (an older file) answers when spoken to; each kind of trigger once', async () => {
+    const { send } = setup();
+    const { triggers: _t, ...old } = miller;
+    expect((await send<PreviewResponse>('/api/editor/preview', { npc: old })).json.ok).toBe(true);
+    const twice = await send<PreviewResponse>('/api/editor/preview', { npc: { ...miller, triggers: [{ kind: 'on_spoken_to' }, { kind: 'on_spoken_to' }] } });
+    expect(twice.json.errors).toEqual(['triggers: each kind of trigger once']);
+  });
+
+  it('GIVE in the model verbs: the schema offers its goods, and a gift the ledger allows moves them', async () => {
+    const beggar: NpcDraft = {
+      ...miller,
+      verbs: ['SAY', 'EMOTE', 'GIVE'],
+      model_verbs: ['SAY', 'EMOTE', 'GIVE'],
+      facts: ['inventory'],
+      start: { gold: 5, stock: { flour: 2 } },
+    };
+    const gift = JSON.stringify({ action: 'GIVE', say: 'Take it, friend.', gift: { kind: 'good', good: 'flour', qty: 1 }, give_to: null, emote: null });
+    const { send } = setup([gift, JSON.stringify({ action: 'EMOTE', say: '', emote: 'shrugs', gift: null, give_to: null })]);
+    const preview = await send<PreviewResponse>('/api/editor/preview', { npc: beggar });
+    expect(preview.json.ok && preview.json.facts).toBe('Your purse: 5 gold.\nYou have (not promised to a job): flour 2.');
+    expect(JSON.stringify(preview.json.ok && preview.json.schema)).toContain('"enum":["flour"]');
+
+    const r = await send<BenchResponse>('/api/editor/bench/say', { npc: beggar, text: 'Spare some flour?' });
+    expect(r.json.events.map((e) => e.type)).toEqual(['SAID', 'GIVEN', 'SAID']);
+    expect(r.json.view.goods).toEqual({ flour: 1 });
+    const shrug = await send<BenchResponse>('/api/editor/bench/say', { npc: beggar, text: 'More?' });
+    expect(shrug.json.events.map((e) => [e.type, e.target])).toEqual([
+      ['SAID', 'miller'],
+      ['EMOTED', 'player'],
+    ]);
   });
 });

@@ -1,4 +1,4 @@
-import { MAX_SAY_LENGTH, type Catalogue, type MadeToOrder, type OfferKind, type Verb } from '@blacksmith/shared';
+import { MAX_EMOTE_LENGTH, MAX_SAY_LENGTH, type Catalogue, type MadeToOrder, type OfferKind, type Verb } from '@blacksmith/shared';
 
 // Meta's strict mode forbids a root anyOf, so a model answers in one flat object: the verb, the spoken line,
 // and the union of the fields its verbs use (nullable). Each verb here says which fields it reads and how
@@ -85,6 +85,27 @@ export function COUNTER_OFFER(catalogue: Catalogue): FlatVerb {
     verb: 'COUNTER_OFFER',
     fields: { offer: offerField(catalogue), contract_id: contractId() },
     toAction: (out) => ({ action: 'COUNTER_OFFER', replaces: out.contract_id, terms: terms(out.offer, kinds) }),
+  };
+}
+
+// The gesture goes in its own field; `say` can still carry a line, spoken after it.
+export const EMOTE: FlatVerb = {
+  verb: 'EMOTE',
+  fields: { emote: str },
+  toAction: (out) => ({ action: 'EMOTE', text: typeof out.emote === 'string' ? out.emote.slice(0, MAX_EMOTE_LENGTH) : '' }),
+};
+
+// One shape per kind of gift; goods are an enum of what it may hold. `give_to` null means whoever it's talking to.
+export function GIVE(goods: readonly string[]): FlatVerb {
+  const shapes = [
+    object({ kind: { type: 'string', enum: ['gold'] }, amount: int }),
+    ...(goods.length ? [object({ kind: { type: 'string', enum: ['good'] }, good: { type: 'string', enum: [...goods] }, qty: int })] : []),
+    object({ kind: { type: 'string', enum: ['item'] }, item_id: str }),
+  ];
+  return {
+    verb: 'GIVE',
+    fields: { gift: { anyOf: shapes }, give_to: str },
+    toAction: (out) => ({ action: 'GIVE', to: out.give_to ?? null, gift: out.gift }),
   };
 }
 

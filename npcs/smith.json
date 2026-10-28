@@ -26,6 +26,7 @@
       "workload_per_job": 0.5
     }
   },
+  "triggers": [{ "kind": "on_spoken_to" }],
   "cue": "Reply to the customer's last words.",
   "fallbacks": {
     "rejected": "Hm. Let me think that through properly. Ask me again.",

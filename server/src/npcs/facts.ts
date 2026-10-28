@@ -25,6 +25,17 @@ export const FACTS: Record<FactBlock, Block> = {
     if (catalogue.in_stock) lines.push(`Goods on the shelf: ${Object.keys(catalogue.in_stock).map((g) => `${g} ${count(g)}`).join(', ')}.`);
     return lines.join('\n') || null;
   },
+  // Everything it owns, not only what it sells: GIVE can hand over any of it, and items go by id.
+  inventory: (world, npcId) => {
+    const goods = Object.entries(availableStock(world, npcId))
+      .filter(([, n]) => n > 0)
+      .map(([g, n]) => `${g} ${n}`)
+      .join(', ');
+    const items = world.items.filter((i) => i.owner === npcId).map((i) => `${i.item_id} ${JSON.stringify(i.item_name)} (${i.item_type})`);
+    const lines = [`Your purse: ${world.gold[npcId] ?? 0} gold.`, `You have (not promised to a job): ${goods || 'nothing'}.`];
+    if (items.length) lines.push(`Items you own: ${items.join(', ')}.`);
+    return lines.join('\n');
+  },
   catalogue: (world, npcId, _customer, catalogue) => {
     const parts: string[] = [];
     const mto = catalogue.made_to_order;

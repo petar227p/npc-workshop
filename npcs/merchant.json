@@ -21,6 +21,7 @@
       "lantern": { "min_price": 20 }
     }
   },
+  "triggers": [{ "kind": "on_spoken_to" }],
   "cue": "Reply to the customer's last words.",
   "fallbacks": {
     "rejected": "Let me check my shelves. Ask me again.",

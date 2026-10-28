@@ -1,5 +1,9 @@
+import type { Gift } from '@blacksmith/shared';
 import type { World } from '../engine';
 import { describe } from './facts';
+
+const gift = (g: Gift, itemName: string | null) =>
+  g.kind === 'gold' ? `${g.amount} gold` : g.kind === 'good' ? `${g.qty} × ${g.good}` : `${JSON.stringify(itemName ?? g.item_id)} (${g.item_id})`;
 
 const HISTORY_EVENTS = 24;
 
@@ -24,6 +28,13 @@ export function historyFor(npcId: string, name: string): (world: World, customer
           if (speaker) lines.push(`${speaker}: ${JSON.stringify(e.data.text)}`);
           break;
         }
+        case 'EMOTED':
+          if (e.actor === npcId && (e.target === customer || e.target === null)) lines.push(`[${name} ${JSON.stringify(e.data.text)}]`);
+          break;
+        case 'GIVEN':
+          if (e.actor === npcId && e.target === customer) lines.push(`[${name} gave the customer ${gift(e.data.gift, e.data.item_name)}]`);
+          if (e.actor === customer && e.target === npcId) lines.push(`[Customer gave ${name} ${gift(e.data.gift, e.data.item_name)}]`);
+          break;
         case 'CONTRACT_PROPOSED':
           if (e.actor === npcId && e.data.customer === customer) {
             lines.push(

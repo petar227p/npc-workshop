@@ -1,5 +1,5 @@
 import { MAX_SAY_LENGTH } from '@blacksmith/shared';
-import type { Act, EngineEvent, World } from '../engine';
+import type { Act, ActOptions, EngineEvent, World } from '../engine';
 import type { ChatClient, ChatMessage, ReasoningEffort, Usage } from '../models';
 import { act as villageAct, type NpcDefinition } from '../npcs';
 import { fromFlat, parseFlat } from './flat';
@@ -19,26 +19,28 @@ export type TurnResult = {
 
 export type NpcModel = { client: ChatClient; model: string };
 
-// What the model sees on a turn: persona, the facts it may rely on, then the conversation and the cue.
-export function turnMessages(npc: NpcDefinition, world: World, customer = 'player'): ChatMessage[] {
+// What the model sees on a turn: persona, the facts it may rely on, then the conversation and the cue
+// (its own when spoken to; a trigger's when it acts on its own).
+export function turnMessages(npc: NpcDefinition, world: World, customer = 'player', cue = npc.cue): ChatMessage[] {
   return [
     { role: 'system', content: npc.prompt },
     { role: 'system', content: npc.facts(world, customer) },
-    { role: 'user', content: `Conversation so far:\n${npc.history(world, customer)}\n\n${npc.cue}` },
+    { role: 'user', content: `Conversation so far:\n${npc.history(world, customer)}\n\n${cue}` },
   ];
 }
 
 // `act` is the engine the NPC is registered with; the village's by default. `effort` overrides the NPC's own.
+// `to: null` is a turn nobody asked for (a trigger): its lines are said to no one in particular, offers still go to `customer`.
 export async function npcTurn(
   npc: NpcDefinition,
   world: World,
   model: NpcModel,
-  opts: { customer?: string; effort?: ReasoningEffort; act?: Act } = {},
+  opts: { customer?: string; effort?: ReasoningEffort; act?: Act; cue?: string; to?: string | null } = {},
 ): Promise<TurnResult> {
   const customer = opts.customer ?? 'player';
   const act = opts.act ?? villageAct;
-  const to = { customer, to: customer }; // every line and action of this turn is addressed to the customer
-  const messages = turnMessages(npc, world, customer);
+  const to: ActOptions = { customer, to: opts.to === undefined ? customer : (opts.to ?? undefined) };
+  const messages = turnMessages(npc, world, customer, opts.cue);
   const schema = { name: `${npc.id}_action`, schema: npc.schema };
   const attempts: Attempt[] = [];
   const events: EngineEvent[] = [];
