@@ -29,8 +29,13 @@ type Person = {
   bubble?: Bubble;
 };
 
-// Something on the canvas has focus or is being typed into: the keys belong to the page.
-const typing = () => ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName ?? '');
+// Something beside the canvas is being typed into: the keys belong to the page. A picker isn't: after choosing from
+// one, the keys go straight back to walking (Space or Alt+↓ still open it).
+const typing = () => {
+  const el = document.activeElement as HTMLElement | null;
+  return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+};
+const WALK_KEYS = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
 
 export class VillageScene extends Phaser.Scene {
   private village!: Village;
@@ -93,9 +98,12 @@ export class VillageScene extends Phaser.Scene {
       event.preventDefault(); // or the E lands in the chat box this focuses
       this.hooks.onTalk(near.id);
     });
-    // Walking with the arrows mustn't also scroll the page once the ledger makes it taller than the window.
+    // Walking keys only walk: they mustn't also scroll the page (once the ledger makes it taller than the window) or
+    // change a focused picker. Esc gives the keys back from any field.
     this.input.keyboard!.on('keydown', (event: KeyboardEvent) => {
-      if (event.key.startsWith('Arrow') && !typing()) event.preventDefault();
+      if (event.key === 'Escape') return (document.activeElement as HTMLElement | null)?.blur();
+      if (typing() || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (WALK_KEYS.includes(event.key.toLowerCase())) event.preventDefault();
     });
     // Clicking the village hands the keys back to walking.
     this.input.on('pointerdown', () => (document.activeElement as HTMLElement | null)?.blur());
@@ -204,7 +212,8 @@ export class VillageScene extends Phaser.Scene {
       });
     };
     if (!url) return show('dungeon', ITEM_FALLBACK);
-    const key = `art:${contractId}`;
+    // By picture, not contract: a new game numbers its contracts from c_001 again, and the scene outlives it.
+    const key = `art:${url}`;
     if (this.textures.exists(key)) return show(key);
     this.load.image(key, url);
     this.load.once(Phaser.Loader.Events.COMPLETE, () => show(this.textures.exists(key) ? key : 'dungeon', this.textures.exists(key) ? undefined : ITEM_FALLBACK));

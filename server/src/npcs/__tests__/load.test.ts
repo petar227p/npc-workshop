@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createEngine, createWorld, verbs } from '../../engine';
 import { NO_FACTS } from '../facts';
 import { buildNpc, newVillage, player, readDraft, smith } from '../index';
+import { toNpc } from '../load';
 
 describe('NPC files', () => {
   it("Brann's file builds the same NPC the village runs", () => {
@@ -55,6 +56,17 @@ describe('NPC files', () => {
     const built = buildNpc(old);
     if (!built.ok) throw new Error(built.errors.join('; '));
     expect(built.draft).toMatchObject({ schedule: [], sprite: 98 });
+  });
+
+  it("a file whose place isn't on the map still loads at start, with a warning, so an old NPC can't stop the village", () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const npc = toNpc({ ...readDraft('merchant'), location: 'mill', schedule: [{ from: 20, place: 'tavern' }] });
+      expect(npc.location).toBe('mill');
+      expect(warn.mock.calls).toEqual([[expect.stringMatching(/^npcs\/merchant\.json: there's no place called 'mill' on the village map/)]]);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('a file can only name verbs and facts that exist, once each, and no extra fields', () => {

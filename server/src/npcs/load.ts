@@ -38,13 +38,20 @@ function modelVerb(v: ModelVerb, catalogue: Catalogue, start: Start): flat.FlatV
 
 export type Built = { ok: true; npc: NpcDefinition; draft: NpcDraft } | { ok: false; errors: string[] };
 
-// Every problem as one readable line, for the editor. `places` are the named places on the village map.
-export function buildNpc(input: unknown, places: readonly string[] = PLACE_NAMES): Built {
+// The places a draft names that aren't on the village map, each as one readable line.
+function offMap(d: Pick<NpcDraft, 'location' | 'schedule'>, places: readonly string[]): string[] {
+  const missing = [...new Set([d.location, ...d.schedule.map((e) => e.place)])].filter((p) => !places.includes(p));
+  return missing.map((p) => `there's no place called '${p}' on the village map (places: ${places.join(', ')})`);
+}
+
+// Every problem as one readable line, for the editor. `places` are the named places on the village map;
+// null skips that check (files at start, see `toNpc`).
+export function buildNpc(input: unknown, places: readonly string[] | null = PLACE_NAMES): Built {
   const parsed = NpcDraftSchema.safeParse(input);
   if (!parsed.success) return { ok: false, errors: parsed.error.issues.map((i) => `${i.path.join('.') || 'npc'}: ${i.message}`) };
   const d = parsed.data;
-  const missing = [...new Set([d.location, ...d.schedule.map((e) => e.place)])].filter((p) => !places.includes(p));
-  if (missing.length > 0) return { ok: false, errors: missing.map((p) => `there's no place called '${p}' on the village map (places: ${places.join(', ')})`) };
+  const missing = places ? offMap(d, places) : [];
+  if (missing.length > 0) return { ok: false, errors: missing };
   try {
     const npc = defineNpc({
       id: d.id,
@@ -72,9 +79,12 @@ export function buildNpc(input: unknown, places: readonly string[] = PLACE_NAMES
   }
 }
 
-// A file that doesn't build stops the server at start, loudly, rather than leaving an NPC out.
+// A file that doesn't build stops the server at start, loudly, rather than leaving an NPC out. A place that isn't on
+// the map only warns: files from before the map could name any place, and the NPC still works (the village shows it
+// where the player starts). The editor won't save a draft like that, so it's fixed by picking a place there.
 export function toNpc(draft: NpcDraft): NpcDefinition {
-  const built = buildNpc(draft);
+  for (const line of offMap(draft, PLACE_NAMES)) console.warn(`npcs/${draft.id}.json: ${line}`);
+  const built = buildNpc(draft, null);
   if (!built.ok) throw new Error(`npcs/${draft.id}.json: ${built.errors.join('; ')}`);
   return built.npc;
 }
