@@ -2,6 +2,8 @@ import type { BenchAttempt, BenchResponse, EngineEvent, NpcDraft, PreviewRespons
 // The zod-free modules, so the schemas stay out of the bundle.
 import { MAX_SAY_LENGTH } from '@blacksmith/shared/src/limits';
 import {
+  EFFORT_CHOICES,
+  EFFORT_INFO,
   FACT_BLOCKS,
   FACT_INFO,
   LEDGER_VERBS,
@@ -32,6 +34,7 @@ const BLANK: NpcDraft = {
   facts: ['clock'],
   perception_radius: 4,
   model: 'muse_spark_open',
+  effort: 'low',
   location: 'square',
   start: { gold: 0, stock: {} },
   catalogue: {},
@@ -75,6 +78,7 @@ function loadStored(): NpcDraft | null {
     location: typeof v.location === 'string' ? v.location : BLANK.location,
     // Drafts from before the picker were all on Muse Spark.
     model: (MODEL_CHOICES as readonly unknown[]).includes(v.model) ? (v.model as NpcDraft['model']) : 'muse_spark',
+    effort: (EFFORT_CHOICES as readonly unknown[]).includes(v.effort) ? (v.effort as NpcDraft['effort']) : 'low',
     start: object('start'),
     catalogue: object('catalogue'),
     cue: text('cue'),
@@ -217,6 +221,15 @@ export function Editor() {
             {MODEL_CHOICES.map((m) => (
               <option key={m} value={m}>
                 {MODEL_INFO[m].label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Thinking" hint={EFFORT_INFO[draft.effort].description}>
+          <select value={draft.effort} onChange={(e) => set('effort', e.target.value as NpcDraft['effort'])}>
+            {EFFORT_CHOICES.map((m) => (
+              <option key={m} value={m}>
+                {EFFORT_INFO[m].label}
               </option>
             ))}
           </select>

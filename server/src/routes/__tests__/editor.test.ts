@@ -35,6 +35,7 @@ const miller: NpcDraft = {
   facts: ['clock'],
   perception_radius: 3,
   model: 'muse_spark_open',
+  effort: 'medium',
   location: 'mill',
   start: { gold: 5, stock: {} },
   catalogue: {},
@@ -126,6 +127,17 @@ describe('NPC editor api', () => {
     expect(choices).toEqual(['muse_spark_open', 'muse_spark']);
     expect(client.requests.map((r) => r.model)).toEqual(['test-muse_spark_open', 'test-muse_spark', 'test-muse_spark_open']);
     const bad = await send<PreviewResponse>('/api/editor/preview', { npc: { ...miller, model: 'gpt' } });
+    expect(bad.json.ok).toBe(false);
+  });
+
+  it('the bench thinks at the level the draft picked; a draft from before the picker thinks at low', async () => {
+    const { send, client } = setup([say('Flour.'), say('Flour.'), say('Flour.')]);
+    await send('/api/editor/bench/say', { npc: miller, text: 'Hi' });
+    await send('/api/editor/bench/say', { npc: { ...miller, effort: 'high' }, text: 'Hi' });
+    const { effort: _, ...old } = miller;
+    await send('/api/editor/bench/say', { npc: old, text: 'Hi' });
+    expect(client.requests.map((r) => r.reasoning_effort)).toEqual(['medium', 'high', 'low']);
+    const bad = await send<PreviewResponse>('/api/editor/preview', { npc: { ...miller, effort: 'xhigh' } });
     expect(bad.json.ok).toBe(false);
   });
 

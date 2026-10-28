@@ -41,6 +41,17 @@ export const MODEL_INFO: Record<ModelChoice, { label: string; description: strin
   muse_spark_open: { label: 'Muse Spark Open', description: 'Open weights on Baseten. Cheaper per line; for villagers, gossip and chatter.' },
 };
 
+// How hard the model thinks before it answers (reasoning_effort). Both providers take all three.
+export const EFFORT_CHOICES = ['low', 'medium', 'high'] as const;
+export type EffortChoice = (typeof EFFORT_CHOICES)[number];
+
+// Times are Muse Spark p50 from the Oct 27 latency test (docs/api-notes.md); high wasn't timed.
+export const EFFORT_INFO: Record<EffortChoice, { label: string; description: string }> = {
+  low: { label: 'Low', description: 'Quick replies, about 4 s on Muse Spark. The default.' },
+  medium: { label: 'Medium', description: 'Thinks longer first, about 6 s on Muse Spark, and costs more reasoning tokens.' },
+  high: { label: 'High', description: 'The slowest and most reasoning tokens. For hard bargains, not small talk.' },
+};
+
 export const MAX_PERSONA_LENGTH = 6000;
 export const NPC_ID_PATTERN = '^[a-z][a-z0-9_]{0,40}$';
 export const RESERVED_IDS = ['player'] as const; // actor ids an NPC can't take
@@ -55,6 +66,7 @@ export type NpcDraft = {
   facts: FactBlock[];
   perception_radius: number;
   model: ModelChoice;
+  effort: EffortChoice;
   location: string; // the place its events happen at (forge, market…)
   start: Start; // its purse and stock in a new world
   catalogue: Catalogue; // what it sells; empty for an NPC that only talks
