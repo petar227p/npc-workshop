@@ -53,7 +53,7 @@ export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept }: Props
         </div>
       </div>
       <div className="messages" ref={box}>
-        <div className="msg npc">Brann looks up from the anvil. "What'll it be?"</div>
+        <div className="msg npc">{talkTo === 'smith' ? 'Brann looks up from the anvil.' : `${name} looks up.`} "What'll it be?"</div>
         {speechFirst(view.events).map((e) => (
           <Entry key={e.id} event={e} view={view} disabled={thinking} onAccept={onAccept} />
         ))}

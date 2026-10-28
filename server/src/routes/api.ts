@@ -130,7 +130,7 @@ export function createApi(deps: ApiDeps) {
     if (s.busy) return busy(c);
 
     const smith = modelFor(s);
-    if (!smith) return c.json({ error: `${npc.name} isn't at the ${placeOf(npc)} right now. Try again later.` }, 503);
+    if (!smith) return c.json({ error: `${npc.name} isn't at the ${placeOf(npc).replace(/_/g, ' ')} right now. Try again later.` }, 503);
 
     s.busy = { by: 'npc', name: npc.name };
     try {
