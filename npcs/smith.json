@@ -5,6 +5,7 @@
   "model_verbs": ["SAY", "OFFER", "COUNTER_OFFER", "REFUSE"],
   "facts": ["clock", "purse", "stock", "catalogue", "price_floor", "open_offers"],
   "perception_radius": 4,
+  "model": "muse_spark",
   "location": "forge",
   "start": {
     "gold": 50,

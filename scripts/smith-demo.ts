@@ -3,11 +3,11 @@
 // REPLAY=logs/x.jsonl npm run smith-demo   (plays a recorded run back)
 import { isMadeToOrder, type EngineEvent, type World } from '../server/src/engine';
 import { playerAccepts, playerSays, skipTime } from '../server/src/game';
-import { createModels } from '../server/src/models';
+import { createModel } from '../server/src/models';
 import { newVillage } from '../server/src/npcs';
 
 const session = `demo-${new Date().toISOString().replace(/[:.]/g, '-')}`;
-const { smith } = createModels(session);
+const smith = createModel(session, 'muse_spark');
 // Contributor prices per 1M tokens (docs/api-notes.md); Standard is ~20x more.
 const PRICE = { input: 0.1, output: 0.2 };
 let cost = 0;

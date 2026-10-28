@@ -6,6 +6,8 @@ import {
   FACT_INFO,
   LEDGER_VERBS,
   MAX_PERSONA_LENGTH,
+  MODEL_CHOICES,
+  MODEL_INFO,
   MODEL_VERBS,
   VERB_INFO,
   type LedgerVerb,
@@ -13,6 +15,7 @@ import {
 } from '@blacksmith/shared/src/npc-info';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { editorApi } from './api';
+import { CatalogueForm } from './CatalogueForm';
 import { ContractCard, speechFirst } from './Chat';
 
 // The NPC workshop: edit a definition on the left, try it on the test bench on the right.
@@ -28,6 +31,7 @@ const BLANK: NpcDraft = {
   model_verbs: ['SAY'],
   facts: ['clock'],
   perception_radius: 4,
+  model: 'muse_spark_open',
   location: 'square',
   start: { gold: 0, stock: {} },
   catalogue: {},
@@ -69,6 +73,8 @@ function loadStored(): NpcDraft | null {
     facts: list(v.facts, FACT_BLOCKS, BLANK.facts),
     perception_radius: typeof v.perception_radius === 'number' && Number.isFinite(v.perception_radius) ? v.perception_radius : BLANK.perception_radius,
     location: typeof v.location === 'string' ? v.location : BLANK.location,
+    // Drafts from before the picker were all on Muse Spark.
+    model: (MODEL_CHOICES as readonly unknown[]).includes(v.model) ? (v.model as NpcDraft['model']) : 'muse_spark',
     start: object('start'),
     catalogue: object('catalogue'),
     cue: text('cue'),
@@ -206,6 +212,15 @@ export function Editor() {
         <Field label="Persona" hint={`${draft.persona.length} / ${MAX_PERSONA_LENGTH} · sent first, as the system prompt`}>
           <textarea className="persona" value={draft.persona} maxLength={MAX_PERSONA_LENGTH} onChange={(e) => set('persona', e.target.value)} />
         </Field>
+        <Field label="Voiced by" hint={MODEL_INFO[draft.model].description}>
+          <select value={draft.model} onChange={(e) => set('model', e.target.value as NpcDraft['model'])}>
+            {MODEL_CHOICES.map((m) => (
+              <option key={m} value={m}>
+                {MODEL_INFO[m].label}
+              </option>
+            ))}
+          </select>
+        </Field>
 
         <h3>What it may do</h3>
         <p className="muted small">
@@ -216,14 +231,13 @@ export function Editor() {
 
         <h3>Where it is and what it sells</h3>
         <p className="muted small">
-          The catalogue is what OFFER checks against: made-to-order item types (stat ranges, base hours, material costs, margin) and goods
-          sold from stock (minimum price each). The ledger refuses an offer verb without one.
+          The catalogue is what OFFER checks against. The ledger refuses an offer verb with nothing in it, and a made-to-order catalogue
+          without START_WORK.
         </p>
         <Field label="Place" hint="where its events happen, e.g. forge, market">
           <input value={draft.location} maxLength={41} onChange={(e) => set('location', e.target.value)} />
         </Field>
-        <JsonField label="Catalogue" hint="JSON" value={draft.catalogue} onChange={(v) => set('catalogue', v as NpcDraft['catalogue'])} />
-        <JsonField label="Starting purse and stock" hint="JSON" value={draft.start} onChange={(v) => set('start', v as NpcDraft['start'])} />
+        <CatalogueForm value={draft} onChange={({ catalogue, start }) => setDraft((d) => ({ ...d, catalogue, start }))} />
 
         <h3>What it knows</h3>
         <div className="facts">
@@ -290,38 +304,6 @@ export function Editor() {
         </section>
       </aside>
     </div>
-  );
-}
-
-// Raw JSON until the catalogue gets a form of its own. A value that parses goes to the draft (the server checks its
-// shape); while it doesn't parse, the draft keeps the last good one. A new starting point replaces the text.
-function JsonField({ label, hint, value, onChange }: { label: string; hint: string; value: object; onChange: (v: object) => void }) {
-  const [text, setText] = useState(() => JSON.stringify(value, null, 2));
-  const [bad, setBad] = useState(false);
-  const shown = useRef(JSON.stringify(value));
-  useEffect(() => {
-    const now = JSON.stringify(value);
-    if (now === shown.current) return;
-    shown.current = now;
-    setText(JSON.stringify(value, null, 2));
-    setBad(false);
-  }, [value]);
-  const edit = (t: string) => {
-    setText(t);
-    try {
-      const v: unknown = JSON.parse(t);
-      if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('not an object');
-      shown.current = JSON.stringify(v);
-      setBad(false);
-      onChange(v);
-    } catch {
-      setBad(true);
-    }
-  };
-  return (
-    <Field label={label} hint={bad ? 'not valid JSON yet; the last valid version is kept' : hint}>
-      <textarea className="code-input" value={text} spellCheck={false} onChange={(e) => edit(e.target.value)} />
-    </Field>
   );
 }
 

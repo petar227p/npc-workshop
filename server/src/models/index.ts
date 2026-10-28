@@ -1,3 +1,4 @@
+import type { ModelChoice } from '@blacksmith/shared';
 import { loadEnv, REPO_ROOT } from '../config/env';
 import { createClient } from './client';
 import { createImageClient, type ImageClient } from './image';
@@ -9,60 +10,33 @@ export { createClient } from './client';
 export { createImageClient, mockImageClient, type ImageClient, type ImageRequest, type ImageResult, type ImageStrength } from './image';
 export { mockClient, readLog, replayClient, withRecorder, type LogEntry } from './recorder';
 
-export type Models = {
-  smith: { client: ChatClient; model: string };
-  villager: { client: ChatClient; model: string };
-};
+export type ModelClient = { client: ChatClient; model: string };
+export type Models = { smith: ModelClient; villager: ModelClient };
 
-// The player is waiting on the smith: live turns take 5–9 s, so give up well before a minute.
+// A player waits on every NPC turn: live turns take 2–9 s, so give up well before a minute.
 // Worst case per call ≈ 2 × 20 s + backoff; a rejected answer means at most one more call.
-const SMITH_LIMITS = { timeoutMs: 20_000, maxAttempts: 2 };
+const TURN_LIMITS = { timeoutMs: 20_000, maxAttempts: 2 };
 
-// Real clients from env, each call recorded to logs/<session>.jsonl. REPLAY=<file> plays a recorded log instead.
-export function createModels(session: string): Models {
+// One model choice's client from env, each call recorded to logs/<session>.jsonl. REPLAY=<file> plays a recorded
+// log instead. Only that choice's key is needed, so an NPC on Muse Spark works without a Baseten key and back.
+export function createModel(session: string, choice: ModelChoice): ModelClient {
   const env = loadEnv();
-  const smithModel = env.SMITH_MODEL ?? 'muse-spark-1.3-contributor';
-  const villagerModel = env.VILLAGER_MODEL ?? 'meta-models/muse-spark-open';
+  const spark = choice === 'muse_spark';
+  const model = spark ? (env.SMITH_MODEL ?? 'muse-spark-1.3-contributor') : (env.VILLAGER_MODEL ?? 'meta-models/muse-spark-open');
+  const provider = spark ? 'meta' : 'baseten';
 
-  if (env.REPLAY) {
-    const log = readLog(env.REPLAY);
-    return {
-      smith: { client: replayClient(log.filter((e) => e.provider === 'meta')), model: smithModel },
-      villager: { client: replayClient(log.filter((e) => e.provider === 'baseten')), model: villagerModel },
-    };
-  }
+  if (env.REPLAY) return { client: replayClient(readLog(env.REPLAY).filter((e) => e.provider === provider)), model };
 
-  const logFile = `${REPO_ROOT}logs/${session}.jsonl`;
-  const need = (name: string) => {
-    const v = env[name];
-    if (!v) throw new Error(`${name} is not set (see .env.example)`);
-    return v;
-  };
-  return {
-    smith: {
-      client: withRecorder(
-        createClient({
-          provider: 'meta',
-          baseURL: env.META_BASE_URL ?? 'https://api.meta.ai/v1',
-          apiKey: need('MODEL_API_KEY'),
-          ...SMITH_LIMITS,
-        }),
-        logFile,
-      ),
-      model: smithModel,
-    },
-    villager: {
-      client: withRecorder(
-        createClient({
-          provider: 'baseten',
-          baseURL: env.BASETEN_BASE_URL ?? 'https://inference.baseten.co/v1',
-          apiKey: need('BASETEN_API_KEY'),
-        }),
-        logFile,
-      ),
-      model: villagerModel,
-    },
-  };
+  const keyName = spark ? 'MODEL_API_KEY' : 'BASETEN_API_KEY';
+  const apiKey = env[keyName];
+  if (!apiKey) throw new Error(`${keyName} is not set (see .env.example)`);
+  const baseURL = spark ? (env.META_BASE_URL ?? 'https://api.meta.ai/v1') : (env.BASETEN_BASE_URL ?? 'https://inference.baseten.co/v1');
+  return { client: withRecorder(createClient({ provider, baseURL, apiKey, ...TURN_LIMITS }), `${REPO_ROOT}logs/${session}.jsonl`), model };
+}
+
+// Both clients, for scripts.
+export function createModels(session: string): Models {
+  return { smith: createModel(session, 'muse_spark'), villager: createModel(session, 'muse_spark_open') };
 }
 
 // Muse Image for item pictures. Replays have no pictures (items keep the placeholder).

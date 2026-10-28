@@ -109,7 +109,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .inline { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; min-width: 0; }
 .field-label { font-size: 12px; font-weight: 600; }
-.field input, .field textarea, .inline select {
+.field input, .field textarea, .field select, .inline select, .catalogue input.cat-name, .catalogue input.cat-num {
   background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; font: inherit; min-width: 0;
 }
 .field input[type='number'] { width: 90px; }
@@ -155,4 +155,12 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .msg .who { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
 .chat-name select { font: inherit; color: inherit; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.code-input { width: 100%; min-height: 140px; font-family: ui-monospace, monospace; font-size: 12px; }
+.catalogue { display: flex; flex-direction: column; gap: 8px; }
+.rows { margin: 0 0 6px 24px; }
+.rows-scroll { overflow-x: auto; margin-bottom: 6px; }
+.cat-table th:not(:first-child), .cat-table td:not(:first-child) { width: auto; }
+.cat-table td { padding: 4px 4px; vertical-align: middle; white-space: nowrap; }
+.catalogue input.cat-name { width: 130px; padding: 4px 6px; }
+.catalogue input.cat-num { width: 58px; padding: 4px 6px; }
+.cat-table .range > span { display: flex; align-items: center; gap: 3px; justify-content: center; }
+.definition { min-width: 0; }
