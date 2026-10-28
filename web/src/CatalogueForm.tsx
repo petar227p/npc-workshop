@@ -54,6 +54,11 @@ function toForm({ catalogue, start }: Value): Form {
 
 // The draft's catalogue and start, or the reason the rows can't be one yet.
 function fromForm(f: Form): { value: Value } | { problem: string } {
+  // The ledger refuses an empty list, so a ticked box needs rows. (Removing the last good unticks its box instead.)
+  if (f.sells && f.goods.length === 0) return { problem: 'Add a good, or untick "Sells from stock".' };
+  if (f.makes && (f.items.length === 0 || f.materials.length === 0)) {
+    return { problem: 'Making to order needs at least one item type and one material, or untick "Makes to order".' };
+  }
   const lists = [...(f.sells ? [f.goods] : []), ...(f.makes ? [f.items, f.materials] : [])];
   if (lists.some((rows) => rows.some((r) => !r.name.trim()))) return { problem: 'Every row needs a name.' };
   for (const rows of lists) {
@@ -110,7 +115,11 @@ export function CatalogueForm({ value, onChange }: { value: Value; onChange: (v:
   const patch = (p: Partial<Form>) => update({ ...form, ...p });
   const row = <K extends 'goods' | 'items' | 'materials'>(list: K, i: number, p: Partial<Form[K][number]>) =>
     patch({ [list]: form[list].map((r, j) => (j === i ? { ...r, ...p } : r)) } as Partial<Form>);
-  const remove = (list: 'goods' | 'items' | 'materials', i: number) => patch({ [list]: form[list].filter((_, j) => j !== i) } as Partial<Form>);
+  const remove = (list: 'goods' | 'items' | 'materials', i: number) => {
+    const rest = form[list].filter((_, j) => j !== i);
+    // Goods are all that "Sells from stock" holds, so taking the last one away unticks it.
+    patch({ [list]: rest, ...(list === 'goods' && rest.length === 0 && { sells: false }) } as Partial<Form>);
+  };
 
   return (
     <div className="catalogue">
