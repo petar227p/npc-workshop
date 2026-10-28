@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MAX_SAY_LENGTH } from './limits';
+import { CatalogueSchema, StartSchema } from './trade';
 import { FACT_BLOCKS, LEDGER_VERBS, MAX_PERSONA_LENGTH, MODEL_VERBS, NPC_ID_PATTERN, RESERVED_IDS, type NpcDraft } from './npc-info';
 
 // The shape check for an NPC file or an editor draft. Cross-field rules (SAY required, model verbs ⊆ verbs)
@@ -19,6 +20,9 @@ export const NpcFileSchema = z
     model_verbs: z.array(z.enum(MODEL_VERBS)).min(1).refine(unique, 'listed twice'),
     facts: z.array(z.enum(FACT_BLOCKS)).refine(unique, 'listed twice'),
     perception_radius: z.number().int().min(0).max(20),
+    location: z.string().regex(new RegExp(NPC_ID_PATTERN), 'a place name: lowercase letters, digits and _'),
+    start: StartSchema,
+    catalogue: CatalogueSchema,
     cue: z.string().trim().min(1).max(300),
     fallbacks: z.object({ rejected: line, unavailable: line }).strict(),
   })

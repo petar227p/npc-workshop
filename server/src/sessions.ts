@@ -2,15 +2,17 @@ import { randomUUID } from 'node:crypto';
 import type { ContractView, StateView } from '@blacksmith/shared';
 import type { NpcModel } from './agents/npc';
 import { artView, type Gallery } from './art';
-import { availableMaterials, createWorld, type World } from './engine';
+import { availableStock, type World } from './engine';
+import { newVillage } from './npcs';
 import type { ImageClient } from './models/image';
 
-// One world per browser, in memory. `busy` locks the world while the smith is thinking, so a tick or an
-// accept can't land on a world the smith turn is about to overwrite.
-// `bench` is the NPC editor's throwaway world, apart from the village one. The forge chat and the bench share the lock
-// (and the model client), so `busy` says which of them holds it; `benchTurns` counts bench turns against its quota.
+// One world per browser, in memory. `busy` locks the world while an NPC is thinking, so a tick or an
+// accept can't land on a world that NPC's turn is about to overwrite.
+// `bench` is the NPC editor's throwaway world, apart from the village one. The village chat and the bench share the lock
+// (and the model client), so `busy` says which of them holds it (and, in the village, who is answering);
+// `benchTurns` counts bench turns against its quota.
 // `art` holds the item pictures of this world (a new game starts an empty one); `artRenders` counts them all.
-export type Busy = 'forge' | 'bench' | null;
+export type Busy = { by: 'npc'; name: string } | { by: 'bench' } | null;
 export type Session = {
   id: string;
   world: World;
@@ -24,17 +26,13 @@ export type Session = {
   lastSeen: number;
 };
 
-const BUSY: Record<Exclude<Busy, null>, string> = {
-  forge: 'Brann is still answering.',
-  bench: 'The workshop bench is still answering.',
-};
-
 // The 409 text for whichever turn holds the lock.
-export const busyMessage = (s: Session) => BUSY[s.busy ?? 'forge'];
+export const busyMessage = (s: Session) =>
+  s.busy?.by === 'bench' ? 'The workshop bench is still answering.' : `${s.busy?.name ?? 'Someone'} is still answering.`;
 
 const newSession = (id: string, lastSeen: number): Session => ({
   id,
-  world: createWorld(),
+  world: newVillage(),
   bench: null,
   busy: null,
   benchTurns: 0,
@@ -100,14 +98,18 @@ export function createSessionStore(limits: SessionLimits = {}) {
 
 const VIEW_EVENTS = 300;
 
-export function toView(world: World, busy: boolean, art: Gallery = new Map(), customer = 'player'): StateView {
+// `names` labels each seller's stock; an actor without one is shown by its id.
+export function toView(world: World, busy: boolean, art: Gallery = new Map(), names: Record<string, string> = {}, customer = 'player'): StateView {
   const contracts: ContractView[] = Object.values(world.contracts)
     .filter((c) => c.customer === customer)
-    .map(({ customer: _c, seller: _s, proposed_tick: _p, ...c }) => c);
+    .map(({ customer: _c, proposed_tick: _p, location: _l, ...c }) => c);
   return {
     tick: world.tick,
     gold: world.gold[customer] ?? 0,
-    materials: availableMaterials(world),
+    goods: { ...(world.stock[customer] ?? {}) },
+    shops: Object.keys(world.stock)
+      .filter((id) => id !== customer)
+      .map((id) => ({ id, name: names[id] ?? id, stock: availableStock(world, id) })),
     contracts,
     items: world.items.filter((i) => i.owner === customer),
     events: world.events.slice(-VIEW_EVENTS),

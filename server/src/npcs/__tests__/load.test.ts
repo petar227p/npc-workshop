@@ -1,21 +1,43 @@
 import { describe, expect, it } from 'vitest';
 import { createEngine, createWorld, verbs } from '../../engine';
 import { NO_FACTS } from '../facts';
-import { buildNpc, player, readDraft, smith } from '../index';
+import { buildNpc, newVillage, player, readDraft, smith } from '../index';
 
 describe('NPC files', () => {
   it("Brann's file builds the same NPC the village runs", () => {
     const built = buildNpc(readDraft('smith'));
     expect(built.ok && built.npc.schema).toEqual(smith.schema);
-    expect(built.ok && built.npc.facts(createWorld(), 'player')).toBe(smith.facts(createWorld(), 'player'));
+    expect(built.ok && built.npc.facts(newVillage(), 'player')).toBe(smith.facts(newVillage(), 'player'));
   });
 
   it('facts are the chosen blocks in a fixed order, or a plain line when none are chosen', () => {
     const base = readDraft('smith');
     const some = buildNpc({ ...base, facts: ['price_floor', 'purse'] });
-    expect(some.ok && some.npc.facts(createWorld(), 'player')).toBe("Customer's purse: 200 gold.\n\nPrice floor: material cost + 20%, rounded up.");
+    expect(some.ok && some.npc.facts(newVillage(), 'player')).toBe(
+      "Customer's purse: 200 gold.\n\nPrice floor for made-to-order work: material cost + 20%, rounded up.",
+    );
     const none = buildNpc({ ...base, facts: [] });
-    expect(none.ok && none.npc.facts(createWorld(), 'player')).toBe(NO_FACTS);
+    expect(none.ok && none.npc.facts(newVillage(), 'player')).toBe(NO_FACTS);
+  });
+
+  it("the facts are the NPC's own: its stock, its catalogue, its jobs", () => {
+    const merchant = buildNpc(readDraft('merchant'));
+    if (!merchant.ok) throw new Error(merchant.errors.join('; '));
+    const text = merchant.npc.facts(newVillage(), 'player');
+    expect(text).toMatch(/Goods on the shelf: torch 10, rope 4, rations 8, healing_salve 3, lantern 1\./);
+    expect(text).toMatch(/- lantern: at least 20 gold each/);
+    expect(text).toMatch(/Price floor for goods: the minimum price each, times the quantity\./);
+    expect(text).not.toMatch(/iron|material cost/);
+    expect(smith.facts(newVillage(), 'player')).not.toMatch(/torch/);
+  });
+
+  it('a catalogue, stock and place are checked like the rest of the file', () => {
+    const base = readDraft('merchant');
+    const errors = (npc: unknown) => (({ ok, ...r }) => (ok ? [] : (r as { errors: string[] }).errors))(buildNpc(npc));
+    expect(errors({ ...base, catalogue: { in_stock: { Torch: { min_price: 1 } } } })[0]).toMatch(/^catalogue\.in_stock\.Torch: names are lowercase/);
+    expect(errors({ ...base, start: { gold: -5, stock: {} } })[0]).toMatch(/^start\.gold/);
+    expect(errors({ ...base, location: 'Town Square' })[0]).toMatch(/^location: a place name/);
+    expect(errors({ ...base, catalogue: {} })[0]).toMatch(/need a catalogue with something to sell/);
   });
 
   it('a file can only name verbs and facts that exist, once each, and no extra fields', () => {
@@ -41,24 +63,31 @@ describe('NPC files', () => {
 describe('two sellers', () => {
   const desk = buildNpc({ ...readDraft('smith'), id: 'desk', name: 'Quill' });
   if (!desk.ok) throw new Error(desk.errors.join('; '));
-  const { act } = createEngine([player, smith, desk.npc, { id: 'clock', verbs: [verbs.START_WORK] }]);
+  const { act } = createEngine([player, smith, desk.npc]);
   const offer = (name: string) => ({
-    action: 'PROPOSE_CONTRACT',
-    item_name: name,
-    item_type: 'dagger',
-    description: 'A plain dagger',
-    stats: { damage: 6, weight: 2, durability: 40 },
-    materials_used: { iron: 1 },
-    price: 60,
-    delivery_ticks: 6,
-    smith_remarks: 'Simple.',
+    action: 'OFFER',
+    terms: {
+      kind: 'made_to_order',
+      item_name: name,
+      item_type: 'dagger',
+      description: 'A plain dagger',
+      stats: { damage: 6, weight: 2, durability: 40 },
+      materials_used: { iron: 1 },
+      price: 60,
+      delivery_ticks: 6,
+      remarks: 'Simple.',
+    },
   });
 
   // Brann offers c_001, the desk offers c_002; the player buys the desk's dagger and work starts on it.
-  let w = act(createWorld(), 'smith', offer('Brann Dagger')).world;
+  let w = act(createWorld([player, smith, desk.npc]), 'smith', offer('Brann Dagger')).world;
   w = act(w, 'desk', offer('Desk Dagger')).world;
   w = act(w, 'player', { action: 'ACCEPT', contract_id: 'c_002' }).world;
-  w = act(w, 'clock', { action: 'START_WORK', contract_id: 'c_002' }).world;
+  w = act(w, 'desk', { action: 'START_WORK', contract_id: 'c_002' }).world;
+
+  it('the desk is paid, not the smith', () => {
+    expect(w.gold).toMatchObject({ player: 140, smith: 50, desk: 110 });
+  });
 
   it("open offers list only the NPC's own", () => {
     expect(smith.facts(w, 'player')).toMatch(/c_001: Brann Dagger/);

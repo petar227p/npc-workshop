@@ -1,5 +1,4 @@
-import { MAX_SAY_LENGTH, type Verb } from '@blacksmith/shared';
-import { ITEM_TYPES, MATERIALS } from '../config/world';
+import { MAX_SAY_LENGTH, type Catalogue, type MadeToOrder, type OfferKind, type Verb } from '@blacksmith/shared';
 
 // Meta's strict mode forbids a root anyOf, so a model answers in one flat object: the verb, the spoken line,
 // and the union of the fields its verbs use (nullable). Each verb here says which fields it reads and how
@@ -14,49 +13,55 @@ export type FlatVerb = {
 };
 
 const int = { type: 'integer' };
+const str = { type: 'string' };
+const kind = (k: OfferKind) => ({ type: 'string', enum: [k] });
+const object = (properties: Record<string, unknown>) => ({ type: 'object', additionalProperties: false, required: Object.keys(properties), properties });
 
-// Enums come from the world config, so the model can't name an item type or material that doesn't exist.
-const contract = () => ({
-  type: 'object',
-  additionalProperties: false,
-  required: ['item_name', 'item_type', 'description', 'stats', 'materials', 'price', 'delivery_ticks', 'smith_remarks'],
-  properties: {
-    item_name: { type: 'string' },
-    item_type: { type: 'string', enum: Object.keys(ITEM_TYPES) },
-    description: { type: 'string' },
-    stats: {
-      type: 'object',
-      additionalProperties: false,
-      required: ['damage', 'weight', 'durability'],
-      properties: { damage: int, weight: int, durability: int },
-    },
-    materials: {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['material', 'qty'],
-        properties: { material: { type: 'string', enum: Object.keys(MATERIALS) }, qty: int },
-      },
-    },
+// Enums come from the seller's catalogue, so the model can't name an item type, material or good it doesn't sell.
+const madeToOrder = (mto: MadeToOrder) =>
+  object({
+    kind: kind('made_to_order'),
+    item_name: str,
+    item_type: { type: 'string', enum: Object.keys(mto.items) },
+    description: str,
+    stats: object({ damage: int, weight: int, durability: int }),
+    materials: { type: 'array', items: object({ material: { type: 'string', enum: Object.keys(mto.materials) }, qty: int }) },
     price: int,
     delivery_ticks: int,
-    smith_remarks: { type: 'string' },
-  },
-});
+    remarks: str,
+  });
+
+const inStock = (goods: Record<string, unknown>) => object({ kind: kind('in_stock'), good: { type: 'string', enum: Object.keys(goods) }, qty: int, price: int, remarks: str });
+
+function kindsOf(catalogue: Catalogue): OfferKind[] {
+  return [...(catalogue.made_to_order ? ['made_to_order' as const] : []), ...(catalogue.in_stock ? ['in_stock' as const] : [])];
+}
+
+// One shape per kind the seller offers. Nested anyOf is fine in strict mode; only the root may not be one.
+function offerField(catalogue: Catalogue): Record<string, unknown> {
+  const shapes = [
+    ...(catalogue.made_to_order ? [madeToOrder(catalogue.made_to_order)] : []),
+    ...(catalogue.in_stock ? [inStock(catalogue.in_stock)] : []),
+  ];
+  if (shapes.length === 0) throw new Error('OFFER and COUNTER_OFFER need a catalogue with something to sell');
+  return shapes.length === 1 ? shapes[0] : { anyOf: shapes };
+}
 const contractId = () => ({ type: 'string' });
 
-// The materials list becomes materials_used. fromEntries makes own keys, so '__proto__' stays a plain (invalid) name.
-function terms(contract: unknown): Record<string, unknown> {
-  if (!contract || typeof contract !== 'object') return {};
-  const { materials, ...rest } = contract as Record<string, unknown>;
+// The flat offer becomes the action's `terms`. A made-to-order materials list becomes materials_used; fromEntries
+// makes own keys, so '__proto__' stays a plain (invalid) name. A seller with one kind may leave `kind` out.
+function terms(offer: unknown, kinds: OfferKind[]): Record<string, unknown> {
+  if (!offer || typeof offer !== 'object') return {};
+  const { materials, ...rest } = offer as Record<string, unknown>;
+  const k = rest.kind ?? (kinds.length === 1 ? kinds[0] : undefined);
+  if (k !== 'made_to_order') return { ...rest, kind: k };
   const totals = new Map<string, number>();
   if (Array.isArray(materials)) {
     for (const m of materials as { material?: unknown; qty?: unknown }[]) {
       if (typeof m?.material === 'string' && typeof m.qty === 'number') totals.set(m.material, (totals.get(m.material) ?? 0) + m.qty);
     }
   }
-  return { ...rest, materials_used: Object.fromEntries(totals) };
+  return { ...rest, kind: k, materials_used: Object.fromEntries(totals) };
 }
 
 export const SAY: FlatVerb = {
@@ -65,17 +70,23 @@ export const SAY: FlatVerb = {
   toAction: (out) => ({ action: 'SAY', text: out.say.slice(0, MAX_SAY_LENGTH) }),
 };
 
-export const PROPOSE_CONTRACT: FlatVerb = {
-  verb: 'PROPOSE_CONTRACT',
-  fields: { contract: contract() },
-  toAction: (out) => ({ ...terms(out.contract), action: 'PROPOSE_CONTRACT' }),
-};
+export function OFFER(catalogue: Catalogue): FlatVerb {
+  const kinds = kindsOf(catalogue);
+  return {
+    verb: 'OFFER',
+    fields: { offer: offerField(catalogue) },
+    toAction: (out) => ({ action: 'OFFER', terms: terms(out.offer, kinds) }),
+  };
+}
 
-export const COUNTER_OFFER: FlatVerb = {
-  verb: 'COUNTER_OFFER',
-  fields: { contract: contract(), contract_id: contractId() },
-  toAction: (out) => ({ ...terms(out.contract), action: 'COUNTER_OFFER', replaces: out.contract_id }),
-};
+export function COUNTER_OFFER(catalogue: Catalogue): FlatVerb {
+  const kinds = kindsOf(catalogue);
+  return {
+    verb: 'COUNTER_OFFER',
+    fields: { offer: offerField(catalogue), contract_id: contractId() },
+    toAction: (out) => ({ action: 'COUNTER_OFFER', replaces: out.contract_id, terms: terms(out.offer, kinds) }),
+  };
+}
 
 export const REFUSE: FlatVerb = {
   verb: 'REFUSE',
@@ -101,7 +112,10 @@ export function flatSchema(verbs: readonly FlatVerb[]): Record<string, unknown> 
     action: { type: 'string', enum: verbs.map((v) => v.verb) },
     say: { type: 'string' },
   };
-  for (const [name, schema] of fields) properties[name] = { anyOf: [schema, { type: 'null' }] };
+  for (const [name, schema] of fields) {
+    const shapes = Array.isArray(schema.anyOf) ? (schema.anyOf as unknown[]) : [schema];
+    properties[name] = { anyOf: [...shapes, { type: 'null' }] };
+  }
   return { type: 'object', additionalProperties: false, required: Object.keys(properties), properties };
 }
 

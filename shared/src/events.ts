@@ -1,9 +1,11 @@
-import type { Contract } from './index';
+import type { Contract, MadeToOrderTerms } from './trade';
 
 // Typed events, shared by the engine (which produces them) and the browser (which renders them).
 
-export type Item = Pick<Contract, 'contract_id' | 'item_name' | 'item_type' | 'description' | 'stats'> & {
+// A made-to-order item, handed over by the clock. In-stock goods are counts in an actor's stock instead.
+export type Item = Pick<MadeToOrderTerms, 'item_name' | 'item_type' | 'description' | 'stats'> & {
   item_id: string;
+  contract_id: string;
   owner: string;
   delivered_tick: number;
 };
@@ -26,6 +28,7 @@ export type EngineEvent =
   | Base<'CONTRACT_ACCEPTED', { contract_id: string; price: number }>
   | Base<'WORK_STARTED', { contract_id: string; due_tick: number }>
   | Base<'ITEM_DELIVERED', { contract_id: string; item: Item }>
+  | Base<'GOODS_DELIVERED', { contract_id: string; good: string; qty: number }>
   | Base<'ACTION_REJECTED', { verb: string | null; reason: string; proposed: unknown }>
   | Base<'CLOCK_ADVANCED', { from: number }>;
 
@@ -34,7 +37,8 @@ export type EventType = EngineEvent['type'];
 // What the browser gets: the player's side of the world plus the log.
 export type ContractStatus = 'proposed' | 'superseded' | 'refused' | 'accepted' | 'in_progress' | 'delivered';
 
-export type ContractView = Contract & { status: ContractStatus; replaces: string | null; due_tick: number | null };
+export type ContractView = Contract & { status: ContractStatus; seller: string; replaces: string | null; due_tick: number | null };
+export type MadeToOrderView = Extract<ContractView, { kind: 'made_to_order' }>;
 
 // The Muse Image picture of a contract's item, from when work starts. Not part of the ledger.
 export type ItemArt = { status: 'rendering' | 'ready' | 'unavailable'; url: string | null };
@@ -42,7 +46,8 @@ export type ItemArt = { status: 'rendering' | 'ready' | 'unavailable'; url: stri
 export type StateView = {
   tick: number;
   gold: number;
-  materials: Record<string, number>; // unreserved stock at the forge
+  goods: Record<string, number>; // the player's own stock (bought in-stock goods)
+  shops: { id: string; name: string; stock: Record<string, number> }[]; // each seller's unreserved stock
   contracts: ContractView[];
   items: Item[];
   events: EngineEvent[];

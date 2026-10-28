@@ -18,7 +18,7 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
 export const api = {
   state: () => call<StateView>('state'),
   art: () => call<ArtResponse>('art'),
-  say: (text: string) => call<ActionResponse>('say', { text }),
+  say: (text: string, npc?: string) => call<ActionResponse>('say', { text, npc }),
   accept: (contract_id: string) => call<ActionResponse>('accept', { contract_id }),
   tick: (ticks: number) => call<ActionResponse>('tick', { ticks }),
   reset: () => call<ActionResponse>('reset', {}),

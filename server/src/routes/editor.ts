@@ -2,8 +2,8 @@ import { MAX_SAY_LENGTH, type BenchResponse, type EditorLibrary, type PreviewRes
 import type { Context, Hono } from 'hono';
 import { z } from 'zod';
 import { npcTurn, type NpcModel } from '../agents/npc';
-import { createEngine, createWorld } from '../engine';
-import { buildNpc, player, type NpcFiles } from '../npcs';
+import { createEngine, createWorld, type World } from '../engine';
+import { buildNpc, player, type NpcDefinition, type NpcFiles } from '../npcs';
 import { busyMessage, toView, type Session } from '../sessions';
 import type { Env } from './api';
 
@@ -35,7 +35,10 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
   let recent: number[] = []; // bench turns started in the last minute, across all visitors
 
   const body = async <T>(c: Context<Env>, schema: z.ZodType<T>) => schema.safeParse(await c.req.json().catch(() => null));
-  const benchView = (s: Session) => toView(s.bench ?? createWorld(), s.busy !== null);
+  // The bench world holds the player and the draft, each with what it starts with.
+  const benchWorld = (npc: NpcDefinition | null): World => createWorld(npc ? [player, npc] : [player]);
+  const benchView = (s: Session, npc: NpcDefinition | null = null) =>
+    toView(s.bench ?? benchWorld(npc), s.busy !== null, undefined, npc ? { [npc.id]: npc.name } : {});
   const busy = (c: Context<Env>) => c.json({ error: busyMessage(c.get('session')) }, 409);
 
   app.get('/api/editor/library', (c) => c.json({ npcs: deps.files.list(), can_save: deps.canSave } satisfies EditorLibrary));
@@ -46,7 +49,7 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
     if (!parsed.success) return c.json({ error: 'expected { npc }' }, 400);
     const built = buildNpc(parsed.data.npc);
     if (!built.ok) return c.json({ ok: false, errors: built.errors } satisfies PreviewResponse);
-    return c.json({ ok: true, schema: built.npc.schema, facts: built.npc.facts(createWorld(), 'player'), errors: [] } satisfies PreviewResponse);
+    return c.json({ ok: true, schema: built.npc.schema, facts: built.npc.facts(benchWorld(built.npc), 'player'), errors: [] } satisfies PreviewResponse);
   });
 
   app.post('/api/editor/bench/say', async (c) => {
@@ -72,9 +75,9 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
     recent.push(t);
     s.benchTurns += 1;
     const { act } = createEngine([player, built.npc]);
-    const said = act(s.bench ?? createWorld(), 'player', { action: 'SAY', text: parsed.data.text });
+    const said = act(s.bench ?? benchWorld(built.npc), 'player', { action: 'SAY', text: parsed.data.text }, { to: built.npc.id });
     s.bench = said.world;
-    s.busy = 'bench';
+    s.busy = { by: 'bench' };
     try {
       const turn = await npcTurn(built.npc, said.world, model, { act });
       s.bench = turn.world;
@@ -85,7 +88,7 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
         outcome: turn.outcome,
         attempts: turn.attempts.map(({ content, ok, reason, latency_ms }) => ({ content: clip(content), ok, reason, latency_ms })),
         events: [...said.events, ...turn.events],
-        view: benchView(s),
+        view: benchView(s, built.npc),
       } satisfies BenchResponse);
     } finally {
       s.busy = null;

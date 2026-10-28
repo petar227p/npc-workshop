@@ -1,30 +1,34 @@
-import { ACTION_SCHEMAS, type Action, type ActionOf } from '@blacksmith/shared';
+import { ACTION_SCHEMAS, STATS, type Action, type ActionOf, type Catalogue, type InStockTerms, type MadeToOrder, type MadeToOrderTerms, type Start, type Terms } from '@blacksmith/shared';
 import type { ZodType } from 'zod';
-import { ECONOMY, ITEM_TYPES, MATERIALS } from '../config/world';
 import type { EventDraft } from './events';
-import { activeJobs, availableMaterials, type World } from './state';
+import { activeJobs, availableStock, type World } from './state';
 
 export type Verdict = { ok: true; events: EventDraft[] } | { ok: false; reason: string };
 
 export type ActOptions = {
   customer?: string; // who a proposal is for; defaults to the player
+  to?: string; // who a spoken line is addressed to, so each NPC's history holds only its own conversations
 };
 
 // A verb is its schema plus one rule. Actors (NPC definitions, the player) list the verbs they may use;
-// DELIVER is in nobody's list: only the clock delivers.
+// DELIVER is in nobody's list: only the clock delivers. A rule gets the acting actor itself, so nothing in it
+// names a particular NPC: the seller, its place and its catalogue all come from the actor and the offer.
 export type VerbDef<V extends Action['action']> = {
   verb: V;
   schema: ZodType<ActionOf<V>>;
-  rule(world: World, actor: string, action: ActionOf<V>, opts: ActOptions): Verdict;
+  rule(world: World, self: Actor, action: ActionOf<V>, opts: ActOptions): Verdict;
 };
 export type AnyVerbDef = { [V in Action['action']]: VerbDef<V> }[Action['action']];
 
-export type Actor = { id: string; verbs: readonly AnyVerbDef[] };
+export type Actor = {
+  id: string;
+  verbs: readonly AnyVerbDef[];
+  location?: string; // where its events happen; 'village' for an actor with no place of its own (the player)
+  catalogue?: Catalogue; // what it sells; OFFER checks terms against it
+  start?: Start; // its purse and stock in a new world
+};
 
-const FORGE = 'forge';
-const STATS = ['damage', 'weight', 'durability'] as const;
-
-type Terms = ActionOf<'PROPOSE_CONTRACT'>;
+export const placeOf = (a: Pick<Actor, 'location'>) => a.location ?? 'village';
 
 export const reject = (reason: string): Verdict => ({ ok: false, reason });
 
@@ -33,22 +37,25 @@ export function own<T>(record: Record<string, T>, key: string): T | undefined {
   return Object.hasOwn(record, key) ? record[key] : undefined;
 }
 
-export function materialCost(materials: Record<string, number>): number {
-  return Object.entries(materials).reduce((sum, [m, n]) => sum + (own(MATERIALS, m)?.cost ?? 0) * n, 0);
+export function materialCost(mto: MadeToOrder, materials: Record<string, number>): number {
+  return Object.entries(materials).reduce((sum, [m, n]) => sum + (own(mto.materials, m) ?? 0) * n, 0);
 }
 
-export function minPrice(materials: Record<string, number>): number {
-  return Math.ceil(materialCost(materials) * (1 + ECONOMY.min_margin));
+export function minPrice(mto: MadeToOrder, materials: Record<string, number>): number {
+  return Math.ceil(materialCost(mto, materials) * (1 + mto.min_margin));
 }
 
-export function minDeliveryTicks(world: World, itemType: string): number {
-  return Math.ceil(ITEM_TYPES[itemType].base_ticks * (1 + ECONOMY.workload_per_job * activeJobs(world)));
+export function minDeliveryTicks(world: World, seller: string, mto: MadeToOrder, itemType: string): number {
+  return Math.ceil(mto.items[itemType].base_ticks * (1 + mto.workload_per_job * activeJobs(world, seller)));
 }
 
-// Checks shared by PROPOSE_CONTRACT and COUNTER_OFFER. Returns a reason, or null if the terms are legal.
-function checkTerms(world: World, t: Terms): string | null {
-  const def = own(ITEM_TYPES, t.item_type);
-  if (!def) return `unknown item type '${t.item_type}'; Brann makes: ${Object.keys(ITEM_TYPES).join(', ')}`;
+const list = (r: Record<string, unknown> | undefined) => Object.keys(r ?? {}).join(', ') || 'nothing';
+
+function checkMadeToOrder(world: World, self: Actor, t: MadeToOrderTerms): string | null {
+  const mto = self.catalogue?.made_to_order;
+  if (!mto) return `${self.id} doesn't take made-to-order work`;
+  const def = own(mto.items, t.item_type);
+  if (!def) return `unknown item type '${t.item_type}'; ${self.id} makes: ${list(mto.items)}`;
 
   for (const stat of STATS) {
     const v = t.stats[stat];
@@ -58,131 +65,149 @@ function checkTerms(world: World, t: Terms): string | null {
   }
 
   const used = Object.entries(t.materials_used);
-  if (used.length === 0) return 'a contract must use at least one material';
-  const available = availableMaterials(world);
+  if (used.length === 0) return 'a made-to-order item must use at least one material';
+  const available = availableStock(world, self.id);
   for (const [m, n] of used) {
-    if (!own(MATERIALS, m)) return `unknown material '${m}'`;
+    if (own(mto.materials, m) === undefined) return `unknown material '${m}'`;
     const have = own(available, m) ?? 0;
     if (n > have) return `needs ${n} ${m}, only ${have} available`;
   }
 
-  const floor = minPrice(t.materials_used);
+  const floor = minPrice(mto, t.materials_used);
   if (t.price < floor) {
-    return `price ${t.price} is below the minimum of ${floor} (materials ${materialCost(t.materials_used)} + ${ECONOMY.min_margin * 100}% margin)`;
+    return `price ${t.price} is below the minimum of ${floor} (materials ${materialCost(mto, t.materials_used)} + ${mto.min_margin * 100}% margin)`;
   }
 
-  const minTicks = minDeliveryTicks(world, t.item_type);
+  const minTicks = minDeliveryTicks(world, self.id, mto, t.item_type);
   if (t.delivery_ticks < minTicks) {
-    return `delivery in ${t.delivery_ticks} ticks is too fast; a ${t.item_type} takes at least ${minTicks} with ${activeJobs(world)} job(s) on the bench`;
+    return `delivery in ${t.delivery_ticks} ticks is too fast; a ${t.item_type} takes at least ${minTicks} with ${activeJobs(world, self.id)} job(s) in hand`;
   }
   return null;
+}
+
+function checkInStock(world: World, self: Actor, t: InStockTerms): string | null {
+  const goods = self.catalogue?.in_stock;
+  const good = goods && own(goods, t.good);
+  if (!good) return `'${t.good}' isn't for sale here; ${self.id} sells from stock: ${list(goods)}`;
+  const have = own(availableStock(world, self.id), t.good) ?? 0;
+  if (t.qty > have) return `needs ${t.qty} ${t.good}, only ${have} in stock`;
+  const floor = good.min_price * t.qty;
+  if (t.price < floor) return `price ${t.price} is below the minimum of ${floor} (${t.qty} × ${good.min_price})`;
+  return null;
+}
+
+// Checks shared by OFFER and COUNTER_OFFER. Returns a reason, or null if the terms are legal for this seller.
+function checkTerms(world: World, self: Actor, t: Terms): string | null {
+  return t.kind === 'made_to_order' ? checkMadeToOrder(world, self, t) : checkInStock(world, self, t);
 }
 
 function nextContractId(world: World): string {
   return `c_${String(Object.keys(world.contracts).length + 1).padStart(3, '0')}`;
 }
 
-function proposal(world: World, actor: string, t: Terms, customer: string, replaces: string | null): EventDraft {
-  const { action: _, ...terms } = t;
+const at = (world: World, self: Actor) => ({ tick: world.tick, actor: self.id, location: placeOf(self), witnesses: [] as string[] });
+
+function proposal(world: World, self: Actor, terms: Terms, customer: string, replaces: string | null): EventDraft {
   return {
+    ...at(world, self),
     type: 'CONTRACT_PROPOSED',
-    tick: world.tick,
-    actor,
     target: customer,
-    location: FORGE,
-    witnesses: [],
     data: { contract: { ...terms, contract_id: nextContractId(world) }, customer, replaces },
   };
 }
 
-const at = (world: World, actor: string) => ({ tick: world.tick, actor, location: FORGE, witnesses: [] as string[] });
-
 export const SAY: VerbDef<'SAY'> = {
   verb: 'SAY',
   schema: ACTION_SCHEMAS.SAY,
-  rule: (world, actor, action) => ({ ok: true, events: [{ ...at(world, actor), type: 'SAID', target: null, data: { text: action.text } }] }),
+  rule: (world, self, action, opts) => ({ ok: true, events: [{ ...at(world, self), type: 'SAID', target: opts.to ?? null, data: { text: action.text } }] }),
 };
 
-export const PROPOSE_CONTRACT: VerbDef<'PROPOSE_CONTRACT'> = {
-  verb: 'PROPOSE_CONTRACT',
-  schema: ACTION_SCHEMAS.PROPOSE_CONTRACT,
-  rule(world, actor, action, opts) {
-    const reason = checkTerms(world, action);
+export const OFFER: VerbDef<'OFFER'> = {
+  verb: 'OFFER',
+  schema: ACTION_SCHEMAS.OFFER,
+  rule(world, self, action, opts) {
+    const reason = checkTerms(world, self, action.terms);
     if (reason) return reject(reason);
-    return { ok: true, events: [proposal(world, actor, action, opts.customer ?? 'player', null)] };
+    return { ok: true, events: [proposal(world, self, action.terms, opts.customer ?? 'player', null)] };
   },
 };
 
 export const COUNTER_OFFER: VerbDef<'COUNTER_OFFER'> = {
   verb: 'COUNTER_OFFER',
   schema: ACTION_SCHEMAS.COUNTER_OFFER,
-  rule(world, actor, action) {
+  rule(world, self, action) {
     const old = own(world.contracts, action.replaces);
     if (!old) return reject(`no contract ${action.replaces} to counter`);
     if (old.status !== 'proposed') return reject(`contract ${action.replaces} is ${old.status}, not open for a counter-offer`);
-    if (old.seller !== actor) return reject(`contract ${action.replaces} is ${old.seller}'s offer; ${actor} can only counter its own`);
-    const { replaces, ...rest } = action;
-    const terms: Terms = { ...rest, action: 'PROPOSE_CONTRACT' };
-    const reason = checkTerms(world, terms);
+    if (old.seller !== self.id) return reject(`contract ${action.replaces} is ${old.seller}'s offer; ${self.id} can only counter its own`);
+    const reason = checkTerms(world, self, action.terms);
     if (reason) return reject(reason);
-    return { ok: true, events: [proposal(world, actor, terms, old.customer, replaces)] };
+    return { ok: true, events: [proposal(world, self, action.terms, old.customer, action.replaces)] };
   },
 };
 
 export const REFUSE: VerbDef<'REFUSE'> = {
   verb: 'REFUSE',
   schema: ACTION_SCHEMAS.REFUSE,
-  rule(world, actor, action, opts) {
-    // The smith may always refuse an order (pride); withdrawing a specific contract needs it to be open and its own.
+  rule(world, self, action, opts) {
+    // A seller may always refuse an order (pride); withdrawing a specific contract needs it to be open and its own.
     if (action.contract_id) {
       const c = own(world.contracts, action.contract_id);
       if (!c) return reject(`no contract ${action.contract_id} to refuse`);
       if (c.status !== 'proposed') return reject(`contract ${action.contract_id} is ${c.status}; it can't be refused now`);
-      if (c.seller !== actor) return reject(`contract ${action.contract_id} is ${c.seller}'s offer; ${actor} can only withdraw its own`);
+      if (c.seller !== self.id) return reject(`contract ${action.contract_id} is ${c.seller}'s offer; ${self.id} can only withdraw its own`);
     }
     const target = action.contract_id ? world.contracts[action.contract_id].customer : (opts.customer ?? 'player');
     return {
       ok: true,
-      events: [{ ...at(world, actor), type: 'CONTRACT_REFUSED', target, data: { contract_id: action.contract_id, reason: action.reason } }],
+      events: [{ ...at(world, self), type: 'CONTRACT_REFUSED', target, data: { contract_id: action.contract_id, reason: action.reason } }],
     };
   },
 };
 
+// The customer pays the offer's seller. In-stock goods change hands at once; made-to-order work waits for START_WORK.
 export const ACCEPT: VerbDef<'ACCEPT'> = {
   verb: 'ACCEPT',
   schema: ACTION_SCHEMAS.ACCEPT,
-  rule(world, actor, action) {
+  rule(world, self, action) {
     const c = own(world.contracts, action.contract_id);
     if (!c) return reject(`no contract ${action.contract_id}`);
     if (c.status !== 'proposed') return reject(`contract ${action.contract_id} is ${c.status}, not open`);
-    if (c.customer !== actor) return reject(`contract ${action.contract_id} was offered to ${c.customer}, not ${actor}`);
-    const gold = world.gold[actor] ?? 0;
-    if (gold < c.price) return reject(`${actor} has ${gold} gold; the contract costs ${c.price}`);
-    // Stock may have been reserved by another contract since this one was proposed.
-    const available = availableMaterials(world);
-    for (const [m, n] of Object.entries(c.materials_used)) {
+    if (c.customer !== self.id) return reject(`contract ${action.contract_id} was offered to ${c.customer}, not ${self.id}`);
+    const gold = world.gold[self.id] ?? 0;
+    if (gold < c.price) return reject(`${self.id} has ${gold} gold; the contract costs ${c.price}`);
+    // Stock may have been reserved or sold since this offer was made.
+    const needs = c.kind === 'made_to_order' ? c.materials_used : { [c.good]: c.qty };
+    const available = availableStock(world, c.seller);
+    for (const [m, n] of Object.entries(needs)) {
       const left = own(available, m) ?? 0;
       if (n > left) return reject(`needs ${n} ${m}, only ${left} left unreserved`);
     }
-    return {
-      ok: true,
-      events: [{ ...at(world, actor), type: 'CONTRACT_ACCEPTED', target: 'smith', data: { contract_id: c.contract_id, price: c.price } }],
-    };
+    const here = { tick: world.tick, location: c.location, witnesses: [] as string[] };
+    const events: EventDraft[] = [
+      { ...here, type: 'CONTRACT_ACCEPTED', actor: self.id, target: c.seller, data: { contract_id: c.contract_id, price: c.price } },
+    ];
+    if (c.kind === 'in_stock') {
+      events.push({ ...here, type: 'GOODS_DELIVERED', actor: c.seller, target: c.customer, data: { contract_id: c.contract_id, good: c.good, qty: c.qty } });
+    }
+    return { ok: true, events };
   },
 };
 
 export const START_WORK: VerbDef<'START_WORK'> = {
   verb: 'START_WORK',
   schema: ACTION_SCHEMAS.START_WORK,
-  rule(world, actor, action) {
+  rule(world, self, action) {
     const c = own(world.contracts, action.contract_id);
     if (!c) return reject(`no contract ${action.contract_id}`);
+    if (c.seller !== self.id) return reject(`contract ${action.contract_id} is ${c.seller}'s job, not ${self.id}'s`);
+    if (c.kind !== 'made_to_order') return reject(`contract ${action.contract_id} is a sale from stock; there is no work to start`);
     if (c.status !== 'accepted') return reject(`contract ${action.contract_id} is ${c.status}; work starts only after it's accepted`);
     return {
       ok: true,
       events: [
         {
-          ...at(world, actor),
+          ...at(world, self),
           type: 'WORK_STARTED',
           target: c.customer,
           data: { contract_id: c.contract_id, due_tick: world.tick + c.delivery_ticks },

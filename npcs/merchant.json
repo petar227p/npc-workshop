@@ -1,0 +1,27 @@
+{
+  "id": "merchant",
+  "name": "Mira",
+  "verbs": ["SAY", "OFFER", "COUNTER_OFFER", "REFUSE"],
+  "model_verbs": ["SAY", "OFFER", "COUNTER_OFFER", "REFUSE"],
+  "facts": ["purse", "stock", "catalogue", "price_floor", "open_offers"],
+  "perception_radius": 4,
+  "location": "market",
+  "start": {
+    "gold": 30,
+    "stock": { "torch": 10, "rope": 4, "rations": 8, "healing_salve": 3, "lantern": 1 }
+  },
+  "catalogue": {
+    "in_stock": {
+      "torch": { "min_price": 2 },
+      "rope": { "min_price": 4 },
+      "rations": { "min_price": 3 },
+      "healing_salve": { "min_price": 12 },
+      "lantern": { "min_price": 20 }
+    }
+  },
+  "cue": "Reply to the customer's last words.",
+  "fallbacks": {
+    "rejected": "Let me check my shelves. Ask me again.",
+    "unavailable": "One moment, I've a customer at the other end of the stall."
+  }
+}

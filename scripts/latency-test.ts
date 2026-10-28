@@ -8,9 +8,8 @@ import { parseArgs } from 'node:util';
 import { fromFlat, parseFlat } from '../server/src/agents/flat';
 import { turnMessages } from '../server/src/agents/npc';
 import { REPO_ROOT, loadEnv } from '../server/src/config/env';
-import { createWorld } from '../server/src/engine';
 import { createClient, type ChatClient, type ReasoningEffort } from '../server/src/models';
-import { act, smith } from '../server/src/npcs';
+import { act, newVillage, smith } from '../server/src/npcs';
 
 const { values: args } = parseArgs({ options: { n: { type: 'string', default: '5' }, only: { type: 'string' } } });
 const N = Number(args.n);
@@ -53,7 +52,7 @@ const setups = groups.flatMap((g) => ALL[g]);
 
 // The turn that matters most: a customer has just ordered, and the smith should quote.
 const ORDER = "Good morning. I'd like a sword shaped like a hammerhead shark: broad head, heavy at the tip. I've got about 150 gold.";
-const world = act(createWorld(), 'player', { action: 'SAY', text: ORDER }).world;
+const world = act(newVillage(), 'player', { action: 'SAY', text: ORDER }).world;
 const messages = turnMessages(smith, world);
 const IMAGE_PROMPT =
   'A single hand-forged fantasy sword, the Hammerhead Blade: a broad iron blade whose head widens like a hammerhead shark, ' +

@@ -28,6 +28,9 @@ const BLANK: NpcDraft = {
   model_verbs: ['SAY'],
   facts: ['clock'],
   perception_radius: 4,
+  location: 'square',
+  start: { gold: 0, stock: {} },
+  catalogue: {},
   cue: "Reply to the customer's last words.",
   fallbacks: { rejected: 'Hm. Ask me again.', unavailable: "I'm busy. Come back in a moment." },
 };
@@ -55,6 +58,7 @@ function loadStored(): NpcDraft | null {
   const list = <T extends string>(x: unknown, allowed: readonly T[], fallback: T[]) =>
     Array.isArray(x) ? (x.filter((i) => (allowed as readonly unknown[]).includes(i)) as T[]) : fallback;
   const fb = (v.fallbacks && typeof v.fallbacks === 'object' ? v.fallbacks : {}) as Record<string, unknown>;
+  const object = <K extends 'start' | 'catalogue'>(k: K) => (v[k] && typeof v[k] === 'object' && !Array.isArray(v[k]) ? (v[k] as NpcDraft[K]) : BLANK[k]);
   const verbs = list(v.verbs, LEDGER_VERBS, BLANK.verbs);
   return {
     id: text('id'),
@@ -64,6 +68,9 @@ function loadStored(): NpcDraft | null {
     model_verbs: list(v.model_verbs, MODEL_VERBS, BLANK.model_verbs).filter((m) => verbs.includes(m)),
     facts: list(v.facts, FACT_BLOCKS, BLANK.facts),
     perception_radius: typeof v.perception_radius === 'number' && Number.isFinite(v.perception_radius) ? v.perception_radius : BLANK.perception_radius,
+    location: typeof v.location === 'string' ? v.location : BLANK.location,
+    start: object('start'),
+    catalogue: object('catalogue'),
     cue: text('cue'),
     fallbacks: {
       rejected: typeof fb.rejected === 'string' ? fb.rejected : BLANK.fallbacks.rejected,
@@ -207,6 +214,17 @@ export function Editor() {
         </p>
         <VerbTable draft={draft} onChange={(verbs, model_verbs) => setDraft((d) => ({ ...d, verbs, model_verbs }))} />
 
+        <h3>Where it is and what it sells</h3>
+        <p className="muted small">
+          The catalogue is what OFFER checks against: made-to-order item types (stat ranges, base hours, material costs, margin) and goods
+          sold from stock (minimum price each). The ledger refuses an offer verb without one.
+        </p>
+        <Field label="Place" hint="where its events happen, e.g. forge, market">
+          <input value={draft.location} maxLength={41} onChange={(e) => set('location', e.target.value)} />
+        </Field>
+        <JsonField label="Catalogue" hint="JSON" value={draft.catalogue} onChange={(v) => set('catalogue', v as NpcDraft['catalogue'])} />
+        <JsonField label="Starting purse and stock" hint="JSON" value={draft.start} onChange={(v) => set('start', v as NpcDraft['start'])} />
+
         <h3>What it knows</h3>
         <div className="facts">
           {FACT_BLOCKS.map((b) => (
@@ -272,6 +290,38 @@ export function Editor() {
         </section>
       </aside>
     </div>
+  );
+}
+
+// Raw JSON until the catalogue gets a form of its own. A value that parses goes to the draft (the server checks its
+// shape); while it doesn't parse, the draft keeps the last good one. A new starting point replaces the text.
+function JsonField({ label, hint, value, onChange }: { label: string; hint: string; value: object; onChange: (v: object) => void }) {
+  const [text, setText] = useState(() => JSON.stringify(value, null, 2));
+  const [bad, setBad] = useState(false);
+  const shown = useRef(JSON.stringify(value));
+  useEffect(() => {
+    const now = JSON.stringify(value);
+    if (now === shown.current) return;
+    shown.current = now;
+    setText(JSON.stringify(value, null, 2));
+    setBad(false);
+  }, [value]);
+  const edit = (t: string) => {
+    setText(t);
+    try {
+      const v: unknown = JSON.parse(t);
+      if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('not an object');
+      shown.current = JSON.stringify(v);
+      setBad(false);
+      onChange(v);
+    } catch {
+      setBad(true);
+    }
+  };
+  return (
+    <Field label={label} hint={bad ? 'not valid JSON yet; the last valid version is kept' : hint}>
+      <textarea className="code-input" value={text} spellCheck={false} onChange={(e) => edit(e.target.value)} />
+    </Field>
   );
 }
 
@@ -405,7 +455,7 @@ function Bench({ draft, valid }: { draft: NpcDraft; valid: boolean }) {
         </div>
         <div className="messages bench-messages" ref={box}>
           {(view?.events.length ?? 0) === 0 && pending === null && <div className="note">Say something to {draft.name || 'the NPC'}.</div>}
-          {view && speechFirst(view.events, draft.id).map((e) => <BenchEntry key={e.id} event={e} view={view} npcName={draft.name} />)}
+          {view && speechFirst(view.events).map((e) => <BenchEntry key={e.id} event={e} view={view} npcName={draft.name} />)}
           {pending !== null && (
             <>
               <div className="msg you">{pending}</div>

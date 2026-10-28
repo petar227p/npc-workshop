@@ -37,6 +37,7 @@ export async function npcTurn(
 ): Promise<TurnResult> {
   const customer = opts.customer ?? 'player';
   const act = opts.act ?? villageAct;
+  const to = { customer, to: customer }; // every line and action of this turn is addressed to the customer
   const messages = turnMessages(npc, world, customer);
   const schema = { name: `${npc.id}_action`, schema: npc.schema };
   const attempts: Attempt[] = [];
@@ -54,12 +55,12 @@ export async function npcTurn(
         json_schema: schema,
       });
     } catch {
-      const said = act(w, npc.id, { action: 'SAY', text: npc.fallbacks.unavailable });
+      const said = act(w, npc.id, { action: 'SAY', text: npc.fallbacks.unavailable }, to);
       return { world: said.world, events: [...events, ...said.events], attempts, outcome: 'unavailable' };
     }
 
     const out = parseFlat(res.content);
-    const r = act(w, npc.id, out ? fromFlat(npc.modelVerbs, out) : res.content, { customer });
+    const r = act(w, npc.id, out ? fromFlat(npc.modelVerbs, out) : res.content, to);
     w = r.world;
     events.push(...r.events);
     attempts.push({ content: res.content, ok: r.ok, reason: r.reason, usage: res.usage, latency_ms: res.latency_ms });
@@ -68,7 +69,7 @@ export async function npcTurn(
       // The spoken line goes in after the action passes, so the NPC never announces something the ledger refused.
       // The action already stands; a line the ledger won't take is dropped rather than logged as a failed turn.
       if (out && out.action !== 'SAY' && out.say.trim()) {
-        const said = act(w, npc.id, { action: 'SAY', text: out.say.slice(0, MAX_SAY_LENGTH) });
+        const said = act(w, npc.id, { action: 'SAY', text: out.say.slice(0, MAX_SAY_LENGTH) }, to);
         if (said.ok) {
           w = said.world;
           events.push(...said.events);
@@ -86,6 +87,6 @@ export async function npcTurn(
     );
   }
 
-  const said = act(w, npc.id, { action: 'SAY', text: npc.fallbacks.rejected });
+  const said = act(w, npc.id, { action: 'SAY', text: npc.fallbacks.rejected }, to);
   return { world: said.world, events: [...events, ...said.events], attempts, outcome: 'fallback' };
 }

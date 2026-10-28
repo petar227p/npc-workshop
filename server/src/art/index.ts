@@ -24,9 +24,10 @@ export function createStudio(limits: StudioLimits = {}) {
   let recent: number[] = []; // renders started in the last minute, across all visitors
 
   return {
-    // Starts the picture for a contract unless it has one, or the caps say no (then it stays a placeholder).
-    // Returns the render so tests can wait for it; routes don't.
+    // Starts the picture for a made-to-order contract unless it has one, or the caps say no (then it stays a placeholder).
+    // Goods from stock get no picture. Returns the render so tests can wait for it; routes don't.
     start(owner: ArtOwner, contract: Contract, client: ImageClient | null): Promise<void> | null {
+      if (contract.kind !== 'made_to_order') return null;
       const gallery = owner.art;
       if (gallery.has(contract.contract_id)) return null;
       const entry: ArtEntry = { id: randomUUID(), status: 'unavailable', png: null };
