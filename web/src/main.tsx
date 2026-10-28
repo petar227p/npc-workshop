@@ -2,7 +2,7 @@ import type { ActionResponse, StateView } from '@blacksmith/shared';
 import { lazy, StrictMode, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api } from './api';
-import { Chat } from './Chat';
+import { Chat, type Pending } from './Chat';
 import { Editor } from './Editor';
 
 // Phaser is most of the bundle, so the village loads on its own and the workshop doesn't wait for it.
@@ -43,7 +43,7 @@ function App() {
 // The village: walk up to someone and talk, accept offers, skip time.
 function VillagePage() {
   const [view, setView] = useState<StateView | null>(null);
-  const [pending, setPending] = useState<string | null>(null);
+  const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [talkTo, setTalkTo] = useState('smith');
   const chatInput = useRef<HTMLInputElement>(null);
@@ -84,7 +84,7 @@ function VillagePage() {
   }, []);
 
   const say = async (text: string) => {
-    setPending(text);
+    setPending({ text, npc: talkTo });
     await run(api.say(text, talkTo));
     setPending(null);
   };

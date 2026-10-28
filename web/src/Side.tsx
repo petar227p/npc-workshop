@@ -1,7 +1,7 @@
 import type { ContractView, EngineEvent, Gift, ItemArt, MadeToOrderView, StateView } from '@blacksmith/shared';
 import { useState } from 'react';
 import { clockText } from './api';
-import { gaveText, goodName, nameOf } from './Chat';
+import { gaveText, giftText, goodName, nameOf } from './Chat';
 
 type ForgeProps = { view: StateView; disabled: boolean; onSkip: (ticks: number) => void; onReset: () => void };
 
@@ -105,7 +105,8 @@ export function Inventory({ view, disabled, onGive }: { view: StateView; disable
   );
 }
 
-// Hand gold, goods or an item to anyone in the village. The ledger checks you have it; a refusal shows as an error.
+// Hand gold, goods or an item to anyone in the village. The ledger checks you have it (if not, an error) and a seller
+// hands back anything outside its trade (a note in that NPC's chat).
 function GiveForm({ view, goods, disabled, onGive }: { view: StateView; goods: string[]; disabled: boolean; onGive: (to: string, gift: Gift) => void }) {
   const [to, setTo] = useState('');
   const [what, setWhat] = useState('gold');
@@ -212,6 +213,8 @@ function describe(e: EngineEvent, view: StateView): string {
       return `Time passes (${e.tick - e.data.from} h)`;
     case 'GIVEN':
       return gaveText(e, view);
+    case 'GIFT_REFUSED':
+      return `${who} refused ${giftText(e.data)} from ${e.target === 'player' ? 'you' : nameOf(view, e.target ?? '')} (${e.data.reason})`;
     case 'TRIGGER_FIRED':
       return e.data.trigger.kind === 'every_hours' ? `${who} acts on their own (every ${e.data.trigger.hours} h)` : `${who} acts on their own`;
     case 'EMOTED':

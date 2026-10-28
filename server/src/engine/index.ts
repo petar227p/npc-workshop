@@ -3,7 +3,7 @@ import type { ZodError, ZodType } from 'zod';
 import { commit, type EngineEvent } from './events';
 import type { World } from './state';
 import { placeAt } from './schedule';
-import { own, reject, type ActOptions, type Actor, type Verdict } from './validator';
+import { own, reject, type ActOptions, type Actor, type ActorOf, type Verdict } from './validator';
 
 export { advance } from './clock';
 export { entryAt, placeAt } from './schedule';
@@ -48,9 +48,9 @@ function check(actors: Actors, world: World, actor: string, raw: unknown, opts: 
     return reject(`${actor} may not use ${verb}`);
   }
   // Each definition's schema only ever yields its own verb's action, so its rule can take what it parses.
-  const run = def as unknown as { schema: ZodType<Action>; rule(w: World, a: Actor, action: Action, o: ActOptions): Verdict };
+  const run = def as unknown as { schema: ZodType<Action>; rule(w: World, a: Actor, action: Action, o: ActOptions, actorOf: ActorOf): Verdict };
   const parsed = run.schema.safeParse(raw);
-  return parsed.success ? run.rule(world, self, parsed.data, opts) : reject(parseReason(parsed.error));
+  return parsed.success ? run.rule(world, self, parsed.data, opts, (id) => own(actors, id)) : reject(parseReason(parsed.error));
 }
 
 // The one door into the world for agents and the player: role check → parse → rule → commit.

@@ -64,17 +64,50 @@ describe('GIVE', () => {
     expect(give(w, 'merchant', 'merchant', { kind: 'gold', amount: 1 }).reason).toMatch(/to itself/);
   });
 
+  const withSword = (): World => ({
+    ...fresh(),
+    items: [{ item_id: 'i_c_001', contract_id: 'c_001', owner: 'player', item_name: 'Shark Fang', item_type: 'sword', description: '', stats: { damage: 9, weight: 5, durability: 50 }, delivered_tick: 6 }],
+  });
+
   it('an item changes owner only if the giver owns it', () => {
-    const w: World = {
-      ...fresh(),
-      items: [{ item_id: 'i_c_001', contract_id: 'c_001', owner: 'player', item_name: 'Shark Fang', item_type: 'sword', description: '', stats: { damage: 9, weight: 5, durability: 50 }, delivered_tick: 6 }],
-    };
+    const w = withSword();
     expect(give(w, 'merchant', 'player', { kind: 'item', item_id: 'i_c_001' }).reason).toMatch(/belongs to player, not merchant/);
     expect(give(w, 'merchant', 'player', { kind: 'item', item_id: 'i_c_404' }).reason).toMatch(/no item i_c_404/);
-    const r = give(w, 'player', 'merchant', { kind: 'item', item_id: 'i_c_001' });
+    const r = give(w, 'player', 'smith', { kind: 'item', item_id: 'i_c_001' });
     expect(r.ok).toBe(true);
     expect(r.events[0].data).toMatchObject({ item_name: 'Shark Fang' });
-    expect(r.world.items[0].owner).toBe('merchant');
+    expect(r.world.items[0].owner).toBe('smith');
+  });
+
+  it('a seller hands back what is not its trade: logged at its place, nothing else changes', () => {
+    const w = withSword();
+    // The stall sells torches and rope; a sword is the smith's trade.
+    const sword = give(w, 'player', 'merchant', { kind: 'item', item_id: 'i_c_001' });
+    expect(sword.ok).toBe(true);
+    expect(sword.events).toHaveLength(1);
+    expect(sword.events[0]).toMatchObject({
+      type: 'GIFT_REFUSED',
+      actor: 'merchant',
+      target: 'player',
+      location: 'market',
+      data: { item_name: 'Shark Fang', reason: 'a seller takes only gold and its own trade: torch, rope' },
+    });
+    const { events: _a, ...after } = sword.world;
+    const { events: _b, ...before } = w;
+    expect(after).toEqual(before); // the sword is still the player's
+
+    // Goods go by the receiver's catalogue too: the stall's wares, or the forge's materials.
+    const torches = give(fresh(), 'merchant', 'smith', { kind: 'good', good: 'torch', qty: 2 });
+    expect(torches.events[0]).toMatchObject({ type: 'GIFT_REFUSED', actor: 'smith', target: 'merchant', location: 'forge' });
+    expect(torches.events[0].type === 'GIFT_REFUSED' && torches.events[0].data.reason).toMatch(/iron, steel, oak, leather, sharkskin_leather, silver, sword, dagger$/);
+    expect(torches.world.stock).toEqual(fresh().stock);
+  });
+
+  it('gold is always welcome, and an actor that sells nothing takes anything', () => {
+    const gold = give(fresh(), 'player', 'smith', { kind: 'gold', amount: 3 });
+    expect(gold.events[0].type).toBe('GIVEN');
+    expect(gold.world.gold.smith).toBe(53);
+    expect(give(fresh(), 'merchant', 'player', { kind: 'good', good: 'rope', qty: 1 }).events[0].type).toBe('GIVEN');
   });
 
   it('a verb the actor does not list is rejected before its rule runs', () => {
