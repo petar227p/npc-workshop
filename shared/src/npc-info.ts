@@ -66,6 +66,14 @@ export const TRIGGER_INFO: Record<TriggerKind, { label: string; description: str
   every_hours: { label: 'On a timer', description: 'Acts on its own when the clock passes every N hours (a call to customers, a gift). A capped number of NPCs act per tick.' },
 };
 
+// From `from` o'clock it is at `place`, until the next entry's hour (the last entry runs on past midnight to the first).
+export type ScheduleEntry = { from: number; place: string };
+
+// The character frames in Tiny Dungeon (rows 7–9 of the sheet). The player is 85.
+export const PLAYER_SPRITE = 85;
+export const NPC_SPRITES = [84, 86, 87, 88, 96, 97, 98, 99, 100, 108, 109, 110, 111, 112] as const;
+export const DEFAULT_SPRITE = 98;
+
 export const MAX_PERSONA_LENGTH = 6000;
 export const NPC_ID_PATTERN = '^[a-z][a-z0-9_]{0,40}$';
 export const RESERVED_IDS = ['player'] as const; // actor ids an NPC can't take
@@ -81,7 +89,9 @@ export type NpcDraft = {
   perception_radius: number;
   model: ModelChoice;
   effort: EffortChoice;
-  location: string; // the place its events happen at (forge, market…)
+  location: string; // its own place (forge, market…): where it is when its schedule says nothing
+  schedule: ScheduleEntry[]; // where it goes during the day; its events happen wherever it is
+  sprite: number; // its look: a character frame in Kenney's Tiny Dungeon sheet
   start: Start; // its purse and stock in a new world
   catalogue: Catalogue; // what it sells; empty for an NPC that only talks
   triggers: Trigger[];
@@ -89,7 +99,7 @@ export type NpcDraft = {
   fallbacks: { rejected: string; unavailable: string };
 };
 
-export type EditorLibrary = { npcs: NpcDraft[]; can_save: boolean };
+export type EditorLibrary = { npcs: NpcDraft[]; can_save: boolean; places: string[] }; // places: the named places on the village map
 
 export type PreviewResponse =
   | { ok: true; schema: Record<string, unknown>; facts: string; errors: [] }

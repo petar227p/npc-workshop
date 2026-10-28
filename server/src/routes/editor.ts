@@ -6,6 +6,7 @@ import { createEngine, createWorld, timedTrigger, type World } from '../engine';
 import { answers, passTime } from '../game';
 import { buildNpc, player, type NpcDefinition, type NpcFiles } from '../npcs';
 import { busyMessage, toView, type Session } from '../sessions';
+import { PLACE_NAMES } from '../village';
 import type { Env } from './api';
 
 // The NPC editor. Drafts live in the browser and come with every request, so nothing a visitor writes is
@@ -40,7 +41,7 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
   // The bench world holds the player and the draft, each with what it starts with.
   const benchWorld = (npc: NpcDefinition | null): World => createWorld(npc ? [player, npc] : [player]);
   const benchView = (s: Session, npc: NpcDefinition | null = null) =>
-    toView(s.bench ?? benchWorld(npc), s.busy !== null, undefined, npc ? { [npc.id]: npc.name } : {});
+    toView(s.bench ?? benchWorld(npc), s.busy !== null, undefined, npc ? [npc] : []);
   const busy = (c: Context<Env>) => c.json({ error: busyMessage(c.get('session')) }, 409);
   const clip = (content: string) => (content.length > MAX_ATTEMPT_CHARS ? `${content.slice(0, MAX_ATTEMPT_CHARS)}… (clipped)` : content);
   const shown = (attempts: Attempt[]) => attempts.map(({ content, ok, reason, latency_ms }) => ({ content: clip(content), ok, reason, latency_ms }));
@@ -63,7 +64,7 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
     return model;
   };
 
-  app.get('/api/editor/library', (c) => c.json({ npcs: deps.files.list(), can_save: deps.canSave } satisfies EditorLibrary));
+  app.get('/api/editor/library', (c) => c.json({ npcs: deps.files.list(), can_save: deps.canSave, places: [...PLACE_NAMES] } satisfies EditorLibrary));
 
   // The generated model schema and what the NPC would be told in a fresh world.
   app.post('/api/editor/preview', async (c) => {

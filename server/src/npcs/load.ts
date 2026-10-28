@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { NpcDraftSchema, NpcFileSchema, type Catalogue, type ModelVerb, type NpcDraft, type Start } from '@blacksmith/shared';
 import * as flat from '../agents/flat';
 import { verbs } from '../engine';
+import { PLACE_NAMES } from '../village';
 import { factsFor } from './facts';
 import { historyFor } from './history';
 import { defineNpc, type NpcDefinition } from './types';
@@ -37,11 +38,13 @@ function modelVerb(v: ModelVerb, catalogue: Catalogue, start: Start): flat.FlatV
 
 export type Built = { ok: true; npc: NpcDefinition; draft: NpcDraft } | { ok: false; errors: string[] };
 
-// Every problem as one readable line, for the editor.
-export function buildNpc(input: unknown): Built {
+// Every problem as one readable line, for the editor. `places` are the named places on the village map.
+export function buildNpc(input: unknown, places: readonly string[] = PLACE_NAMES): Built {
   const parsed = NpcDraftSchema.safeParse(input);
   if (!parsed.success) return { ok: false, errors: parsed.error.issues.map((i) => `${i.path.join('.') || 'npc'}: ${i.message}`) };
   const d = parsed.data;
+  const missing = [...new Set([d.location, ...d.schedule.map((e) => e.place)])].filter((p) => !places.includes(p));
+  if (missing.length > 0) return { ok: false, errors: missing.map((p) => `there's no place called '${p}' on the village map (places: ${places.join(', ')})`) };
   try {
     const npc = defineNpc({
       id: d.id,
@@ -49,6 +52,8 @@ export function buildNpc(input: unknown): Built {
       prompt: d.persona,
       verbs: d.verbs.map((v) => LEDGER[v]),
       location: d.location,
+      schedule: d.schedule,
+      sprite: d.sprite,
       catalogue: d.catalogue,
       start: d.start,
       modelVerbs: d.model_verbs.map((v) => modelVerb(v, d.catalogue, d.start)),

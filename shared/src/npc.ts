@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { MAX_SAY_LENGTH } from './limits';
 import { CatalogueSchema, StartSchema } from './trade';
 import {
+  DEFAULT_SPRITE,
   EFFORT_CHOICES,
   FACT_BLOCKS,
   LEDGER_VERBS,
@@ -10,6 +11,7 @@ import {
   MODEL_CHOICES,
   MODEL_VERBS,
   NPC_ID_PATTERN,
+  NPC_SPRITES,
   RESERVED_IDS,
   type NpcDraft,
 } from './npc-info';
@@ -20,6 +22,14 @@ import {
 const unique = <T>(list: T[]) => new Set(list).size === list.length;
 const line = z.string().trim().min(1).max(MAX_SAY_LENGTH);
 const cue = z.string().trim().min(1).max(300);
+
+const placeName = z.string().regex(new RegExp(NPC_ID_PATTERN), 'a place name: lowercase letters, digits and _');
+
+// Hours must differ, so it's never unclear where an NPC is. Sorted by the loader, so the order in the file doesn't matter.
+const ScheduleSchema = z
+  .array(z.object({ from: z.number().int().min(0).max(23), place: placeName }).strict())
+  .max(24)
+  .refine((s) => unique(s.map((e) => e.from)), 'two entries start at the same hour');
 
 const TriggerSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('on_spoken_to') }).strict(),
@@ -39,7 +49,9 @@ export const NpcFileSchema = z
     perception_radius: z.number().int().min(0).max(20),
     model: z.enum(MODEL_CHOICES).default('muse_spark'), // files from before the picker are sellers on Muse Spark
     effort: z.enum(EFFORT_CHOICES).default('low'), // files from before the picker thought at low, the old fixed value
-    location: z.string().regex(new RegExp(NPC_ID_PATTERN), 'a place name: lowercase letters, digits and _'),
+    location: placeName,
+    schedule: ScheduleSchema.default([]), // files from before schedules stayed at their place all day
+    sprite: z.number().int().refine((n) => (NPC_SPRITES as readonly number[]).includes(n), 'not one of the character sprites').default(DEFAULT_SPRITE),
     start: StartSchema,
     catalogue: CatalogueSchema,
     // Files from before triggers only ever answered when spoken to.

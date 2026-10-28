@@ -1,6 +1,7 @@
-import { ACTION_SCHEMAS, STATS, type Action, type ActionOf, type Catalogue, type InStockTerms, type MadeToOrder, type MadeToOrderTerms, type Start, type Terms } from '@blacksmith/shared';
+import { ACTION_SCHEMAS, STATS, type Action, type ActionOf, type Catalogue, type InStockTerms, type MadeToOrder, type MadeToOrderTerms, type ScheduleEntry, type Start, type Terms } from '@blacksmith/shared';
 import type { ZodType } from 'zod';
 import type { EventDraft } from './events';
+import { placeAt } from './schedule';
 import { activeJobs, availableStock, type World } from './state';
 
 export type Verdict = { ok: true; events: EventDraft[] } | { ok: false; reason: string };
@@ -23,11 +24,13 @@ export type AnyVerbDef = { [V in Action['action']]: VerbDef<V> }[Action['action'
 export type Actor = {
   id: string;
   verbs: readonly AnyVerbDef[];
-  location?: string; // where its events happen; 'village' for an actor with no place of its own (the player)
+  location?: string; // its own place; 'village' for an actor with no place of its own (the player)
+  schedule?: readonly ScheduleEntry[]; // where it is during the day; its own place when this says nothing
   catalogue?: Catalogue; // what it sells; OFFER checks terms against it
   start?: Start; // its purse and stock in a new world
 };
 
+// Its own place, whatever the hour. Events happen where it is at their tick: `placeAt`.
 export const placeOf = (a: Pick<Actor, 'location'>) => a.location ?? 'village';
 
 export const reject = (reason: string): Verdict => ({ ok: false, reason });
@@ -105,7 +108,7 @@ function nextContractId(world: World): string {
   return `c_${String(Object.keys(world.contracts).length + 1).padStart(3, '0')}`;
 }
 
-const at = (world: World, self: Actor) => ({ tick: world.tick, actor: self.id, location: placeOf(self), witnesses: [] as string[] });
+const at = (world: World, self: Actor) => ({ tick: world.tick, actor: self.id, location: placeAt(self, world.tick), witnesses: [] as string[] });
 
 function proposal(world: World, self: Actor, terms: Terms, customer: string, replaces: string | null): EventDraft {
   return {

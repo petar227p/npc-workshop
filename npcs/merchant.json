@@ -8,6 +8,12 @@
   "model": "muse_spark",
   "effort": "low",
   "location": "market",
+  "schedule": [
+    { "from": 8, "place": "market" },
+    { "from": 19, "place": "tavern" },
+    { "from": 23, "place": "market" }
+  ],
+  "sprite": 99,
   "start": {
     "gold": 30,
     "stock": { "torch": 10, "rope": 4, "rations": 8, "healing_salve": 3, "lantern": 1 }

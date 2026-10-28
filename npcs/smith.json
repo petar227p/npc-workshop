@@ -8,6 +8,8 @@
   "model": "muse_spark",
   "effort": "low",
   "location": "forge",
+  "schedule": [],
+  "sprite": 86,
   "start": {
     "gold": 50,
     "stock": { "iron": 12, "steel": 4, "oak": 8, "leather": 6, "sharkskin_leather": 2, "silver": 1 }

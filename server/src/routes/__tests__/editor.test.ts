@@ -36,7 +36,9 @@ const miller: NpcDraft = {
   perception_radius: 3,
   model: 'muse_spark_open',
   effort: 'medium',
-  location: 'mill',
+  location: 'cottage',
+  schedule: [],
+  sprite: 98,
   start: { gold: 5, stock: {} },
   catalogue: {},
   triggers: [{ kind: 'on_spoken_to' }],
@@ -157,7 +159,7 @@ describe('NPC editor api', () => {
     const trader = { ...miller, verbs: ['SAY', 'OFFER', 'START_WORK'], model_verbs: ['SAY', 'OFFER'], catalogue, start };
     const r = await send<BenchResponse>('/api/editor/bench/say', { npc: trader, text: 'A sword.' });
     expect(r.json.view.contracts).toEqual([expect.objectContaining({ contract_id: 'c_001', price: 120, status: 'proposed', seller: 'miller' })]);
-    expect(r.json.events.find((e) => e.type === 'CONTRACT_PROPOSED')).toMatchObject({ actor: 'miller', location: 'mill' });
+    expect(r.json.events.find((e) => e.type === 'CONTRACT_PROPOSED')).toMatchObject({ actor: 'miller', location: 'cottage' });
     // The bench world gives the draft its own starting stock, shown under its name.
     expect(r.json.view.shops).toEqual([{ id: 'miller', name: 'Odda', stock: start.stock }]);
   });

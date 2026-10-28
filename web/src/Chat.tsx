@@ -1,7 +1,7 @@
 import type { ContractView, EngineEvent, StateView } from '@blacksmith/shared';
 // The zod-free module, so the schemas stay out of the bundle.
 import { MAX_SAY_LENGTH } from '@blacksmith/shared/src/limits';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 import { clockText } from './api';
 
 type Props = {
@@ -11,12 +11,16 @@ type Props = {
   pending: string | null; // the player's line while that NPC is thinking
   onSay: (text: string) => void;
   onAccept: (contractId: string) => void;
+  inputRef?: RefObject<HTMLInputElement>; // the village focuses it when the player walks up to someone
 };
+
+// A Tiny Dungeon character frame at 3x, as the portrait's background.
+const portraitStyle = (frame: number) => ({ backgroundPosition: `-${(frame % 12) * 48}px -${Math.floor(frame / 12) * 48}px` });
 
 // Display names come with each seller's stock in the view.
 export const nameOf = (view: StateView, id: string) => view.shops.find((s) => s.id === id)?.name ?? id;
 
-export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept }: Props) {
+export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRef }: Props) {
   const [text, setText] = useState('');
   const box = useRef<HTMLDivElement>(null);
   const thinking = pending !== null;
@@ -37,7 +41,7 @@ export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept }: Props
   return (
     <section className="panel chat-panel">
       <div className="chat-head">
-        <div className="portrait" />
+        <div className="portrait" style={portraitStyle(view.people.find((p) => p.id === talkTo)?.sprite ?? 86)} />
         <div>
           <label className="chat-name">
             <span className="sr-only">Talking to </span>
@@ -73,7 +77,9 @@ export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept }: Props
           maxLength={MAX_SAY_LENGTH}
           placeholder={talkTo === 'smith' ? 'Describe what you want forged…' : `Ask ${name} for something…`}
           aria-label={`Message to ${name}`}
-          autoFocus
+          ref={inputRef}
+          // Esc hands the keys back to walking.
+          onKeyDown={(e) => e.key === 'Escape' && e.currentTarget.blur()}
         />
         <button disabled={thinking || !text.trim()}>Send</button>
       </form>

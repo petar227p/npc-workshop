@@ -11,6 +11,7 @@ export type NpcSpec = Actor & {
   model: ModelChoice; // which model voices it; the route picks the client from this
   effort: EffortChoice; // how hard that model thinks each turn
   perception_radius: number; // in tiles: who witnesses this NPC's events (used by perception from Oct 30)
+  sprite?: number; // its look in the village (a Tiny Dungeon frame); the default villager if not given
   facts(world: World, customer: string): string; // code-owned numbers it may quote
   history(world: World, customer: string): string; // the conversation with this customer, rebuilt from the event log
   triggers?: readonly Trigger[]; // when it takes a turn; being spoken to if not given

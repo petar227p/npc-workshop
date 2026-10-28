@@ -382,6 +382,19 @@ describe('api', () => {
     expect(empty.events[0].type).toBe('ACTION_REJECTED');
   });
 
+  it('the view says where each NPC is, from its schedule; the browser only walks them there', async () => {
+    const { app } = setup();
+    const b = browser(app);
+    const start = (await b.send('/api/state')).json as StateView;
+    expect(start.people).toEqual([
+      { id: 'merchant', name: 'Mira', sprite: 99, place: 'market' },
+      { id: 'smith', name: 'Brann', sprite: 86, place: 'forge' },
+    ]);
+    const evening = (await b.send('/api/tick', { ticks: 11 })).json as ActionResponse; // 19:00
+    expect(evening.view.people.find((p) => p.id === 'merchant')?.place).toBe('tavern');
+    expect(evening.view.people.find((p) => p.id === 'smith')?.place).toBe('forge');
+  });
+
   it('passing time calls no model while nobody in the village is on a timer', async () => {
     const { app, made } = setup();
     const r = (await browser(app).send('/api/tick', { ticks: 24 })).json as ActionResponse;

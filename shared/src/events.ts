@@ -47,8 +47,12 @@ export type MadeToOrderView = Extract<ContractView, { kind: 'made_to_order' }>;
 // The Muse Image picture of a contract's item, from when work starts. Not part of the ledger.
 export type ItemArt = { status: 'rendering' | 'ready' | 'unavailable'; url: string | null };
 
+// An NPC in the village and the place it is at this tick, worked out by the server. The browser walks it there.
+export type PersonView = { id: string; name: string; sprite: number; place: string };
+
 export type StateView = {
   tick: number;
+  people: PersonView[];
   gold: number;
   goods: Record<string, number>; // the player's own stock (bought in-stock goods)
   shops: { id: string; name: string; stock: Record<string, number> }[]; // each seller's unreserved stock

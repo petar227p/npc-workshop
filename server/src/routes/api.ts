@@ -6,10 +6,10 @@ import { getCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
 import type { NpcModel } from '../agents/npc';
 import { artView, createStudio, type StudioLimits } from '../art';
-import { placeOf } from '../engine';
+import { placeAt } from '../engine';
 import { answers, passTime, playerAccepts, playerGives, playerSays, playerSpeaks } from '../game';
 import type { ImageClient } from '../models/image';
-import { NAMES, NPC_FILES, NPCS, newVillage, smith as brann, type NpcFiles } from '../npcs';
+import { NPC_FILES, NPCS, newVillage, smith as brann, type NpcFiles } from '../npcs';
 import { busyMessage, createSessionStore, guestSession, toView, type Session, type SessionLimits } from '../sessions';
 import { mountEditor, type BenchLimits } from './editor';
 
@@ -78,7 +78,7 @@ export function createApi(deps: ApiDeps) {
 
   const respond = (c: Context<Env>, r: Omit<ActionResponse, 'view'>) => {
     const s = c.get('session');
-    return c.json({ ...r, view: toView(s.world, s.busy !== null, s.art, NAMES) } satisfies ActionResponse);
+    return c.json({ ...r, view: toView(s.world, s.busy !== null, s.art, NPCS) } satisfies ActionResponse);
   };
   // A missing key or bad config is the server's problem: say so plainly, log the cause, change nothing.
   const modelFor = (s: Session, choice: ModelChoice): NpcModel | null => {
@@ -108,7 +108,7 @@ export function createApi(deps: ApiDeps) {
 
   app.get('/api/state', (c) => {
     const s = c.get('session');
-    return c.json(toView(s.world, s.busy !== null, s.art, NAMES));
+    return c.json(toView(s.world, s.busy !== null, s.art, NPCS));
   });
 
   // Polled by the page while a picture renders; only the pictures, so a poll can't overwrite a newer world.
@@ -136,7 +136,7 @@ export function createApi(deps: ApiDeps) {
     }
 
     const model = modelFor(s, npc.model);
-    if (!model) return c.json({ error: `${npc.name} isn't at the ${placeOf(npc).replace(/_/g, ' ')} right now. Try again later.` }, 503);
+    if (!model) return c.json({ error: `${npc.name} isn't at the ${placeAt(npc, s.world.tick).replace(/_/g, ' ')} right now. Try again later.` }, 503);
 
     s.busy = { by: 'npc', name: npc.name };
     try {

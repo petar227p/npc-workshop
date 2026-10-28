@@ -2,6 +2,7 @@ import type { BenchAttempt, BenchResponse, EngineEvent, NpcDraft, PreviewRespons
 // The zod-free modules, so the schemas stay out of the bundle.
 import { MAX_SAY_LENGTH } from '@blacksmith/shared/src/limits';
 import {
+  DEFAULT_SPRITE,
   EFFORT_CHOICES,
   EFFORT_INFO,
   FACT_BLOCKS,
@@ -12,10 +13,12 @@ import {
   MODEL_CHOICES,
   MODEL_INFO,
   MODEL_VERBS,
+  NPC_SPRITES,
   TRIGGER_INFO,
   VERB_INFO,
   type LedgerVerb,
   type ModelVerb,
+  type ScheduleEntry,
   type Trigger,
 } from '@blacksmith/shared/src/npc-info';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
@@ -39,6 +42,8 @@ const BLANK: NpcDraft = {
   model: 'muse_spark_open',
   effort: 'low',
   location: 'square',
+  schedule: [],
+  sprite: DEFAULT_SPRITE,
   start: { gold: 0, stock: {} },
   catalogue: {},
   triggers: [{ kind: 'on_spoken_to' }],
@@ -93,6 +98,11 @@ function loadStored(): NpcDraft | null {
     facts: list(v.facts, FACT_BLOCKS, BLANK.facts),
     perception_radius: typeof v.perception_radius === 'number' && Number.isFinite(v.perception_radius) ? v.perception_radius : BLANK.perception_radius,
     location: typeof v.location === 'string' ? v.location : BLANK.location,
+    // Drafts from before schedules stayed at their place all day, and looked like the default villager.
+    schedule: Array.isArray(v.schedule)
+      ? (v.schedule as Record<string, unknown>[]).filter((e) => typeof e?.from === 'number' && typeof e.place === 'string').map((e) => ({ from: e.from as number, place: e.place as string }))
+      : BLANK.schedule,
+    sprite: (NPC_SPRITES as readonly unknown[]).includes(v.sprite) ? (v.sprite as number) : BLANK.sprite,
     // Drafts from before the picker were all on Muse Spark.
     model: (MODEL_CHOICES as readonly unknown[]).includes(v.model) ? (v.model as NpcDraft['model']) : 'muse_spark',
     effort: (EFFORT_CHOICES as readonly unknown[]).includes(v.effort) ? (v.effort as NpcDraft['effort']) : 'low',
@@ -120,6 +130,7 @@ type Turn = { text: string; attempts: BenchAttempt[]; outcome: BenchResponse['ou
 export function Editor() {
   const [library, setLibrary] = useState<NpcDraft[]>([]);
   const [canSave, setCanSave] = useState(false);
+  const [places, setPlaces] = useState<string[]>([]);
   const stored = useRef(loadStored()); // read once, before the first save overwrites it
   const [draft, setDraft] = useState<NpcDraft>(() => stored.current ?? BLANK);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
@@ -131,6 +142,7 @@ export function Editor() {
       (lib) => {
         setLibrary(lib.npcs);
         setCanSave(lib.can_save);
+        setPlaces(lib.places);
         // First visit: start from Brann, so there is something real to look at.
         if (!stored.current && lib.npcs[0]) setDraft(lib.npcs.find((n) => n.id === 'smith') ?? lib.npcs[0]);
       },
@@ -265,9 +277,15 @@ export function Editor() {
           The catalogue is what OFFER checks against. The ledger refuses an offer verb with nothing in it, a made-to-order catalogue
           without START_WORK, and GIVE on an NPC that sells.
         </p>
-        <Field label="Place" hint="where its events happen, e.g. forge, market">
-          <input value={draft.location} maxLength={41} onChange={(e) => set('location', e.target.value)} />
-        </Field>
+        <div className="row2">
+          <Field label="Place" hint="where it is when its day says nothing else">
+            <PlacePicker places={places} value={draft.location} onChange={(p) => set('location', p)} />
+          </Field>
+          <Field label="Look">
+            <SpritePicker value={draft.sprite} onChange={(s) => set('sprite', s)} />
+          </Field>
+        </div>
+        <Schedule places={places} home={draft.location} value={draft.schedule} onChange={(s) => set('schedule', s)} />
         <CatalogueForm value={draft} onChange={({ catalogue, start }) => setDraft((d) => ({ ...d, catalogue, start }))} />
 
         <h3>What it knows</h3>
@@ -348,6 +366,87 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       </span>
       {children}
     </label>
+  );
+}
+
+const placeLabel = (p: string) => p.replace(/_/g, ' ');
+
+// The named places on the village map. A value that isn't one (a hand-edited draft) stays listed, and the
+// server's check says what's wrong with it.
+function PlacePicker({ places, value, onChange }: { places: string[]; value: string; onChange: (p: string) => void }) {
+  const options = places.includes(value) ? places : [value, ...places];
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)}>
+      {options.map((p) => (
+        <option key={p} value={p}>
+          {placeLabel(p)}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+// Tiny Dungeon character frames, drawn from the sheet at 2x.
+export const spriteStyle = (frame: number) => ({ backgroundPosition: `-${(frame % 12) * 32}px -${Math.floor(frame / 12) * 32}px` });
+
+function SpritePicker({ value, onChange }: { value: number; onChange: (s: number) => void }) {
+  return (
+    <div className="sprites" role="radiogroup" aria-label="Look">
+      {NPC_SPRITES.map((f) => (
+        <button
+          key={f}
+          type="button"
+          role="radio"
+          aria-checked={value === f}
+          aria-label={`Character ${f}`}
+          className={`sprite${value === f ? ' on' : ''}`}
+          style={spriteStyle(f)}
+          onClick={() => onChange(f)}
+        />
+      ))}
+    </div>
+  );
+}
+
+const HOURS = Array.from({ length: 24 }, (_, h) => h);
+const hourText = (h: number) => `${String(h).padStart(2, '0')}:00`;
+
+// Its day: from an hour it goes to a place, until the next entry. With no entries it stays at its place.
+function Schedule({ places, home, value, onChange }: { places: string[]; home: string; value: ScheduleEntry[]; onChange: (s: ScheduleEntry[]) => void }) {
+  const sorted = [...value].sort((a, b) => a.from - b.from);
+  const replace = (i: number, e: ScheduleEntry) => onChange(sorted.map((x, j) => (j === i ? e : x)));
+  const free = HOURS.find((h) => !value.some((e) => e.from === h));
+  return (
+    <div className="field">
+      <span className="field-label">
+        Its day <span className="muted">· the village walks it there; whatever it does happens where it stands</span>
+      </span>
+      {sorted.length === 0 && <span className="muted small">At the {placeLabel(home)} all day.</span>}
+      {sorted.map((e, i) => (
+        <div key={i} className="inline">
+          <span className="muted small">from</span>
+          <select value={e.from} onChange={(ev) => replace(i, { ...e, from: Number(ev.target.value) })} aria-label="From hour">
+            {HOURS.filter((h) => h === e.from || !value.some((x) => x.from === h)).map((h) => (
+              <option key={h} value={h}>
+                {hourText(h)}
+              </option>
+            ))}
+          </select>
+          <span className="muted small">at the</span>
+          <PlacePicker places={places} value={e.place} onChange={(p) => replace(i, { ...e, place: p })} />
+          <button type="button" className="secondary small" onClick={() => onChange(sorted.filter((_, j) => j !== i))}>
+            Remove
+          </button>
+        </div>
+      ))}
+      {free !== undefined && (
+        <div>
+          <button type="button" className="secondary small" onClick={() => onChange([...sorted, { from: sorted.length ? free : 8, place: home }])}>
+            Add a stop
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -169,3 +169,20 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .catalogue input.cat-num { width: 58px; padding: 4px 6px; }
 .cat-table .range > span { display: flex; align-items: center; gap: 3px; justify-content: center; }
 .definition { min-width: 0; }
+
+/* The village canvas above the chat */
+.village-col { height: calc(100vh - 80px); min-height: 640px; }
+.game { height: 55%; min-height: 300px; flex-shrink: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #5a9e4b; }
+.game canvas { display: block; }
+.village-col .chat-panel { flex: 1; height: auto; min-height: 240px; }
+@media (max-width: 860px) {
+  .village-col { height: auto; min-height: 0; }
+  .game { height: 50vh; }
+  .village-col .chat-panel { height: 60vh; }
+}
+
+/* Workshop: look and day */
+.sprites { display: flex; flex-wrap: wrap; gap: 4px; }
+.sprite { width: 36px; height: 36px; padding: 0; border: 2px solid transparent; border-radius: 6px; background: var(--panel-2) url(/assets/dungeon/tilemap_packed.png) no-repeat; background-size: 384px 352px; image-rendering: pixelated; }
+.sprite.on { border-color: var(--accent); }
+.field .inline { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
