@@ -66,7 +66,26 @@ export function apply(world: World, event: EngineEvent): World {
       to[good] = (to[good] ?? 0) + qty;
       break;
     }
+    case 'GIVEN': {
+      const { gift } = event.data;
+      const [from, to] = [event.actor, event.target as string];
+      if (gift.kind === 'gold') {
+        w.gold[from] -= gift.amount;
+        w.gold[to] = (w.gold[to] ?? 0) + gift.amount;
+      } else if (gift.kind === 'good') {
+        const a = (w.stock[from] ??= {});
+        const b = (w.stock[to] ??= {});
+        a[gift.good] -= gift.qty;
+        b[gift.good] = (b[gift.good] ?? 0) + gift.qty;
+      } else {
+        const item = w.items.find((i) => i.item_id === gift.item_id);
+        if (item) item.owner = to;
+      }
+      break;
+    }
     case 'SAID':
+    case 'EMOTED':
+    case 'TRIGGER_FIRED':
     case 'ACTION_REJECTED':
     case 'CLOCK_ADVANCED':
       break;

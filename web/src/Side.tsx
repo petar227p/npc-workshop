@@ -1,6 +1,7 @@
-import type { ContractView, EngineEvent, ItemArt, MadeToOrderView, StateView } from '@blacksmith/shared';
+import type { ContractView, EngineEvent, Gift, ItemArt, MadeToOrderView, StateView } from '@blacksmith/shared';
+import { useState } from 'react';
 import { clockText } from './api';
-import { goodName, nameOf } from './Chat';
+import { gaveText, goodName, nameOf } from './Chat';
 
 type ForgeProps = { view: StateView; disabled: boolean; onSkip: (ticks: number) => void; onReset: () => void };
 
@@ -72,12 +73,12 @@ export function Stock({ view }: { view: StateView }) {
   );
 }
 
-export function Inventory({ view }: { view: StateView }) {
+export function Inventory({ view, disabled, onGive }: { view: StateView; disabled: boolean; onGive: (to: string, gift: Gift) => void }) {
   const goods = Object.entries(view.goods).filter(([, n]) => n > 0);
-  if (view.items.length === 0 && goods.length === 0) return null;
   return (
     <section className="panel">
       <h2>Your gear</h2>
+      {view.items.length === 0 && goods.length === 0 && <div className="muted">Nothing yet but your purse.</div>}
       {goods.length > 0 && (
         <ul className="stock">
           {goods.map(([g, n]) => (
@@ -99,7 +100,59 @@ export function Inventory({ view }: { view: StateView }) {
           </div>
         </div>
       ))}
+      <GiveForm view={view} goods={goods.map(([g]) => g)} disabled={disabled} onGive={onGive} />
     </section>
+  );
+}
+
+// Hand gold, goods or an item to anyone in the village. The ledger checks you have it; a refusal shows as an error.
+function GiveForm({ view, goods, disabled, onGive }: { view: StateView; goods: string[]; disabled: boolean; onGive: (to: string, gift: Gift) => void }) {
+  const [to, setTo] = useState('');
+  const [what, setWhat] = useState('gold');
+  const [qty, setQty] = useState(1);
+  const choices = [
+    { value: 'gold', label: 'gold' },
+    ...goods.map((g) => ({ value: `good:${g}`, label: goodName(g) })),
+    ...view.items.map((i) => ({ value: `item:${i.item_id}`, label: i.item_name })),
+  ];
+  // A choice that's gone (given away, or a new game) falls back to the first one.
+  const pick = choices.some((c) => c.value === what) ? what : 'gold';
+  const target = view.shops.some((s) => s.id === to) ? to : (view.shops[0]?.id ?? '');
+  const isItem = pick.startsWith('item:');
+  const gift = (): Gift =>
+    pick === 'gold' ? { kind: 'gold', amount: qty } : isItem ? { kind: 'item', item_id: pick.slice(5) } : { kind: 'good', good: pick.slice(5), qty };
+
+  return (
+    <form
+      className="give"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (target) onGive(target, gift());
+      }}
+    >
+      <span className="muted small">Give</span>
+      {!isItem && (
+        <input type="number" min={1} value={qty} onChange={(e) => setQty(Math.max(1, Number.parseInt(e.target.value || '1', 10)))} aria-label="How many" />
+      )}
+      <select value={pick} onChange={(e) => setWhat(e.target.value)} aria-label="What to give">
+        {choices.map((c) => (
+          <option key={c.value} value={c.value}>
+            {c.label}
+          </option>
+        ))}
+      </select>
+      <span className="muted small">to</span>
+      <select value={target} onChange={(e) => setTo(e.target.value)} aria-label="Who to give it to">
+        {view.shops.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+      <button className="secondary small" disabled={disabled || !target}>
+        Give
+      </button>
+    </form>
   );
 }
 
@@ -157,6 +210,12 @@ function describe(e: EngineEvent, view: StateView): string {
       return `Rejected ${e.actor} ${e.data.verb ?? 'output'}: ${e.data.reason}`;
     case 'CLOCK_ADVANCED':
       return `Time passes (${e.tick - e.data.from} h)`;
+    case 'GIVEN':
+      return gaveText(e, view);
+    case 'TRIGGER_FIRED':
+      return e.data.trigger.kind === 'every_hours' ? `${who} acts on their own (every ${e.data.trigger.hours} h)` : `${who} acts on their own`;
+    case 'EMOTED':
+      return `${who} ${e.data.text}`;
     case 'SAID':
       return e.data.text;
   }

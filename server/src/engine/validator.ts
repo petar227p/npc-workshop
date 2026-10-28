@@ -122,6 +122,13 @@ export const SAY: VerbDef<'SAY'> = {
   rule: (world, self, action, opts) => ({ ok: true, events: [{ ...at(world, self), type: 'SAID', target: opts.to ?? null, data: { text: action.text } }] }),
 };
 
+// Flavour: a gesture changes nothing, so it is always allowed.
+export const EMOTE: VerbDef<'EMOTE'> = {
+  verb: 'EMOTE',
+  schema: ACTION_SCHEMAS.EMOTE,
+  rule: (world, self, action, opts) => ({ ok: true, events: [{ ...at(world, self), type: 'EMOTED', target: opts.to ?? null, data: { text: action.text } }] }),
+};
+
 export const OFFER: VerbDef<'OFFER'> = {
   verb: 'OFFER',
   schema: ACTION_SCHEMAS.OFFER,
@@ -214,5 +221,33 @@ export const START_WORK: VerbDef<'START_WORK'> = {
         },
       ],
     };
+  },
+};
+
+// A gift needs only that the giver has it: gold in its purse, goods it hasn't promised to a job, an item it owns.
+// Whether an NPC should give at all is the definition's call (GIVE in its verbs); nothing is ever taken from the receiver.
+export const GIVE: VerbDef<'GIVE'> = {
+  verb: 'GIVE',
+  schema: ACTION_SCHEMAS.GIVE,
+  rule(world, self, action, opts) {
+    const to = action.to ?? opts.customer ?? 'player';
+    if (to === self.id) return reject(`${self.id} can't give something to itself`);
+    // Every actor in a world has a purse from its start. Being in range waits for positions (the village).
+    if (!Object.hasOwn(world.gold, to)) return reject(`there's nobody called '${to}' here to give to`);
+    const g = action.gift;
+    let itemName: string | null = null;
+    if (g.kind === 'gold') {
+      const have = world.gold[self.id] ?? 0;
+      if (g.amount > have) return reject(`${self.id} has ${have} gold; it can't give ${g.amount}`);
+    } else if (g.kind === 'good') {
+      const have = own(availableStock(world, self.id), g.good) ?? 0;
+      if (g.qty > have) return reject(`${self.id} has ${have} ${g.good} to spare; it can't give ${g.qty}`);
+    } else {
+      const item = world.items.find((i) => i.item_id === g.item_id);
+      if (!item) return reject(`there is no item ${g.item_id}`);
+      if (item.owner !== self.id) return reject(`${g.item_id} belongs to ${item.owner}, not ${self.id}`);
+      itemName = item.item_name;
+    }
+    return { ok: true, events: [{ ...at(world, self), type: 'GIVEN', target: to, data: { gift: g, item_name: itemName } }] };
   },
 };

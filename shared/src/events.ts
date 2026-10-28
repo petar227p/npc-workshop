@@ -1,4 +1,5 @@
-import type { Contract, MadeToOrderTerms } from './trade';
+import type { Trigger } from './npc-info';
+import type { Contract, Gift, MadeToOrderTerms } from './trade';
 
 // Typed events, shared by the engine (which produces them) and the browser (which renders them).
 
@@ -23,12 +24,15 @@ type Base<T extends string, D> = {
 
 export type EngineEvent =
   | Base<'SAID', { text: string }>
+  | Base<'EMOTED', { text: string }>
   | Base<'CONTRACT_PROPOSED', { contract: Contract; customer: string; replaces: string | null }>
   | Base<'CONTRACT_REFUSED', { contract_id: string | null; reason: string }>
   | Base<'CONTRACT_ACCEPTED', { contract_id: string; price: number }>
   | Base<'WORK_STARTED', { contract_id: string; due_tick: number }>
   | Base<'ITEM_DELIVERED', { contract_id: string; item: Item }>
   | Base<'GOODS_DELIVERED', { contract_id: string; good: string; qty: number }>
+  | Base<'GIVEN', { gift: Gift; item_name: string | null }> // target: who got it; item_name for an item, so the log can name it
+  | Base<'TRIGGER_FIRED', { trigger: Trigger }> // an NPC acting on its own; its turn's events follow
   | Base<'ACTION_REJECTED', { verb: string | null; reason: string; proposed: unknown }>
   | Base<'CLOCK_ADVANCED', { from: number }>;
 

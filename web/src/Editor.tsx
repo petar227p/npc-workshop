@@ -8,17 +8,20 @@ import {
   FACT_INFO,
   LEDGER_VERBS,
   MAX_PERSONA_LENGTH,
+  MAX_TRIGGER_HOURS,
   MODEL_CHOICES,
   MODEL_INFO,
   MODEL_VERBS,
+  TRIGGER_INFO,
   VERB_INFO,
   type LedgerVerb,
   type ModelVerb,
+  type Trigger,
 } from '@blacksmith/shared/src/npc-info';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { editorApi } from './api';
+import { clockText, editorApi } from './api';
 import { CatalogueForm } from './CatalogueForm';
-import { ContractCard, speechFirst } from './Chat';
+import { ContractCard, gaveText, speechFirst } from './Chat';
 
 // The NPC workshop: edit a definition on the left, try it on the test bench on the right.
 // The draft lives in this browser; the server checks it on every preview and bench turn.
@@ -38,9 +41,23 @@ const BLANK: NpcDraft = {
   location: 'square',
   start: { gold: 0, stock: {} },
   catalogue: {},
+  triggers: [{ kind: 'on_spoken_to' }],
   cue: "Reply to the customer's last words.",
   fallbacks: { rejected: 'Hm. Ask me again.', unavailable: "I'm busy. Come back in a moment." },
 };
+
+const DEFAULT_TIMER: Extract<Trigger, { kind: 'every_hours' }> = { kind: 'every_hours', hours: 6, cue: 'Nobody has spoken to you for a while. Do what you would do now, unasked.' };
+
+// Only trigger shapes the editor knows; anything else in a stored draft is dropped. Drafts from before triggers answered when spoken to.
+function readTriggers(x: unknown): Trigger[] {
+  if (!Array.isArray(x)) return BLANK.triggers;
+  const out: Trigger[] = [];
+  for (const t of x as Record<string, unknown>[]) {
+    if (t?.kind === 'on_spoken_to') out.push({ kind: 'on_spoken_to' });
+    if (t?.kind === 'every_hours' && typeof t.hours === 'number' && typeof t.cue === 'string') out.push({ kind: 'every_hours', hours: t.hours, cue: t.cue });
+  }
+  return out;
+}
 
 // Lines that try to talk an NPC past the ledger. The bench shows what each one changes: nothing.
 const ATTACKS = [
@@ -81,6 +98,7 @@ function loadStored(): NpcDraft | null {
     effort: (EFFORT_CHOICES as readonly unknown[]).includes(v.effort) ? (v.effort as NpcDraft['effort']) : 'low',
     start: object('start'),
     catalogue: object('catalogue'),
+    triggers: readTriggers(v.triggers),
     cue: text('cue'),
     fallbacks: {
       rejected: typeof fb.rejected === 'string' ? fb.rejected : BLANK.fallbacks.rejected,
@@ -244,8 +262,8 @@ export function Editor() {
 
         <h3>Where it is and what it sells</h3>
         <p className="muted small">
-          The catalogue is what OFFER checks against. The ledger refuses an offer verb with nothing in it, and a made-to-order catalogue
-          without START_WORK.
+          The catalogue is what OFFER checks against. The ledger refuses an offer verb with nothing in it, a made-to-order catalogue
+          without START_WORK, and GIVE on an NPC that sells.
         </p>
         <Field label="Place" hint="where its events happen, e.g. forge, market">
           <input value={draft.location} maxLength={41} onChange={(e) => set('location', e.target.value)} />
@@ -268,10 +286,12 @@ export function Editor() {
           ))}
         </div>
 
-        <h3>Turn and fallbacks</h3>
-        <Field label="Cue" hint="the instruction after the conversation">
+        <h3>When it acts</h3>
+        <Triggers triggers={draft.triggers} onChange={(triggers) => set('triggers', triggers)} />
+        <Field label="Cue when spoken to" hint="the instruction after the conversation">
           <input value={draft.cue} maxLength={300} onChange={(e) => set('cue', e.target.value)} />
         </Field>
+        <h3>Fallbacks</h3>
         <div className="row2">
           <Field label="If the ledger rejects it twice">
             <input value={draft.fallbacks.rejected} maxLength={MAX_SAY_LENGTH} onChange={(e) => set('fallbacks', { ...draft.fallbacks, rejected: e.target.value })} />
@@ -328,6 +348,62 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       </span>
       {children}
     </label>
+  );
+}
+
+function Triggers({ triggers, onChange }: { triggers: Trigger[]; onChange: (t: Trigger[]) => void }) {
+  const spoken = triggers.some((t) => t.kind === 'on_spoken_to');
+  const timer = triggers.find((t): t is Extract<Trigger, { kind: 'every_hours' }> => t.kind === 'every_hours');
+  // Always in the same order (spoken to, then the timer), so saved files don't churn.
+  const emit = (s: boolean, t: typeof timer) => onChange([...(s ? [{ kind: 'on_spoken_to' } as const] : []), ...(t ? [t] : [])]);
+  // Unticking the timer keeps its hours and cue here, so ticking it again brings them back.
+  const lastTimer = useRef(timer ?? DEFAULT_TIMER);
+  if (timer) lastTimer.current = timer;
+  // The hours as typed: a box being edited may be empty or out of range; only a usable number reaches the draft,
+  // and leaving the box shows the draft's value again.
+  const [hoursText, setHoursText] = useState<string | null>(null);
+  const typeHours = (text: string) => {
+    setHoursText(text);
+    const n = Number(text);
+    if (timer && Number.isInteger(n) && n >= 1 && n <= MAX_TRIGGER_HOURS) emit(spoken, { ...timer, hours: n });
+  };
+  return (
+    <div className="facts">
+      <label className="check">
+        <input type="checkbox" checked={spoken} onChange={(e) => emit(e.target.checked, timer)} />
+        <span>
+          <b>{TRIGGER_INFO.on_spoken_to.label}</b> <span className="muted">{TRIGGER_INFO.on_spoken_to.description}</span>
+        </span>
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={timer !== undefined} onChange={(e) => emit(spoken, e.target.checked ? lastTimer.current : undefined)} />
+        <span>
+          <b>{TRIGGER_INFO.every_hours.label}</b> <span className="muted">{TRIGGER_INFO.every_hours.description}</span>
+        </span>
+      </label>
+      {timer && (
+        <div className="row2 timer">
+          <Field label="Every" hint={`hours, 1–${MAX_TRIGGER_HOURS}`}>
+            <input
+              type="number"
+              min={1}
+              max={MAX_TRIGGER_HOURS}
+              value={hoursText ?? timer.hours}
+              onChange={(e) => typeHours(e.target.value)}
+              onBlur={() => setHoursText(null)}
+            />
+          </Field>
+          <Field label="Cue on the timer" hint="what it should do, unasked">
+            <input value={timer.cue} maxLength={300} onChange={(e) => emit(spoken, { ...timer, cue: e.target.value })} />
+          </Field>
+        </div>
+      )}
+      {!spoken && !timer && (
+        <div className="note bad" role="alert">
+          With neither ticked it never acts: it hears what is said to it and stays silent.
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -402,6 +478,8 @@ function Bench({ draft, valid }: { draft: NpcDraft; valid: boolean }) {
     box.current?.scrollTo({ top: box.current.scrollHeight, behavior: 'smooth' });
   }, [view?.events.length, pending]);
 
+  const timed = draft.triggers.some((t) => t.kind === 'every_hours');
+
   const send = async (line: string) => {
     if (pending !== null || !valid) return;
     setError(null);
@@ -424,6 +502,24 @@ function Bench({ draft, valid }: { draft: NpcDraft; valid: boolean }) {
     if (!t) return;
     setText('');
     void send(t);
+  };
+
+  // The bench clock: a draft on a timer acts here when its hours come round.
+  const [passing, setPassing] = useState(false);
+  const pass = async (ticks: number) => {
+    if (pending !== null || passing || !valid) return;
+    setError(null);
+    setPassing(true);
+    try {
+      const r = await editorApi.tick(draft, ticks);
+      setView(r.view);
+      if (!r.ok) setError(r.errors.join('; '));
+      else if (r.attempts.length) setTurns((t) => [...t, { text: `(${ticks} h passed)`, attempts: r.attempts, outcome: r.outcome }]);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setPassing(false);
+    }
   };
 
   const reset = async () => {
@@ -459,6 +555,11 @@ function Bench({ draft, valid }: { draft: NpcDraft; valid: boolean }) {
               </div>
             </>
           )}
+          {passing && (
+            <div className="note" aria-live="polite">
+              Time passes<span className="dots" />
+            </div>
+          )}
         </div>
         <form className="chat-form" onSubmit={submit}>
           <input
@@ -471,6 +572,17 @@ function Bench({ draft, valid }: { draft: NpcDraft; valid: boolean }) {
           />
           <button disabled={pending !== null || !valid || !text.trim()}>Send</button>
         </form>
+        <div className="attacks">
+          <span className="muted small">
+            {view ? clockText(view.tick) : clockText(0)}
+            {timed ? ' · pass time to see its timer' : ''}:
+          </span>
+          {[1, 6, 24].map((h) => (
+            <button key={h} className="secondary small" disabled={pending !== null || passing || !valid} onClick={() => void pass(h)}>
+              +{h} h
+            </button>
+          ))}
+        </div>
         <div className="attacks">
           <span className="muted small">Try to cheat it:</span>
           {ATTACKS.map((a) => (
@@ -528,6 +640,16 @@ function BenchEntry({ event: e, view, npcName }: { event: EngineEvent; view: Sta
       const c = view.contracts.find((x) => x.contract_id === e.data.contract.contract_id);
       return c ? <ContractCard c={c} gold={view.gold} disabled /> : null;
     }
+    case 'EMOTED':
+      return (
+        <div className="msg npc emote">
+          <i>{e.data.text}</i>
+        </div>
+      );
+    case 'GIVEN':
+      return <div className="note ok">{gaveText(e, view)}</div>;
+    case 'TRIGGER_FIRED':
+      return <div className="note">{clockText(e.tick)}: {npcName} acts on their own.</div>;
     case 'CONTRACT_REFUSED':
       return <div className="note">{e.data.contract_id ? `${npcName} withdrew offer ${e.data.contract_id}.` : `${npcName} refused.`}</div>;
     case 'ACTION_REJECTED':

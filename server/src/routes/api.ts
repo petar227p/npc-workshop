@@ -7,7 +7,7 @@ import { z } from 'zod';
 import type { NpcModel } from '../agents/npc';
 import { artView, createStudio, type StudioLimits } from '../art';
 import { placeOf } from '../engine';
-import { playerAccepts, playerSays, skipTime } from '../game';
+import { answers, passTime, playerAccepts, playerGives, playerSays, playerSpeaks } from '../game';
 import type { ImageClient } from '../models/image';
 import { NAMES, NPC_FILES, NPCS, newVillage, smith as brann, type NpcFiles } from '../npcs';
 import { busyMessage, createSessionStore, guestSession, toView, type Session, type SessionLimits } from '../sessions';
@@ -23,6 +23,7 @@ const ART_FILE = /^([0-9a-f-]{36})\.png$/;
 const SayBody = z.object({ text: z.string().max(MAX_SAY_LENGTH), npc: z.string().optional() }); // npc: who the player talks to; Brann by default
 const AcceptBody = z.object({ contract_id: z.string() });
 const TickBody = z.object({ ticks: z.number().int().min(1).max(MAX_SKIP) });
+const GiveBody = z.object({ to: z.string(), gift: z.unknown() }); // the engine checks the gift itself
 
 export type Env = { Variables: { session: Session } };
 
@@ -128,6 +129,11 @@ export function createApi(deps: ApiDeps) {
     const npc = parsed.data.npc === undefined ? brann : NPCS.find((n) => n.id === parsed.data.npc);
     if (!npc) return c.json({ error: `there's nobody called '${parsed.data.npc}' in the village` }, 400);
     if (s.busy) return busy(c);
+    if (!answers(npc)) {
+      const r = playerSpeaks(s.world, parsed.data.text, npc);
+      s.world = r.world;
+      return respond(c, { ok: r.ok, reason: r.reason, outcome: null, events: r.events });
+    }
 
     const model = modelFor(s, npc.model);
     if (!model) return c.json({ error: `${npc.name} isn't at the ${placeOf(npc).replace(/_/g, ' ')} right now. Try again later.` }, 503);
@@ -160,9 +166,25 @@ export function createApi(deps: ApiDeps) {
     const parsed = await body(c, TickBody);
     if (!parsed.success) return c.json({ error: `expected { ticks: 1–${MAX_SKIP} }` }, 400);
     if (s.busy) return busy(c);
-    const r = skipTime(s.world, parsed.data.ticks);
+    // NPCs on a timer may act once the clock has moved, so the world is locked until they have.
+    s.busy = { by: 'npc', name: 'The village' };
+    try {
+      const r = await passTime(s.world, parsed.data.ticks, (choice) => modelFor(s, choice));
+      s.world = r.world;
+      return respond(c, { ok: true, reason: null, outcome: null, events: r.events });
+    } finally {
+      s.busy = null;
+    }
+  });
+
+  app.post('/api/give', async (c) => {
+    const s = c.get('session');
+    const parsed = await body(c, GiveBody);
+    if (!parsed.success) return c.json({ error: 'expected { to, gift }' }, 400);
+    if (s.busy) return busy(c);
+    const r = playerGives(s.world, parsed.data.to, parsed.data.gift);
     s.world = r.world;
-    return respond(c, { ok: true, reason: null, outcome: null, events: r.events });
+    return respond(c, { ok: r.ok, reason: r.reason, outcome: null, events: r.events });
   });
 
   app.post('/api/reset', (c) => {

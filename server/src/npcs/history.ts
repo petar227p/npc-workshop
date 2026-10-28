@@ -1,5 +1,9 @@
+import { clockText, type Gift } from '@blacksmith/shared';
 import type { World } from '../engine';
 import { describe } from './facts';
+
+const gift = (g: Gift, itemName: string | null) =>
+  g.kind === 'gold' ? `${g.amount} gold` : g.kind === 'good' ? `${g.qty} × ${g.good}` : `${JSON.stringify(itemName ?? g.item_id)} (${g.item_id})`;
 
 const HISTORY_EVENTS = 24;
 
@@ -24,6 +28,13 @@ export function historyFor(npcId: string, name: string): (world: World, customer
           if (speaker) lines.push(`${speaker}: ${JSON.stringify(e.data.text)}`);
           break;
         }
+        case 'EMOTED':
+          if (e.actor === npcId && (e.target === customer || e.target === null)) lines.push(`[${name} ${JSON.stringify(e.data.text)}]`);
+          break;
+        case 'GIVEN':
+          if (e.actor === npcId && e.target === customer) lines.push(`[${name} gave the customer ${gift(e.data.gift, e.data.item_name)}]`);
+          if (e.actor === customer && e.target === npcId) lines.push(`[Customer gave ${name} ${gift(e.data.gift, e.data.item_name)}]`);
+          break;
         case 'CONTRACT_PROPOSED':
           if (e.actor === npcId && e.data.customer === customer) {
             lines.push(
@@ -38,10 +49,10 @@ export function historyFor(npcId: string, name: string): (world: World, customer
           if (e.actor === customer && sold(e.data.contract_id)) lines.push(`[Customer accepted ${e.data.contract_id} and paid ${e.data.price} gold]`);
           break;
         case 'WORK_STARTED':
-          if (e.target === customer && sold(e.data.contract_id)) lines.push(`[Work began on ${e.data.contract_id}, ready at hour ${e.data.due_tick}]`);
+          if (e.target === customer && sold(e.data.contract_id)) lines.push(`[Work began on ${e.data.contract_id}, ready ${clockText(e.data.due_tick)}]`);
           break;
         case 'ITEM_DELIVERED':
-          if (e.target === customer && sold(e.data.contract_id)) lines.push(`[${e.data.item.item_name} (${e.data.contract_id}) was handed to the customer at hour ${e.tick}]`);
+          if (e.target === customer && sold(e.data.contract_id)) lines.push(`[${e.data.item.item_name} (${e.data.contract_id}) was handed to the customer ${clockText(e.tick)}]`);
           break;
         case 'GOODS_DELIVERED':
           if (e.target === customer && sold(e.data.contract_id)) lines.push(`[${e.data.qty} × ${e.data.good} (${e.data.contract_id}) handed to the customer]`);

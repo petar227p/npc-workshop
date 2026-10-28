@@ -7,6 +7,7 @@ import { own, placeOf, reject, type ActOptions, type Actor, type Verdict } from 
 export { advance } from './clock';
 export { apply, commit, replay, type EngineEvent, type EventDraft } from './events';
 export * from './state';
+export { lastFired, timedTrigger, triggerFired, type TimedTrigger } from './triggers';
 export * as verbs from './verbs';
 export { minDeliveryTicks, minPrice, materialCost, placeOf, type ActOptions, type Actor, type AnyVerbDef, type Verdict, type VerbDef } from './validator';
 

@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { NpcDraftSchema, NpcFileSchema, type Catalogue, type ModelVerb, type NpcDraft } from '@blacksmith/shared';
+import { NpcDraftSchema, NpcFileSchema, type Catalogue, type ModelVerb, type NpcDraft, type Start } from '@blacksmith/shared';
 import * as flat from '../agents/flat';
 import { verbs } from '../engine';
 import { factsFor } from './facts';
@@ -16,12 +16,22 @@ export const NPC_DIRS: NpcDirs = {
   prompts: new URL('../../../prompts/', import.meta.url),
 };
 
-const LEDGER = { SAY: verbs.SAY, OFFER: verbs.OFFER, COUNTER_OFFER: verbs.COUNTER_OFFER, REFUSE: verbs.REFUSE, ACCEPT: verbs.ACCEPT, START_WORK: verbs.START_WORK };
+const LEDGER = {
+  SAY: verbs.SAY,
+  EMOTE: verbs.EMOTE,
+  OFFER: verbs.OFFER,
+  COUNTER_OFFER: verbs.COUNTER_OFFER,
+  REFUSE: verbs.REFUSE,
+  ACCEPT: verbs.ACCEPT,
+  START_WORK: verbs.START_WORK,
+  GIVE: verbs.GIVE,
+};
 
-// The offer verbs' schemas are built from the NPC's own catalogue.
-function modelVerb(v: ModelVerb, catalogue: Catalogue): flat.FlatVerb {
+// The offer verbs' schemas are built from the NPC's own catalogue, GIVE's from what it may have in stock.
+function modelVerb(v: ModelVerb, catalogue: Catalogue, start: Start): flat.FlatVerb {
   if (v === 'OFFER') return flat.OFFER(catalogue);
   if (v === 'COUNTER_OFFER') return flat.COUNTER_OFFER(catalogue);
+  if (v === 'GIVE') return flat.GIVE([...new Set([...Object.keys(start.stock), ...Object.keys(catalogue.in_stock ?? {}), ...Object.keys(catalogue.made_to_order?.materials ?? {})])]);
   return flat[v];
 }
 
@@ -41,12 +51,13 @@ export function buildNpc(input: unknown): Built {
       location: d.location,
       catalogue: d.catalogue,
       start: d.start,
-      modelVerbs: d.model_verbs.map((v) => modelVerb(v, d.catalogue)),
+      modelVerbs: d.model_verbs.map((v) => modelVerb(v, d.catalogue, d.start)),
       perception_radius: d.perception_radius,
       model: d.model,
       effort: d.effort,
       facts: factsFor(d.id, d.facts, d.catalogue),
       history: historyFor(d.id, d.name),
+      triggers: d.triggers,
       cue: d.cue,
       fallbacks: d.fallbacks,
     });

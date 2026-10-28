@@ -105,6 +105,15 @@ function Entry({ event: e, view, disabled, onAccept }: { event: EngineEvent; vie
           {e.data.text}
         </div>
       );
+    case 'EMOTED':
+      return (
+        <div className="msg npc emote">
+          <span className="who">{nameOf(view, e.actor)}</span>
+          <i>{e.data.text}</i>
+        </div>
+      );
+    case 'GIVEN':
+      return <div className="note ok">{gaveText(e, view)}</div>;
     case 'CONTRACT_PROPOSED': {
       const c = view.contracts.find((x) => x.contract_id === e.data.contract.contract_id);
       return c ? <ContractCard c={c} gold={view.gold} disabled={disabled} onAccept={onAccept} /> : null;
@@ -145,6 +154,17 @@ const STATUS: Record<ContractView['status'], string> = {
 };
 
 export const goodName = (good: string) => good.replace(/_/g, ' ');
+
+type Given = Extract<EngineEvent, { type: 'GIVEN' }>;
+export const giftText = ({ gift, item_name }: Given['data']) =>
+  gift.kind === 'gold' ? `${gift.amount} gold` : gift.kind === 'good' ? `${gift.qty} × ${goodName(gift.good)}` : `the ${item_name ?? gift.item_id}`;
+
+// From the player's side: "Mira gives you 2 × torch", "You give Brann 5 gold".
+export function gaveText(e: Given, view: StateView): string {
+  const from = e.actor === 'player' ? 'You give' : `${nameOf(view, e.actor)} gives`;
+  const to = e.target === 'player' ? 'you' : nameOf(view, e.target ?? '');
+  return `${from} ${to} ${giftText(e.data)}.`;
+}
 
 // Without onAccept (the editor's test bench) an open offer is shown but can't be taken.
 export function ContractCard({ c, gold, disabled, onAccept }: { c: ContractView; gold: number; disabled: boolean; onAccept?: (id: string) => void }) {

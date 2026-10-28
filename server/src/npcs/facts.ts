@@ -1,4 +1,4 @@
-import type { Catalogue, Contract, FactBlock } from '@blacksmith/shared';
+import { clockText, type Catalogue, type Contract, type FactBlock } from '@blacksmith/shared';
 import { activeJobs, availableStock, minDeliveryTicks, type World } from '../engine';
 
 // The facts an NPC can be told, one block each. Code-owned numbers, so the model can quote prices and limits that will pass.
@@ -9,7 +9,8 @@ type Block = (world: World, npcId: string, customer: string, catalogue: Catalogu
 const show = (name: string) => name.replace(/_/g, ' ');
 
 export const FACTS: Record<FactBlock, Block> = {
-  clock: (world, npcId) => `Hour ${world.tick}. Jobs in hand: ${activeJobs(world, npcId)}.`,
+  // The same day and time the player sees, so a line about the morning comes in the morning.
+  clock: (world, npcId) => `It is ${clockText(world.tick)}. Jobs in hand: ${activeJobs(world, npcId)}.`,
   purse: (world, _npc, customer) => `Customer's purse: ${world.gold[customer] ?? 0} gold.`,
   stock: (world, npcId, _customer, catalogue) => {
     const available = availableStock(world, npcId);
@@ -24,6 +25,17 @@ export const FACTS: Record<FactBlock, Block> = {
     }
     if (catalogue.in_stock) lines.push(`Goods on the shelf: ${Object.keys(catalogue.in_stock).map((g) => `${g} ${count(g)}`).join(', ')}.`);
     return lines.join('\n') || null;
+  },
+  // Everything it owns, not only what it sells: GIVE can hand over any of it, and items go by id.
+  inventory: (world, npcId) => {
+    const goods = Object.entries(availableStock(world, npcId))
+      .filter(([, n]) => n > 0)
+      .map(([g, n]) => `${g} ${n}`)
+      .join(', ');
+    const items = world.items.filter((i) => i.owner === npcId).map((i) => `${i.item_id} ${JSON.stringify(i.item_name)} (${i.item_type})`);
+    const lines = [`Your purse: ${world.gold[npcId] ?? 0} gold.`, `You have (not promised to a job): ${goods || 'nothing'}.`];
+    if (items.length) lines.push(`Items you own: ${items.join(', ')}.`);
+    return lines.join('\n');
   },
   catalogue: (world, npcId, _customer, catalogue) => {
     const parts: string[] = [];

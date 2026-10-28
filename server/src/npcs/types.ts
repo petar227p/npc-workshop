@@ -1,4 +1,4 @@
-import { NPC_ID_PATTERN, type EffortChoice, type ModelChoice } from '@blacksmith/shared';
+import { NPC_ID_PATTERN, type EffortChoice, type ModelChoice, type Trigger } from '@blacksmith/shared';
 import type { Actor, World } from '../engine';
 import { flatSchema, type FlatVerb } from '../agents/flat';
 
@@ -13,12 +13,13 @@ export type NpcSpec = Actor & {
   perception_radius: number; // in tiles: who witnesses this NPC's events (used by perception from Oct 30)
   facts(world: World, customer: string): string; // code-owned numbers it may quote
   history(world: World, customer: string): string; // the conversation with this customer, rebuilt from the event log
+  triggers?: readonly Trigger[]; // when it takes a turn; being spoken to if not given
   cue: string; // the instruction after the history
   fallbacks: { rejected: string; unavailable: string };
 };
 
 // The model's answer schema is built once here, so a clashing field shows up when the NPC is defined, not on its first turn.
-export type NpcDefinition = NpcSpec & { schema: Record<string, unknown> };
+export type NpcDefinition = NpcSpec & { schema: Record<string, unknown>; triggers: readonly Trigger[] };
 
 // The id names the model's schema, which the API limits to letters, digits, '_' and '-'.
 const ID = new RegExp(NPC_ID_PATTERN);
@@ -34,11 +35,14 @@ export function defineNpc(spec: NpcSpec): NpcDefinition {
   for (const v of ['OFFER', 'COUNTER_OFFER']) {
     if (allowed.has(v) && !sells) throw new Error(`${spec.id}: ${v} needs a catalogue with something to sell`);
   }
+  // Giving is for quest givers and gift-givers. A seller who could give would let a customer talk its stock out of it
+  // for free, around every price floor in its catalogue.
+  if (allowed.has('GIVE') && sells) throw new Error(`${spec.id}: GIVE is for NPCs who give (quest givers, gifts), not sellers: a seller could be talked into giving its stock away`);
   if (spec.catalogue?.made_to_order && !allowed.has('START_WORK')) {
     throw new Error(`${spec.id}: a made-to-order catalogue needs START_WORK, or accepted work never starts`);
   }
   for (const v of spec.modelVerbs) {
     if (!allowed.has(v.verb)) throw new Error(`${spec.id}: model verb ${v.verb} isn't in its allowed verbs`);
   }
-  return { ...spec, schema: flatSchema(spec.modelVerbs) };
+  return { ...spec, triggers: spec.triggers ?? [{ kind: 'on_spoken_to' }], schema: flatSchema(spec.modelVerbs) };
 }

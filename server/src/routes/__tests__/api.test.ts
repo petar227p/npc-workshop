@@ -363,4 +363,29 @@ describe('api', () => {
       logged.mockRestore();
     });
   });
+
+  it('the player can give gold or goods to an NPC; the ledger refuses what the player does not have', async () => {
+    const { app } = setup();
+    const b = browser(app);
+    const gave = (await b.send('/api/give', { to: 'merchant', gift: { kind: 'gold', amount: 15 } })).json as ActionResponse;
+    expect(gave.ok).toBe(true);
+    expect(gave.events[0]).toMatchObject({ type: 'GIVEN', actor: 'player', target: 'merchant' });
+    expect(gave.view.gold).toBe(185);
+
+    const broke = (await b.send('/api/give', { to: 'merchant', gift: { kind: 'gold', amount: 999 } })).json as ActionResponse;
+    expect(broke).toMatchObject({ ok: false, reason: "player has 185 gold; it can't give 999" });
+    const torch = (await b.send('/api/give', { to: 'smith', gift: { kind: 'good', good: 'torch', qty: 1 } })).json as ActionResponse;
+    expect(torch.reason).toMatch(/player has 0 torch to spare/);
+    expect((await b.send('/api/give', { gift: { kind: 'gold', amount: 1 } })).status).toBe(400);
+    const empty = (await b.send('/api/give', { to: 'smith' })).json as ActionResponse; // the engine checks the gift: a logged rejection
+    expect(empty.ok).toBe(false);
+    expect(empty.events[0].type).toBe('ACTION_REJECTED');
+  });
+
+  it('passing time calls no model while nobody in the village is on a timer', async () => {
+    const { app, made } = setup();
+    const r = (await browser(app).send('/api/tick', { ticks: 24 })).json as ActionResponse;
+    expect(r.events.map((e) => e.type)).toEqual(['CLOCK_ADVANCED']);
+    expect(made).toEqual([]);
+  });
 });
