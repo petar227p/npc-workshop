@@ -1,4 +1,4 @@
-import type { ActionResponse, StateView } from '@blacksmith/shared';
+import type { ActionResponse, Gift, StateView } from '@blacksmith/shared';
 import { lazy, StrictMode, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api } from './api';
@@ -88,6 +88,11 @@ function VillagePage() {
     await run(api.say(text, talkTo));
     setPending(null);
   };
+  // Giving opens the chat with whoever it's for: what happened (taken, or handed back) is a note in that chat only.
+  const give = (to: string, gift: Gift) => {
+    setTalkTo(to);
+    run(api.give(to, gift));
+  };
 
   if (!view) return <div className="loading">{error ?? 'Waking the village…'}</div>;
   const busy = pending !== null || waiting;
@@ -107,7 +112,7 @@ function VillagePage() {
       </div>
       <aside className="side-col">
         <ForgePanel view={view} disabled={busy} onSkip={(n) => run(api.tick(n))} onReset={() => run(api.reset())} />
-        <Inventory view={view} disabled={busy} onGive={(to, gift) => run(api.give(to, gift))} />
+        <Inventory view={view} disabled={busy} onGive={give} />
         <Stock view={view} />
         <Ledger view={view} />
       </aside>

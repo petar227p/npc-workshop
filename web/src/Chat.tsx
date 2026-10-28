@@ -30,9 +30,10 @@ export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRe
   const name = nameOf(view, talkTo);
   const lines = speechFirst(view.events.filter((e) => between(e, talkTo, view)));
 
+  // On the newest line, not the count: once the log is past the view's cap, a line can arrive as an old one drops out.
   useEffect(() => {
     box.current?.scrollTo({ top: box.current.scrollHeight, behavior: 'smooth' });
-  }, [lines.length, pending]);
+  }, [lines.at(-1)?.id, pending]);
   // Another NPC's chat starts at its latest line, without scrolling through.
   useEffect(() => {
     box.current?.scrollTo({ top: box.current.scrollHeight });
