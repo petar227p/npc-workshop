@@ -93,6 +93,10 @@ export class VillageScene extends Phaser.Scene {
       event.preventDefault(); // or the E lands in the chat box this focuses
       this.hooks.onTalk(near.id);
     });
+    // Walking with the arrows mustn't also scroll the page once the ledger makes it taller than the window.
+    this.input.keyboard!.on('keydown', (event: KeyboardEvent) => {
+      if (event.key.startsWith('Arrow') && !typing()) event.preventDefault();
+    });
     // Clicking the village hands the keys back to walking.
     this.input.on('pointerdown', () => (document.activeElement as HTMLElement | null)?.blur());
 
@@ -180,12 +184,14 @@ export class VillageScene extends Phaser.Scene {
   // The finished item rises above whoever made it, flies to the player and hangs over them for a moment.
   private handOver(seller: string | undefined, contractId: string, view: StateView) {
     const from = (seller && this.people.get(seller)) || null;
-    const start = from ? { x: from.x, y: from.y - 14 } : { x: this.player.x, y: this.player.y - 14 };
     const url = view.art[contractId]?.url;
     const show = (key: string, frame?: number) => {
+      const at = from ?? this.player;
+      // Clear of the maker's "ready!" bubble (its bottom is 10 px above them), or the item rises hidden behind it.
+      const start = { x: at.x, y: at.y - (from?.bubble ? from.bubble.text.displayHeight + 20 : 14) };
       const img = this.add.image(start.x, start.y, key, frame).setDepth(9000);
       if (key !== 'dungeon') img.setDisplaySize(TILE, TILE);
-      const ring = this.add.circle(start.x, start.y + 14, TILE * 2, 0xe8a547, 0.18).setStrokeStyle(1, 0xe8a547).setDepth(2);
+      const ring = this.add.circle(at.x, at.y, TILE * 2, 0xe8a547, 0.18).setStrokeStyle(1, 0xe8a547).setDepth(2);
       this.tweens.add({ targets: ring, alpha: 0, delay: 1500, duration: 1200, onComplete: () => ring.destroy() });
       this.tweens.chain({
         targets: img,
