@@ -1,4 +1,4 @@
-import type { Gift } from '@blacksmith/shared';
+import { clockText, type Gift } from '@blacksmith/shared';
 import type { World } from '../engine';
 import { describe } from './facts';
 
@@ -49,10 +49,10 @@ export function historyFor(npcId: string, name: string): (world: World, customer
           if (e.actor === customer && sold(e.data.contract_id)) lines.push(`[Customer accepted ${e.data.contract_id} and paid ${e.data.price} gold]`);
           break;
         case 'WORK_STARTED':
-          if (e.target === customer && sold(e.data.contract_id)) lines.push(`[Work began on ${e.data.contract_id}, ready at hour ${e.data.due_tick}]`);
+          if (e.target === customer && sold(e.data.contract_id)) lines.push(`[Work began on ${e.data.contract_id}, ready ${clockText(e.data.due_tick)}]`);
           break;
         case 'ITEM_DELIVERED':
-          if (e.target === customer && sold(e.data.contract_id)) lines.push(`[${e.data.item.item_name} (${e.data.contract_id}) was handed to the customer at hour ${e.tick}]`);
+          if (e.target === customer && sold(e.data.contract_id)) lines.push(`[${e.data.item.item_name} (${e.data.contract_id}) was handed to the customer ${clockText(e.tick)}]`);
           break;
         case 'GOODS_DELIVERED':
           if (e.target === customer && sold(e.data.contract_id)) lines.push(`[${e.data.qty} × ${e.data.good} (${e.data.contract_id}) handed to the customer]`);

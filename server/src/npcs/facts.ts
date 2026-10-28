@@ -1,4 +1,4 @@
-import type { Catalogue, Contract, FactBlock } from '@blacksmith/shared';
+import { clockText, type Catalogue, type Contract, type FactBlock } from '@blacksmith/shared';
 import { activeJobs, availableStock, minDeliveryTicks, type World } from '../engine';
 
 // The facts an NPC can be told, one block each. Code-owned numbers, so the model can quote prices and limits that will pass.
@@ -9,7 +9,8 @@ type Block = (world: World, npcId: string, customer: string, catalogue: Catalogu
 const show = (name: string) => name.replace(/_/g, ' ');
 
 export const FACTS: Record<FactBlock, Block> = {
-  clock: (world, npcId) => `Hour ${world.tick}. Jobs in hand: ${activeJobs(world, npcId)}.`,
+  // The same day and time the player sees, so a line about the morning comes in the morning.
+  clock: (world, npcId) => `It is ${clockText(world.tick)}. Jobs in hand: ${activeJobs(world, npcId)}.`,
   purse: (world, _npc, customer) => `Customer's purse: ${world.gold[customer] ?? 0} gold.`,
   stock: (world, npcId, _customer, catalogue) => {
     const available = availableStock(world, npcId);

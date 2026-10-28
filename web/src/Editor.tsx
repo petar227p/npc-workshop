@@ -262,8 +262,8 @@ export function Editor() {
 
         <h3>Where it is and what it sells</h3>
         <p className="muted small">
-          The catalogue is what OFFER checks against. The ledger refuses an offer verb with nothing in it, and a made-to-order catalogue
-          without START_WORK.
+          The catalogue is what OFFER checks against. The ledger refuses an offer verb with nothing in it, a made-to-order catalogue
+          without START_WORK, and GIVE on an NPC that sells.
         </p>
         <Field label="Place" hint="where its events happen, e.g. forge, market">
           <input value={draft.location} maxLength={41} onChange={(e) => set('location', e.target.value)} />

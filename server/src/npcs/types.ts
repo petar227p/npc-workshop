@@ -35,6 +35,9 @@ export function defineNpc(spec: NpcSpec): NpcDefinition {
   for (const v of ['OFFER', 'COUNTER_OFFER']) {
     if (allowed.has(v) && !sells) throw new Error(`${spec.id}: ${v} needs a catalogue with something to sell`);
   }
+  // Giving is for quest givers and gift-givers. A seller who could give would let a customer talk its stock out of it
+  // for free, around every price floor in its catalogue.
+  if (allowed.has('GIVE') && sells) throw new Error(`${spec.id}: GIVE is for NPCs who give (quest givers, gifts), not sellers: a seller could be talked into giving its stock away`);
   if (spec.catalogue?.made_to_order && !allowed.has('START_WORK')) {
     throw new Error(`${spec.id}: a made-to-order catalogue needs START_WORK, or accepted work never starts`);
   }

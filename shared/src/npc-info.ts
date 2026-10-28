@@ -19,7 +19,7 @@ export const VERB_INFO: Record<LedgerVerb, string> = {
   REFUSE: 'Turn a request down, or withdraw one of its open offers.',
   ACCEPT: 'Take an offer made to it: pays, and gets in-stock goods at once. Customers use this, not sellers.',
   START_WORK: 'Start the timer on an accepted made-to-order job. Needed when the catalogue has made-to-order items.',
-  GIVE: 'Hand over gold, goods or an item it owns, for nothing. The ledger checks it has them. Only for NPCs meant to give (rewards, gifts): a seller with GIVE can be talked into giving stock away.',
+  GIVE: 'Hand over gold, goods or an item it owns, for nothing: a quest reward, a gift. The ledger checks it has them. Not for sellers: an NPC with a catalogue can\'t have it, or it could be talked into giving its stock away.',
 };
 
 export const FACT_BLOCKS = ['clock', 'purse', 'stock', 'inventory', 'catalogue', 'price_floor', 'open_offers'] as const;

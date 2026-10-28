@@ -70,6 +70,7 @@ export const MemorySchema = z.object({
 });
 export type Memory = z.infer<typeof MemorySchema>;
 
+export * from './clock';
 export * from './events';
 export * from './limits';
 export * from './npc';

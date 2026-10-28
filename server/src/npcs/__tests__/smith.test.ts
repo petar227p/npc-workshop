@@ -128,7 +128,7 @@ describe('game flow', () => {
     w = skipTime(accepted.world, 8).world;
     expect(w.items[0]).toMatchObject({ item_name: 'Hammerhead Blade', stats: hammerhead.stats });
 
-    expect(smithHistory(w)).toMatch(/\[Hammerhead Blade \(c_001\) was handed to the customer at hour 8\]/);
+    expect(smithHistory(w)).toMatch(/\[Hammerhead Blade \(c_001\) was handed to the customer Day 1 · 16:00\]/);
     expect(smithFacts(w)).toMatch(/Jobs in hand: 0/);
   });
 

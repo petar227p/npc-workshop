@@ -89,7 +89,7 @@ describe('NPC editor api', () => {
   it('preview returns the generated schema and the facts, or every problem with the draft', async () => {
     const { send } = setup();
     const ok = await send<PreviewResponse>('/api/editor/preview', { npc: miller });
-    expect(ok.json).toMatchObject({ ok: true, facts: 'Hour 0. Jobs in hand: 0.' });
+    expect(ok.json).toMatchObject({ ok: true, facts: 'It is Day 1 · 08:00. Jobs in hand: 0.' });
     expect(ok.json.ok && ok.json.schema).toMatchObject({ required: ['action', 'say'] });
 
     const bad = await send<PreviewResponse>('/api/editor/preview', {
@@ -283,6 +283,14 @@ describe('NPC editor api', () => {
     expect((await send<PreviewResponse>('/api/editor/preview', { npc: old })).json.ok).toBe(true);
     const twice = await send<PreviewResponse>('/api/editor/preview', { npc: { ...miller, triggers: [{ kind: 'on_spoken_to' }, { kind: 'on_spoken_to' }] } });
     expect(twice.json.errors).toEqual(['triggers: each kind of trigger once']);
+  });
+
+  it('GIVE is for givers, not sellers: a draft that sells anything may not list it', async () => {
+    const { send } = setup();
+    const r = await send<PreviewResponse>('/api/editor/preview', {
+      npc: { ...miller, verbs: ['SAY', 'OFFER', 'GIVE'], model_verbs: ['SAY', 'OFFER', 'GIVE'], catalogue: { in_stock: { flour: { min_price: 2 } } }, start: { gold: 5, stock: { flour: 2 } } },
+    });
+    expect(r.json.errors).toEqual(['miller: GIVE is for NPCs who give (quest givers, gifts), not sellers: a seller could be talked into giving its stock away']);
   });
 
   it('GIVE in the model verbs: the schema offers its goods, and a gift the ledger allows moves them', async () => {

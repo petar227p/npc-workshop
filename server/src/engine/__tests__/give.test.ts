@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createEngine, createWorld, replay, timedTrigger, verbs, type World } from '../index';
 import { hammerheadTerms, merchant, player, smith } from './fixtures';
 
-// GIVE and EMOTE on the engine's own actors: the merchant may give, the smith may not.
+// GIVE and EMOTE on the engine's own actors. The engine doesn't care who gives (here the merchant, the smith may not);
+// keeping GIVE off sellers is a definition rule (npcs/types.ts).
 const giver = { ...merchant, verbs: [...merchant.verbs, verbs.GIVE, verbs.EMOTE] };
 const ACTORS = [giver, smith, { ...player, verbs: [...player.verbs, verbs.GIVE] }];
 const { act } = createEngine(ACTORS);

@@ -34,8 +34,5 @@ export const editorApi = {
   save: (npc: NpcDraft, overwrite = false) => call<SaveResponse>('editor/save', { npc, overwrite }),
 };
 
-// Tick 0 is 08:00 on day 1; one tick is one hour.
-export function clockText(tick: number): string {
-  const h = 8 + tick;
-  return `Day ${Math.floor(h / 24) + 1} · ${String(h % 24).padStart(2, '0')}:00`;
-}
+// The zod-free module, so the schemas stay out of the bundle. The NPCs' clock fact uses the same text.
+export { clockText } from '@blacksmith/shared/src/clock';
