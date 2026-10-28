@@ -82,14 +82,16 @@ function fromForm(f: Form): { value: Value } | { problem: string } {
   return { value: { catalogue, start: { gold: f.gold, stock } } };
 }
 
-const key = (v: Value) => JSON.stringify(v);
+// Only the catalogue and start: the form is handed the whole draft, and edits elsewhere in it mustn't rebuild the rows.
+const key = (v: Value) => JSON.stringify({ catalogue: v.catalogue, start: v.start });
 
 export function CatalogueForm({ value, onChange }: { value: Value; onChange: (v: Value) => void }) {
   const [form, setForm] = useState(() => toForm(value));
   const [problem, setProblem] = useState<string | null>(null);
   const shown = useRef(key(value));
 
-  // A new starting point (or a draft loaded from storage) replaces the rows; the form's own edits don't come back here.
+  // A new starting point (or a draft loaded from storage) replaces the rows; the form's own edits don't come back here,
+  // so rows that aren't in the draft (unnamed ones, or a list whose box is unticked) survive.
   useEffect(() => {
     if (key(value) === shown.current) return;
     shown.current = key(value);
@@ -247,15 +249,38 @@ function Name({ value, onChange, label }: { value: string; onChange: (v: string)
   return <input className="cat-name" value={value} maxLength={41} placeholder="name" aria-label={label} onChange={(e) => onChange(e.target.value)} />;
 }
 
+const toNumber = (s: string) => Number(s) || 0;
+
+// A number box that may be left empty while typing: an empty box counts as 0 but isn't shown as one,
+// so clearing it to type a new value doesn't leave a 0 in front. A value changed from outside replaces the text.
+function NumberInput({ value, onChange, parse, ...rest }: { value: number; onChange: (v: number) => void; parse: (s: string) => number; className?: string; step?: number; 'aria-label'?: string }) {
+  const [text, setText] = useState(String(value));
+  useEffect(() => {
+    setText((t) => (parse(t) === value ? t : String(value)));
+  }, [value, parse]);
+  return (
+    <input
+      {...rest}
+      type="number"
+      min={0}
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        onChange(parse(e.target.value));
+      }}
+    />
+  );
+}
+
 function Cell({ value, onChange, label }: { value: number; onChange: (v: number) => void; label: string }) {
-  return <input className="cat-num" type="number" min={0} value={value} aria-label={label} onChange={(e) => onChange(toInt(e.target.value))} />;
+  return <NumberInput className="cat-num" value={value} parse={toInt} aria-label={label} onChange={onChange} />;
 }
 
 function Num({ label, value, onChange, step = 1 }: { label: string; value: number; onChange: (v: number) => void; step?: number }) {
   return (
     <label className="field">
       <span className="field-label">{label}</span>
-      <input type="number" min={0} step={step} value={value} onChange={(e) => onChange(Number(e.target.value) || 0)} />
+      <NumberInput value={value} step={step} parse={toNumber} onChange={onChange} />
     </label>
   );
 }

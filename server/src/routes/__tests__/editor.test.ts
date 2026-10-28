@@ -129,7 +129,7 @@ describe('NPC editor api', () => {
     expect(bad.json.ok).toBe(false);
   });
 
-    it("a draft's model can't use a verb the draft doesn't allow; the ledger rejects it and the fallback is said", async () => {
+  it("a draft's model can't use a verb the draft doesn't allow; the ledger rejects it and the fallback is said", async () => {
     const { send } = setup([offer, offer]);
     const r = await send<BenchResponse>('/api/editor/bench/say', { npc: miller, text: 'Forge me a sword.' });
     expect(r.json.outcome).toBe('fallback');
