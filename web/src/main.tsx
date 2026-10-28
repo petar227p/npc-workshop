@@ -47,11 +47,16 @@ function VillagePage() {
   const [error, setError] = useState<string | null>(null);
   const [talkTo, setTalkTo] = useState('smith');
   const chatInput = useRef<HTMLInputElement>(null);
-  // E next to someone: talk to them, with the keys in the chat box until Esc.
-  const talk = useCallback((npc: string) => {
-    setTalkTo(npc);
-    chatInput.current?.focus();
-  }, []);
+  // E next to someone: talk to them, with the keys in the chat box until Esc. Not to someone else while an NPC is
+  // thinking: the picker is locked then too, and the reply on its way belongs to the one asked.
+  const talk = useCallback(
+    (npc: string) => {
+      if (pending !== null && npc !== talkTo) return;
+      setTalkTo(npc);
+      chatInput.current?.focus();
+    },
+    [pending, talkTo],
+  );
 
   useEffect(() => {
     api.state().then(setView, (e: Error) => setError(e.message));
