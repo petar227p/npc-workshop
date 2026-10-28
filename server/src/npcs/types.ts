@@ -1,4 +1,4 @@
-import { NPC_ID_PATTERN, type ModelChoice } from '@blacksmith/shared';
+import { NPC_ID_PATTERN, type EffortChoice, type ModelChoice } from '@blacksmith/shared';
 import type { Actor, World } from '../engine';
 import { flatSchema, type FlatVerb } from '../agents/flat';
 
@@ -9,6 +9,7 @@ export type NpcSpec = Actor & {
   prompt: string; // persona and reply rules, sent first so it stays cacheable
   modelVerbs: readonly FlatVerb[]; // what the model may choose; any other entry in `verbs` is issued by code only
   model: ModelChoice; // which model voices it; the route picks the client from this
+  effort: EffortChoice; // how hard that model thinks each turn
   perception_radius: number; // in tiles: who witnesses this NPC's events (used by perception from Oct 30)
   facts(world: World, customer: string): string; // code-owned numbers it may quote
   history(world: World, customer: string): string; // the conversation with this customer, rebuilt from the event log

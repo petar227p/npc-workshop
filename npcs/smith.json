@@ -6,6 +6,7 @@
   "facts": ["clock", "purse", "stock", "catalogue", "price_floor", "open_offers"],
   "perception_radius": 4,
   "model": "muse_spark",
+  "effort": "low",
   "location": "forge",
   "start": {
     "gold": 50,

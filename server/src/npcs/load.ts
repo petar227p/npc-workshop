@@ -44,6 +44,7 @@ export function buildNpc(input: unknown): Built {
       modelVerbs: d.model_verbs.map((v) => modelVerb(v, d.catalogue)),
       perception_radius: d.perception_radius,
       model: d.model,
+      effort: d.effort,
       facts: factsFor(d.id, d.facts, d.catalogue),
       history: historyFor(d.id, d.name),
       cue: d.cue,

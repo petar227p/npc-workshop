@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { MAX_SAY_LENGTH } from './limits';
 import { CatalogueSchema, StartSchema } from './trade';
-import { FACT_BLOCKS, LEDGER_VERBS, MAX_PERSONA_LENGTH, MODEL_CHOICES, MODEL_VERBS, NPC_ID_PATTERN, RESERVED_IDS, type NpcDraft } from './npc-info';
+import { EFFORT_CHOICES, FACT_BLOCKS, LEDGER_VERBS, MAX_PERSONA_LENGTH, MODEL_CHOICES, MODEL_VERBS, NPC_ID_PATTERN, RESERVED_IDS, type NpcDraft } from './npc-info';
 
 // The shape check for an NPC file or an editor draft. Cross-field rules (SAY required, model verbs ⊆ verbs)
 // are checked again by defineNpc on the server, which is the one that counts.
@@ -21,6 +21,7 @@ export const NpcFileSchema = z
     facts: z.array(z.enum(FACT_BLOCKS)).refine(unique, 'listed twice'),
     perception_radius: z.number().int().min(0).max(20),
     model: z.enum(MODEL_CHOICES).default('muse_spark'), // files from before the picker are sellers on Muse Spark
+    effort: z.enum(EFFORT_CHOICES).default('low'), // files from before the picker thought at low, the old fixed value
     location: z.string().regex(new RegExp(NPC_ID_PATTERN), 'a place name: lowercase letters, digits and _'),
     start: StartSchema,
     catalogue: CatalogueSchema,

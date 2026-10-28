@@ -28,7 +28,7 @@ export function turnMessages(npc: NpcDefinition, world: World, customer = 'playe
   ];
 }
 
-// `act` is the engine the NPC is registered with; the village's by default.
+// `act` is the engine the NPC is registered with; the village's by default. `effort` overrides the NPC's own.
 export async function npcTurn(
   npc: NpcDefinition,
   world: World,
@@ -50,7 +50,7 @@ export async function npcTurn(
       res = await model.client.chat({
         model: model.model,
         messages,
-        reasoning_effort: opts.effort ?? 'low',
+        reasoning_effort: opts.effort ?? npc.effort,
         max_tokens: 4096,
         json_schema: schema,
       });
