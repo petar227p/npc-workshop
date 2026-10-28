@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import type { ContractView, ModelChoice, StateView } from '@blacksmith/shared';
+import { DEFAULT_SPRITE, type ContractView, type ModelChoice, type StateView } from '@blacksmith/shared';
 import type { NpcModel } from './agents/npc';
 import { artView, type Gallery } from './art';
-import { availableStock, type World } from './engine';
-import { newVillage } from './npcs';
+import { availableStock, placeAt, type World } from './engine';
+import { newVillage, type NpcSpec } from './npcs';
 import type { ImageClient } from './models/image';
 
 // One world per browser, in memory. `busy` locks the world while an NPC is thinking, so a tick or an
@@ -98,13 +98,18 @@ export function createSessionStore(limits: SessionLimits = {}) {
 
 const VIEW_EVENTS = 300;
 
-// `names` labels each seller's stock; an actor without one is shown by its id.
-export function toView(world: World, busy: boolean, art: Gallery = new Map(), names: Record<string, string> = {}, customer = 'player'): StateView {
+// The NPCs a view shows: their names label each seller's stock (an actor without one is shown by its id),
+// and where they are comes from their schedule.
+export type Cast = readonly Pick<NpcSpec, 'id' | 'name' | 'sprite' | 'location' | 'schedule'>[];
+
+export function toView(world: World, busy: boolean, art: Gallery = new Map(), cast: Cast = [], customer = 'player'): StateView {
+  const names = Object.fromEntries(cast.map((n) => [n.id, n.name]));
   const contracts: ContractView[] = Object.values(world.contracts)
     .filter((c) => c.customer === customer)
     .map(({ customer: _c, proposed_tick: _p, location: _l, ...c }) => c);
   return {
     tick: world.tick,
+    people: cast.map((n) => ({ id: n.id, name: n.name, sprite: n.sprite ?? DEFAULT_SPRITE, place: placeAt(n, world.tick) })),
     gold: world.gold[customer] ?? 0,
     goods: { ...(world.stock[customer] ?? {}) },
     shops: Object.keys(world.stock)

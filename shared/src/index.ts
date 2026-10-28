@@ -76,3 +76,4 @@ export * from './limits';
 export * from './npc';
 export * from './npc-info';
 export * from './trade';
+export * from './village';

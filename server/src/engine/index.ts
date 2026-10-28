@@ -2,9 +2,11 @@ import type { Action } from '@blacksmith/shared';
 import type { ZodError, ZodType } from 'zod';
 import { commit, type EngineEvent } from './events';
 import type { World } from './state';
-import { own, placeOf, reject, type ActOptions, type Actor, type Verdict } from './validator';
+import { placeAt } from './schedule';
+import { own, reject, type ActOptions, type Actor, type Verdict } from './validator';
 
 export { advance } from './clock';
+export { entryAt, placeAt } from './schedule';
 export { apply, commit, replay, type EngineEvent, type EventDraft } from './events';
 export * from './state';
 export { lastFired, timedTrigger, triggerFired, type TimedTrigger } from './triggers';
@@ -71,7 +73,7 @@ export function createEngine(list: readonly Actor[]): { act: Act } {
           tick: world.tick,
           actor,
           target: null,
-          location: placeOf(own(actors, actor) ?? {}),
+          location: placeAt(own(actors, actor) ?? {}, world.tick),
           witnesses: [],
           data: { verb: verbOf(raw), reason: verdict.reason, proposed: clip(raw) },
         },

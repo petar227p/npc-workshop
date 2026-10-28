@@ -1,7 +1,8 @@
 import type { Trigger } from '@blacksmith/shared';
 import type { EventDraft } from './events';
 import type { World } from './state';
-import { placeOf, type Actor } from './validator';
+import { placeAt } from './schedule';
+import type { Actor } from './validator';
 
 // When an NPC acts on its own. Pure: town/ asks which timers came round and logs the firing; the turn itself is the agent's.
 
@@ -25,6 +26,6 @@ export function lastFired(world: World, npcId: string): number {
   return -1;
 }
 
-export function triggerFired(world: World, npc: Pick<Actor, 'id' | 'location'>, trigger: Trigger): EventDraft {
-  return { type: 'TRIGGER_FIRED', tick: world.tick, actor: npc.id, target: null, location: placeOf(npc), witnesses: [], data: { trigger } };
+export function triggerFired(world: World, npc: Pick<Actor, 'id' | 'location' | 'schedule'>, trigger: Trigger): EventDraft {
+  return { type: 'TRIGGER_FIRED', tick: world.tick, actor: npc.id, target: null, location: placeAt(npc, world.tick), witnesses: [], data: { trigger } };
 }

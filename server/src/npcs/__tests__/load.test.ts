@@ -40,6 +40,23 @@ describe('NPC files', () => {
     expect(errors({ ...base, catalogue: {} })[0]).toMatch(/need a catalogue with something to sell/);
   });
 
+  it("its place and the places in its day must be on the village map; a day can't start twice at one hour", () => {
+    const base = readDraft('merchant');
+    const errors = (npc: unknown) => (({ ok, ...r }) => (ok ? [] : (r as { errors: string[] }).errors))(buildNpc(npc));
+    expect(errors({ ...base, location: 'mill' })[0]).toMatch(/^there's no place called 'mill' on the village map \(places: forge, market/);
+    expect(errors({ ...base, schedule: [{ from: 20, place: 'moon' }] })).toEqual([expect.stringMatching(/no place called 'moon'/)]);
+    expect(errors({ ...base, schedule: [{ from: 9, place: 'market' }, { from: 9, place: 'tavern' }] })).toEqual(['schedule: two entries start at the same hour']);
+    expect(errors({ ...base, schedule: [{ from: 24, place: 'market' }] })[0]).toMatch(/^schedule\.0\.from/);
+    expect(errors({ ...base, sprite: 85 })).toEqual(['sprite: not one of the character sprites']); // the player's look
+  });
+
+  it('a file from before schedules and looks stays at its place, looking like the default villager', () => {
+    const { schedule: _s, sprite: _l, ...old } = readDraft('merchant');
+    const built = buildNpc(old);
+    if (!built.ok) throw new Error(built.errors.join('; '));
+    expect(built.draft).toMatchObject({ schedule: [], sprite: 98 });
+  });
+
   it('a file can only name verbs and facts that exist, once each, and no extra fields', () => {
     const base = readDraft('smith');
     const errors = (npc: unknown) => (({ ok, ...r }) => (ok ? [] : (r as { errors: string[] }).errors))(buildNpc(npc));

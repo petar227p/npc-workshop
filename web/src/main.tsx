@@ -1,14 +1,17 @@
 import type { ActionResponse, StateView } from '@blacksmith/shared';
-import { StrictMode, useCallback, useEffect, useState } from 'react';
+import { lazy, StrictMode, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api } from './api';
 import { Chat } from './Chat';
 import { Editor } from './Editor';
+
+// Phaser is most of the bundle, so the village loads on its own and the workshop doesn't wait for it.
+const Village = lazy(() => import('./game/Village').then((m) => ({ default: m.Village })));
 import { Forge as ForgePanel, Inventory, Ledger, Stock } from './Side';
 import './style.css';
 
-type Page = 'forge' | 'workshop';
-const pageFromHash = (): Page => (location.hash === '#/workshop' ? 'workshop' : 'forge');
+type Page = 'village' | 'workshop';
+const pageFromHash = (): Page => (location.hash === '#/workshop' ? 'workshop' : 'village');
 
 function App() {
   const [page, setPage] = useState<Page>(pageFromHash);
@@ -24,25 +27,31 @@ function App() {
         <h1>The Blacksmith</h1>
         <span className="tag">Models propose. Code decides.</span>
         <nav className="tabs" aria-label="Pages">
-          <a href="#/" aria-current={page === 'forge' ? 'page' : undefined}>
-            Forge
+          <a href="#/" aria-current={page === 'village' ? 'page' : undefined}>
+            Village
           </a>
           <a href="#/workshop" aria-current={page === 'workshop' ? 'page' : undefined}>
             NPC workshop
           </a>
         </nav>
       </header>
-      {page === 'workshop' ? <Editor /> : <ForgePage />}
+      {page === 'workshop' ? <Editor /> : <VillagePage />}
     </main>
   );
 }
 
-// The village forge: chat with Brann, accept, skip time.
-function ForgePage() {
+// The village: walk up to someone and talk, accept offers, skip time.
+function VillagePage() {
   const [view, setView] = useState<StateView | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [talkTo, setTalkTo] = useState('smith');
+  const chatInput = useRef<HTMLInputElement>(null);
+  // E next to someone: talk to them, with the keys in the chat box until Esc.
+  const talk = useCallback((npc: string) => {
+    setTalkTo(npc);
+    chatInput.current?.focus();
+  }, []);
 
   useEffect(() => {
     api.state().then(setView, (e: Error) => setError(e.message));
@@ -80,13 +89,16 @@ function ForgePage() {
     setPending(null);
   };
 
-  if (!view) return <div className="loading">{error ?? 'Lighting the forge…'}</div>;
+  if (!view) return <div className="loading">{error ?? 'Waking the village…'}</div>;
   const busy = pending !== null || waiting;
 
   return (
     <div className="cols">
-      <div className="main-col">
-        <Chat view={view} talkTo={talkTo} onTalkTo={setTalkTo} pending={pending} onSay={say} onAccept={(id) => run(api.accept(id))} />
+      <div className="main-col village-col">
+        <Suspense fallback={<div className="game" />}>
+          <Village view={view} onTalk={talk} />
+        </Suspense>
+        <Chat view={view} talkTo={talkTo} onTalkTo={setTalkTo} pending={pending} onSay={say} onAccept={(id) => run(api.accept(id))} inputRef={chatInput} />
         {error && (
           <div className="error" role="alert">
             {error}
