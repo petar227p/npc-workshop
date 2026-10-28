@@ -32,6 +32,7 @@ export type EngineEvent =
   | Base<'ITEM_DELIVERED', { contract_id: string; item: Item }>
   | Base<'GOODS_DELIVERED', { contract_id: string; good: string; qty: number }>
   | Base<'GIVEN', { gift: Gift; item_name: string | null }> // target: who got it; item_name for an item, so the log can name it
+  | Base<'GIFT_REFUSED', { gift: Gift; item_name: string | null; reason: string }> // actor: who wouldn't take it; target: the giver, who keeps it
   | Base<'TRIGGER_FIRED', { trigger: Trigger }> // an NPC acting on its own; its turn's events follow
   | Base<'ACTION_REJECTED', { verb: string | null; reason: string; proposed: unknown }>
   | Base<'CLOCK_ADVANCED', { from: number }>;

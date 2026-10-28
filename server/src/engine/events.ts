@@ -85,6 +85,7 @@ export function apply(world: World, event: EngineEvent): World {
     }
     case 'SAID':
     case 'EMOTED':
+    case 'GIFT_REFUSED':
     case 'TRIGGER_FIRED':
     case 'ACTION_REJECTED':
     case 'CLOCK_ADVANCED':

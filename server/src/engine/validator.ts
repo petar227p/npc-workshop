@@ -1,4 +1,4 @@
-import { ACTION_SCHEMAS, STATS, type Action, type ActionOf, type Catalogue, type InStockTerms, type MadeToOrder, type MadeToOrderTerms, type ScheduleEntry, type Start, type Terms } from '@blacksmith/shared';
+import { ACTION_SCHEMAS, STATS, type Action, type ActionOf, type Catalogue, type Gift, type InStockTerms, type Item, type MadeToOrder, type MadeToOrderTerms, type ScheduleEntry, type Start, type Terms } from '@blacksmith/shared';
 import type { ZodType } from 'zod';
 import type { EventDraft } from './events';
 import { placeAt } from './schedule';
@@ -14,10 +14,11 @@ export type ActOptions = {
 // A verb is its schema plus one rule. Actors (NPC definitions, the player) list the verbs they may use;
 // DELIVER is in nobody's list: only the clock delivers. A rule gets the acting actor itself, so nothing in it
 // names a particular NPC: the seller, its place and its catalogue all come from the actor and the offer.
+// `actorOf` finds any other actor by id, for a rule that depends on the other side (who a gift is for).
 export type VerbDef<V extends Action['action']> = {
   verb: V;
   schema: ZodType<ActionOf<V>>;
-  rule(world: World, self: Actor, action: ActionOf<V>, opts: ActOptions): Verdict;
+  rule(world: World, self: Actor, action: ActionOf<V>, opts: ActOptions, actorOf: ActorOf): Verdict;
 };
 export type AnyVerbDef = { [V in Action['action']]: VerbDef<V> }[Action['action']];
 
@@ -29,6 +30,8 @@ export type Actor = {
   catalogue?: Catalogue; // what it sells; OFFER checks terms against it
   start?: Start; // its purse and stock in a new world
 };
+
+export type ActorOf = (id: string) => Actor | undefined;
 
 // Its own place, whatever the hour. Events happen where it is at their tick: `placeAt`.
 export const placeOf = (a: Pick<Actor, 'location'>) => a.location ?? 'village';
@@ -227,18 +230,30 @@ export const START_WORK: VerbDef<'START_WORK'> = {
   },
 };
 
-// A gift needs only that the giver has it: gold in its purse, goods it hasn't promised to a job, an item it owns.
-// Whether an NPC should give at all is the definition's call (GIVE in its verbs); nothing is ever taken from the receiver.
+// A seller takes gold and the things of its own trade: the goods it sells, its materials, the item types it makes.
+// An actor that sells nothing (the player, a quest giver) takes whatever it's given. Returns why not, or null.
+function refuses(receiver: Actor, gift: Gift, itemType: string | null): string | null {
+  const { in_stock, made_to_order } = receiver.catalogue ?? {};
+  if ((!in_stock && !made_to_order) || gift.kind === 'gold') return null;
+  const goods = { ...in_stock, ...made_to_order?.materials };
+  const makes = made_to_order?.items ?? {};
+  const takes = gift.kind === 'good' ? own(goods, gift.good) !== undefined : itemType !== null && own(makes, itemType) !== undefined;
+  return takes ? null : `a seller takes only gold and its own trade: ${list({ ...goods, ...makes })}`;
+}
+
+// A gift needs that the giver has it: gold in its purse, goods it hasn't promised to a job, an item it owns.
+// Whether an NPC should give at all is the definition's call (GIVE in its verbs). The receiver may refuse it (`refuses`):
+// that is logged as GIFT_REFUSED and the giver keeps the gift. Nothing is ever taken from the receiver.
 export const GIVE: VerbDef<'GIVE'> = {
   verb: 'GIVE',
   schema: ACTION_SCHEMAS.GIVE,
-  rule(world, self, action, opts) {
+  rule(world, self, action, opts, actorOf) {
     const to = action.to ?? opts.customer ?? 'player';
     if (to === self.id) return reject(`${self.id} can't give something to itself`);
     // Every actor in a world has a purse from its start. Being in range waits for positions (the village).
     if (!Object.hasOwn(world.gold, to)) return reject(`there's nobody called '${to}' here to give to`);
     const g = action.gift;
-    let itemName: string | null = null;
+    let item: Item | null = null;
     if (g.kind === 'gold') {
       const have = world.gold[self.id] ?? 0;
       if (g.amount > have) return reject(`${self.id} has ${have} gold; it can't give ${g.amount}`);
@@ -246,11 +261,15 @@ export const GIVE: VerbDef<'GIVE'> = {
       const have = own(availableStock(world, self.id), g.good) ?? 0;
       if (g.qty > have) return reject(`${self.id} has ${have} ${g.good} to spare; it can't give ${g.qty}`);
     } else {
-      const item = world.items.find((i) => i.item_id === g.item_id);
+      item = world.items.find((i) => i.item_id === g.item_id) ?? null;
       if (!item) return reject(`there is no item ${g.item_id}`);
       if (item.owner !== self.id) return reject(`${g.item_id} belongs to ${item.owner}, not ${self.id}`);
-      itemName = item.item_name;
     }
-    return { ok: true, events: [{ ...at(world, self), type: 'GIVEN', target: to, data: { gift: g, item_name: itemName } }] };
+    const data = { gift: g, item_name: item?.item_name ?? null };
+    // The receiver hands it back where it stands, so the refusal happens at the receiver's place.
+    const receiver = actorOf(to);
+    const reason = receiver ? refuses(receiver, g, item?.item_type ?? null) : null;
+    if (receiver && reason) return { ok: true, events: [{ ...at(world, receiver), type: 'GIFT_REFUSED', target: self.id, data: { ...data, reason } }] };
+    return { ok: true, events: [{ ...at(world, self), type: 'GIVEN', target: to, data }] };
   },
 };

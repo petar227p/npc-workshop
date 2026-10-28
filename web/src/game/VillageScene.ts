@@ -180,6 +180,9 @@ export class VillageScene extends Phaser.Scene {
       case 'GOODS_DELIVERED':
         this.bubble(e.actor, `Here: ${e.data.qty} × ${e.data.good.replace(/_/g, ' ')}.`, 3500);
         break;
+      case 'GIFT_REFUSED':
+        this.bubble(e.actor, 'Not my trade. Keep it.', 3500);
+        break;
       case 'ITEM_DELIVERED': {
         const seller = view.contracts.find((c) => c.contract_id === e.data.contract_id)?.seller;
         if (seller) this.bubble(seller, `Your ${e.data.item.item_name} is ready!`, 5000);

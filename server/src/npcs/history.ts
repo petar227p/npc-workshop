@@ -35,6 +35,10 @@ export function historyFor(npcId: string, name: string): (world: World, customer
           if (e.actor === npcId && e.target === customer) lines.push(`[${name} gave the customer ${gift(e.data.gift, e.data.item_name)}]`);
           if (e.actor === customer && e.target === npcId) lines.push(`[Customer gave ${name} ${gift(e.data.gift, e.data.item_name)}]`);
           break;
+        case 'GIFT_REFUSED':
+          if (e.actor === npcId && e.target === customer) lines.push(`[Customer tried to give ${name} ${gift(e.data.gift, e.data.item_name)}; ${name} handed it back: not ${name}'s trade]`);
+          if (e.actor === customer && e.target === npcId) lines.push(`[${name} tried to give the customer ${gift(e.data.gift, e.data.item_name)}; the customer handed it back]`);
+          break;
         case 'CONTRACT_PROPOSED':
           if (e.actor === npcId && e.data.customer === customer) {
             lines.push(

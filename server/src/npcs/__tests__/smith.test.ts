@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEngine, verbs } from '../../engine';
-import { playerAccepts, playerSays, skipTime } from '../../game';
+import { playerAccepts, playerGives, playerSays, skipTime } from '../../game';
 import { mockClient, ModelError } from '../../models';
 import { npcTurn } from '../../agents/npc';
 import { ACTORS, newVillage, NPCS, smith } from '../index';
@@ -171,6 +171,20 @@ describe('the merchant', () => {
     expect(w.stock.player).toEqual({ torch: 3 });
     expect(mira.history(w, 'player')).toMatch(/\[3 × torch \(c_001\) handed to the customer\]/);
     expect(smith.history(w, 'player')).not.toMatch(/c_001/);
+  });
+
+  it("hands back an axe (not her trade) and remembers it; Brann, who makes axes, takes it", () => {
+    const axe = { item_id: 'i_c_001', contract_id: 'c_001', owner: 'player', item_name: 'Steel Axe', item_type: 'axe', description: '', stats: { damage: 12, weight: 8, durability: 60 }, delivered_tick: 6 };
+    const w = { ...newVillage(), items: [axe] };
+    const refused = playerGives(w, 'merchant', { kind: 'item', item_id: 'i_c_001' });
+    expect(refused.events.map((e) => e.type)).toEqual(['GIFT_REFUSED']);
+    expect(refused.world.items[0].owner).toBe('player');
+    expect(mira.history(refused.world, 'player')).toBe('[Customer tried to give Mira "Steel Axe" (i_c_001); Mira handed it back: not Mira\'s trade]');
+    expect(smith.history(refused.world, 'player')).toBe('(nothing yet)');
+
+    const taken = playerGives(refused.world, 'smith', { kind: 'item', item_id: 'i_c_001' });
+    expect(taken.events.map((e) => e.type)).toEqual(['GIVEN']);
+    expect(taken.world.items[0].owner).toBe('smith');
   });
 
   it("each NPC hears only what the customer said to it", async () => {

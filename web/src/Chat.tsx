@@ -4,11 +4,13 @@ import { MAX_SAY_LENGTH } from '@blacksmith/shared/src/limits';
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 import { clockText } from './api';
 
+export type Pending = { text: string; npc: string }; // the player's line while that NPC is thinking
+
 type Props = {
   view: StateView;
-  talkTo: string; // the NPC the next line goes to
+  talkTo: string; // the NPC the next line goes to; the chat shows only the conversation with it
   onTalkTo: (npc: string) => void;
-  pending: string | null; // the player's line while that NPC is thinking
+  pending: Pending | null;
   onSay: (text: string) => void;
   onAccept: (contractId: string) => void;
   inputRef?: RefObject<HTMLInputElement>; // the village focuses it when the player walks up to someone
@@ -23,12 +25,19 @@ export const nameOf = (view: StateView, id: string) => view.shops.find((s) => s.
 export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRef }: Props) {
   const [text, setText] = useState('');
   const box = useRef<HTMLDivElement>(null);
+  // One NPC thinks at a time and the server is locked until it's done, so nobody can be spoken to meanwhile.
   const thinking = pending !== null;
   const name = nameOf(view, talkTo);
+  const lines = speechFirst(view.events.filter((e) => between(e, talkTo, view)));
 
+  // On the newest line, not the count: once the log is past the view's cap, a line can arrive as an old one drops out.
   useEffect(() => {
     box.current?.scrollTo({ top: box.current.scrollHeight, behavior: 'smooth' });
-  }, [view.events.length, pending]);
+  }, [lines.at(-1)?.id, pending]);
+  // Another NPC's chat starts at its latest line, without scrolling through.
+  useEffect(() => {
+    box.current?.scrollTo({ top: box.current.scrollHeight });
+  }, [talkTo]);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -58,12 +67,12 @@ export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRe
       </div>
       <div className="messages" ref={box}>
         <div className="msg npc">{talkTo === 'smith' ? 'Brann looks up from the anvil.' : `${name} looks up.`} "What'll it be?"</div>
-        {speechFirst(view.events).map((e) => (
+        {lines.map((e) => (
           <Entry key={e.id} event={e} view={view} disabled={thinking} onAccept={onAccept} />
         ))}
-        {pending !== null && (
+        {pending?.npc === talkTo && (
           <>
-            <div className="msg you">{pending}</div>
+            <div className="msg you">{pending.text}</div>
             <div className="msg npc thinking" aria-live="polite">
               {name} is thinking<span className="dots" />
             </div>
@@ -85,6 +94,30 @@ export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRe
       </form>
     </section>
   );
+}
+
+// Whether an event belongs in the player's chat with `npc`: what the two said and gave each other, the NPC's offers
+// to the player and its own sales' handovers. An NPC's lines to nobody in particular (acting on its own) count too.
+// Same split as the NPC's own history on the server (npcs/history.ts), from the player's side.
+export function between(e: EngineEvent, npc: string, view: StateView): boolean {
+  const toPlayer = e.actor === npc && e.target === 'player';
+  switch (e.type) {
+    case 'SAID':
+    case 'EMOTED':
+      return (e.actor === npc && e.target === null) || toPlayer || (e.actor === 'player' && e.target === npc);
+    case 'GIVEN':
+    case 'GIFT_REFUSED':
+      return toPlayer || (e.actor === 'player' && e.target === npc);
+    case 'CONTRACT_PROPOSED':
+    case 'CONTRACT_REFUSED':
+    case 'WORK_STARTED':
+    case 'GOODS_DELIVERED':
+      return toPlayer;
+    case 'ITEM_DELIVERED': // the clock delivers, so the contract says whose work it was
+      return e.target === 'player' && view.contracts.find((c) => c.contract_id === e.data.contract_id)?.seller === npc;
+    default:
+      return false;
+  }
 }
 
 // An NPC's line is logged after the action it goes with (so a rejected offer is never announced),
@@ -120,6 +153,8 @@ function Entry({ event: e, view, disabled, onAccept }: { event: EngineEvent; vie
       );
     case 'GIVEN':
       return <div className="note ok">{gaveText(e, view)}</div>;
+    case 'GIFT_REFUSED':
+      return <div className="note">{refusedText(e, view)}</div>;
     case 'CONTRACT_PROPOSED': {
       const c = view.contracts.find((x) => x.contract_id === e.data.contract.contract_id);
       return c ? <ContractCard c={c} gold={view.gold} disabled={disabled} onAccept={onAccept} /> : null;
@@ -162,6 +197,7 @@ const STATUS: Record<ContractView['status'], string> = {
 export const goodName = (good: string) => good.replace(/_/g, ' ');
 
 type Given = Extract<EngineEvent, { type: 'GIVEN' }>;
+type Refused = Extract<EngineEvent, { type: 'GIFT_REFUSED' }>;
 export const giftText = ({ gift, item_name }: Given['data']) =>
   gift.kind === 'gold' ? `${gift.amount} gold` : gift.kind === 'good' ? `${gift.qty} × ${goodName(gift.good)}` : `the ${item_name ?? gift.item_id}`;
 
@@ -170,6 +206,13 @@ export function gaveText(e: Given, view: StateView): string {
   const from = e.actor === 'player' ? 'You give' : `${nameOf(view, e.actor)} gives`;
   const to = e.target === 'player' ? 'you' : nameOf(view, e.target ?? '');
   return `${from} ${to} ${giftText(e.data)}.`;
+}
+
+// The refuser is the actor: "Mira won't take the Steel Axe; you keep it."
+export function refusedText(e: Refused, view: StateView): string {
+  const who = e.actor === 'player' ? 'You' : nameOf(view, e.actor);
+  const keeps = e.target === 'player' ? 'you keep it' : `${nameOf(view, e.target ?? '')} keeps it`;
+  return `${who} won't take ${giftText(e.data)}; ${keeps}.`;
 }
 
 // Without onAccept (the editor's test bench) an open offer is shown but can't be taken.
