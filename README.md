@@ -37,8 +37,8 @@ Not built yet: the walkable village, villagers that gossip, and the live-site bu
 
 | Role | Model | Via |
 |---|---|---|
-| Blacksmith negotiation | Muse Spark 1.3 | Meta Model API |
-| Villagers, gossip, attackers | Muse Spark Open (`meta-models/muse-spark-open-1026`) | Baseten |
+| Brann, the blacksmith (haggling over made-to-order work) | Muse Spark 1.3 | Meta Model API |
+| Mira, the merchant, and later villagers, gossip and attackers | Muse Spark Open (`meta-models/muse-spark-open-1026`) | Baseten |
 | Item picture | Muse Image | Meta Model API |
 
 Muse Spark and Muse Spark Open always reason, so the clients send a low `reasoning_effort` and a generous token limit. Baseten does not enforce `json_schema` for Muse Spark Open, so every reply is Zod-validated with one repair retry. Latency and cost numbers from real calls are in [`docs/api-notes.md`](docs/api-notes.md); `npm run latency-test` reproduces them (about 50 calls, six minutes, roughly $0.20).
@@ -116,7 +116,7 @@ scripts/       dev runner, smith demo, latency test
 
 - Walkable Phaser village with NPC schedules; the server owns positions.
 - **Perception and gossip**: an NPC only knows events it witnessed or was told, with a confidence that decays as the story passes on.
-- Villagers on Muse Spark Open through Baseten.
+- Villagers and gossip on Muse Spark Open through Baseten (Mira already runs on it).
 - A raw-LLM versus ledger side-by-side, and a per-NPC exploit suite.
 - A non-game NPC (a parts-supplier quote desk) on the same engine, to show it isn't only for games.
 - Session and budget caps for the public demo.

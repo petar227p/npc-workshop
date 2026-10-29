@@ -1,4 +1,4 @@
-import type { Trigger } from './npc-info';
+import type { ModelChoice, Trigger } from './npc-info';
 import type { Contract, Gift, MadeToOrderTerms } from './trade';
 
 // Typed events, shared by the engine (which produces them) and the browser (which renders them).
@@ -49,7 +49,7 @@ export type MadeToOrderView = Extract<ContractView, { kind: 'made_to_order' }>;
 export type ItemArt = { status: 'rendering' | 'ready' | 'unavailable'; url: string | null };
 
 // An NPC in the village and the place it is at this tick, worked out by the server. The browser walks it there.
-export type PersonView = { id: string; name: string; sprite: number; place: string };
+export type PersonView = { id: string; name: string; sprite: number; place: string; model: ModelChoice }; // model: who voices it, for the chat's badge
 
 export type StateView = {
   tick: number;

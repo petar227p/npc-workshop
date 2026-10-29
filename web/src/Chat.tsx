@@ -1,6 +1,7 @@
 import type { ContractView, EngineEvent, StateView } from '@blacksmith/shared';
 // The zod-free module, so the schemas stay out of the bundle.
 import { MAX_SAY_LENGTH } from '@blacksmith/shared/src/limits';
+import { MODEL_INFO } from '@blacksmith/shared/src/npc-info';
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 import { clockText } from './api';
 
@@ -28,6 +29,7 @@ export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRe
   // One NPC thinks at a time and the server is locked until it's done, so nobody can be spoken to meanwhile.
   const thinking = pending !== null;
   const name = nameOf(view, talkTo);
+  const person = view.people.find((p) => p.id === talkTo);
   const lines = speechFirst(view.events.filter((e) => between(e, talkTo, view)));
 
   // On the newest line, not the count: once the log is past the view's cap, a line can arrive as an old one drops out.
@@ -50,7 +52,7 @@ export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRe
   return (
     <section className="panel chat-panel">
       <div className="chat-head">
-        <div className="portrait" style={portraitStyle(view.people.find((p) => p.id === talkTo)?.sprite ?? 86)} />
+        <div className="portrait" style={portraitStyle(person?.sprite ?? 86)} />
         <div>
           <label className="chat-name">
             <span className="sr-only">Talking to </span>
@@ -62,7 +64,7 @@ export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRe
               ))}
             </select>
           </label>
-          <div className="tag">Muse Spark · proposes; the ledger decides</div>
+          <div className="tag">{(person && MODEL_INFO[person.model]?.label) ?? 'The model'} · proposes; the ledger decides</div>
         </div>
       </div>
       <div className="messages" ref={box}>

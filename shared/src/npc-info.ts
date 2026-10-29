@@ -40,8 +40,8 @@ export const MODEL_CHOICES = ['muse_spark', 'muse_spark_open'] as const;
 export type ModelChoice = (typeof MODEL_CHOICES)[number];
 
 export const MODEL_INFO: Record<ModelChoice, { label: string; description: string }> = {
-  muse_spark: { label: 'Muse Spark', description: 'Meta Model API. The strongest; for sellers who haggle over real money.' },
-  muse_spark_open: { label: 'Muse Spark Open', description: 'Open weights on Baseten. Cheaper per line; for villagers, gossip and chatter.' },
+  muse_spark: { label: 'Muse Spark', description: 'Meta Model API. Its JSON schema is enforced while it writes; slower on the contributor tier.' },
+  muse_spark_open: { label: 'Muse Spark Open', description: 'Open weights on Baseten. About 2 s a turn; Mira the merchant runs on it. Its schema isn\'t enforced, so the ledger and one retry catch a bad answer.' },
 };
 
 // How hard the model thinks before it answers (reasoning_effort). Both providers take all three.

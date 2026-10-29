@@ -387,8 +387,8 @@ describe('api', () => {
     const b = browser(app);
     const start = (await b.send('/api/state')).json as StateView;
     expect(start.people).toEqual([
-      { id: 'merchant', name: 'Mira', sprite: 99, place: 'market' },
-      { id: 'smith', name: 'Brann', sprite: 86, place: 'forge' },
+      { id: 'merchant', name: 'Mira', sprite: 99, place: 'market', model: 'muse_spark_open' },
+      { id: 'smith', name: 'Brann', sprite: 86, place: 'forge', model: 'muse_spark' },
     ]);
     const evening = (await b.send('/api/tick', { ticks: 11 })).json as ActionResponse; // 19:00
     expect(evening.view.people.find((p) => p.id === 'merchant')?.place).toBe('tavern');

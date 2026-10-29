@@ -102,7 +102,7 @@ const VIEW_EVENTS = 300;
 
 // The NPCs a view shows: their names label each seller's stock (an actor without one is shown by its id),
 // and where they are comes from their schedule.
-export type Cast = readonly Pick<NpcSpec, 'id' | 'name' | 'sprite' | 'location' | 'schedule'>[];
+export type Cast = readonly Pick<NpcSpec, 'id' | 'name' | 'sprite' | 'location' | 'schedule' | 'model'>[];
 
 export function toView(world: World, busy: boolean, art: Gallery = new Map(), cast: Cast = [], customer = 'player'): StateView {
   const names = Object.fromEntries(cast.map((n) => [n.id, n.name]));
@@ -111,7 +111,7 @@ export function toView(world: World, busy: boolean, art: Gallery = new Map(), ca
     .map(({ customer: _c, proposed_tick: _p, location: _l, ...c }) => c);
   return {
     tick: world.tick,
-    people: cast.map((n) => ({ id: n.id, name: n.name, sprite: n.sprite ?? DEFAULT_SPRITE, place: placeAt(n, world.tick) })),
+    people: cast.map((n) => ({ id: n.id, name: n.name, sprite: n.sprite ?? DEFAULT_SPRITE, place: placeAt(n, world.tick), model: n.model })),
     gold: world.gold[customer] ?? 0,
     goods: { ...(world.stock[customer] ?? {}) },
     shops: Object.keys(world.stock)
