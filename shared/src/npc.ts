@@ -6,11 +6,15 @@ import {
   EFFORT_CHOICES,
   FACT_BLOCKS,
   LEDGER_VERBS,
+  MAX_ART_STYLE,
+  MAX_REFERENCE_BYTES,
+  MAX_REFERENCES,
   MAX_PERSONA_LENGTH,
   MAX_TRIGGER_HOURS,
   MODEL_CHOICES,
   MODEL_VERBS,
   NPC_ID_PATTERN,
+  NO_ART,
   NPC_SPRITES,
   RESERVED_IDS,
   type NpcDraft,
@@ -38,6 +42,21 @@ const TriggerSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('on_new_memory'), cue }).strict(),
 ]);
 
+// One line, so a style can't open a new section of the image prompt.
+const style = z.string().max(MAX_ART_STYLE).transform((s) => s.replace(/\s+/g, ' ').trim());
+const ArtFileSchema = z
+  .object({
+    style,
+    references: z.array(z.string().regex(/^[a-z][a-z0-9_]{0,40}-[1-3]\.(png|jpg|webp)$/, 'a picture name under npcs/art/')).max(MAX_REFERENCES),
+  })
+  .strict();
+// base64 is 4 characters for every 3 bytes, so the decoded size is checked before anything decodes it.
+const reference = z
+  .string()
+  .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/, 'a PNG, JPEG or WebP picture')
+  .refine((u) => ((u.length - u.indexOf(',') - 1) * 3) / 4 <= MAX_REFERENCE_BYTES, `a reference picture is at most ${MAX_REFERENCE_BYTES / 1024} KB`);
+const ArtDraftSchema = z.object({ style, references: z.array(reference).max(MAX_REFERENCES, `at most ${MAX_REFERENCES} reference pictures`) }).strict();
+
 export const NpcFileSchema = z
   .object({
     id: z
@@ -54,6 +73,7 @@ export const NpcFileSchema = z
     location: placeName,
     schedule: ScheduleSchema.default([]), // files from before schedules stayed at their place all day
     sprite: z.number().int().refine((n) => (NPC_SPRITES as readonly number[]).includes(n), 'not one of the character sprites').default(DEFAULT_SPRITE),
+    art: ArtFileSchema.default(() => ({ ...NO_ART, references: [] })), // files from before the art box drew in the plain pixel-art style
     start: StartSchema,
     catalogue: CatalogueSchema,
     // Files from before triggers only ever answered when spoken to.
@@ -67,7 +87,10 @@ export const NpcFileSchema = z
   .strict();
 export type NpcFile = z.infer<typeof NpcFileSchema>;
 
-export const NpcDraftSchema = NpcFileSchema.extend({ persona: z.string().trim().min(1).max(MAX_PERSONA_LENGTH) }).strict();
+export const NpcDraftSchema = NpcFileSchema.extend({
+  persona: z.string().trim().min(1).max(MAX_PERSONA_LENGTH),
+  art: ArtDraftSchema.default(() => ({ ...NO_ART, references: [] })),
+}).strict();
 
 // Compile-time check that the zod shape and the plain type agree.
 const _same: z.infer<typeof NpcDraftSchema> extends NpcDraft ? (NpcDraft extends z.infer<typeof NpcDraftSchema> ? true : never) : never = true;

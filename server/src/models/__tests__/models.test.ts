@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { REPO_ROOT } from '../../config/env';
-import { createClient, createModel, createModels, mockClient, readLog, replayClient, withRecorder, type ChatRequest } from '../index';
+import { createClient, createImageClient, createModel, createModels, mockClient, readLog, replayClient, withRecorder, type ChatRequest } from '../index';
 
 const req: ChatRequest = {
   model: 'm',
@@ -150,5 +150,28 @@ describe('recorder and replay', () => {
     expect((await replay.chat(req)).content).toBe('two');
     await expect(replay.chat(req)).rejects.toThrow('boom');
     await expect(replay.chat(req)).rejects.toThrow(/exhausted after 3 calls/);
+  });
+});
+
+describe('image client', () => {
+  const answer = () => new Response(JSON.stringify({ data: [{ b64_json: Buffer.from('png').toString('base64') }] }), { status: 200 });
+  const sent = (fetch: ReturnType<typeof vi.fn>) => fetch.mock.calls.map(([url, init]) => ({ url: url as string, body: JSON.parse((init as RequestInit).body as string) }));
+
+  it('draws from the prompt alone on generations, or with references on edits (searches off)', async () => {
+    const fetch = vi.fn(async () => answer());
+    const client = createImageClient({ baseURL: 'https://img.test/v1/', apiKey: 'k', model: 'muse-image-1.0', fetch });
+    expect((await client.generate({ prompt: 'a lantern' })).png.toString()).toBe('png');
+    await client.generate({ prompt: 'a lantern', references: ['data:image/png;base64,AA=='] });
+    const [plain, styled] = sent(fetch);
+    expect(plain.url).toBe('https://img.test/v1/images/generations');
+    expect(plain.body).not.toHaveProperty('images');
+    expect(plain.body).not.toHaveProperty('tool_enablement');
+    expect(styled.url).toBe('https://img.test/v1/images/edits');
+    expect(styled.body).toMatchObject({
+      prompt: 'a lantern',
+      output_format: 'png',
+      images: [{ image_url: 'data:image/png;base64,AA==' }],
+      tool_enablement: { enable_image_search: false, enable_web_search: false, enable_shell: false },
+    });
   });
 });

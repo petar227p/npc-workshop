@@ -1,4 +1,4 @@
-import { NPC_ID_PATTERN, type EffortChoice, type ModelChoice, type Trigger } from '@blacksmith/shared';
+import { NPC_ID_PATTERN, type EffortChoice, type ModelChoice, type NpcArt, type Trigger } from '@blacksmith/shared';
 import type { Actor, World } from '../engine';
 import { flatSchema, type FlatVerb } from '../agents/flat';
 
@@ -12,6 +12,7 @@ export type NpcSpec = Actor & {
   effort: EffortChoice; // how hard that model thinks each turn
   perception_radius: number; // in tiles: how far from its place it sees what happens (engine/perception.ts)
   sprite?: number; // its look in the village (a Tiny Dungeon frame); the default villager if not given
+  art?: NpcArt; // how pictures of what it makes look; the plain pixel-art style if not given
   facts(world: World, customer: string): string; // code-owned numbers it may quote
   history(world: World, customer: string): string; // the conversation with this customer, rebuilt from the event log
   triggers?: readonly Trigger[]; // when it takes a turn; being spoken to if not given

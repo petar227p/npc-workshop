@@ -201,3 +201,14 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .god-people { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 10px; }
 .god-people .check { font-size: 12px; }
 .god-notable { align-self: center; margin: 8px 0 10px; }
+
+/* Reference pictures and the trial picture in the workshop's art section. */
+.dropzone { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-height: 76px; padding: 8px; border: 2px dashed var(--line); border-radius: 8px; background: var(--bg); cursor: pointer; }
+.dropzone.over, .dropzone:focus-visible { border-color: var(--accent); outline: none; }
+.dropzone .ref { position: relative; }
+.dropzone .ref img { display: block; width: 56px; height: 56px; object-fit: contain; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); image-rendering: pixelated; }
+.dropzone .ref button { position: absolute; top: -6px; right: -6px; padding: 0 5px; line-height: 16px; }
+.sketch { display: flex; gap: 12px; align-items: flex-start; margin-top: 6px; }
+.sketch img { width: 128px; height: 128px; flex: none; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); image-rendering: pixelated; }
+.sketch > div { min-width: 0; flex: 1; }
+@media (max-width: 520px) { .sketch { flex-direction: column; } }

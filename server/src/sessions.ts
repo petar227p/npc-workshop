@@ -13,6 +13,7 @@ import { PLACE_NAMES } from './village';
 // (and the model client), so `busy` says which of them holds it (and, in the village, who is answering);
 // `benchTurns` counts bench turns against its quota.
 // `art` holds the item pictures of this world (a new game starts an empty one); `artRenders` counts them all.
+// `sketches` counts the workshop's trial pictures; `sketching` is on while one is drawn (it locks nothing else).
 export type Busy = { by: 'npc'; name: string } | { by: 'bench' } | null;
 export type Session = {
   id: string;
@@ -21,6 +22,8 @@ export type Session = {
   benchKey: string | null; // which draft's id and starting stock `bench` was made for
   busy: Busy;
   benchTurns: number;
+  sketches: number;
+  sketching: boolean;
   models: Partial<Record<ModelChoice, NpcModel>>; // made on first use, one per model choice
   art: Gallery;
   artRenders: number;
@@ -39,6 +42,8 @@ const newSession = (id: string, lastSeen: number): Session => ({
   benchKey: null,
   busy: null,
   benchTurns: 0,
+  sketches: 0,
+  sketching: false,
   models: {},
   art: new Map(),
   artRenders: 0,

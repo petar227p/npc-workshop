@@ -1,4 +1,4 @@
-import type { ActionResponse, ArtResponse, BenchResponse, EditorLibrary, Gift, NpcDraft, PreviewResponse, ReadNoteResponse, SaveResponse, StateView, WorldReport } from '@blacksmith/shared';
+import type { ActionResponse, ArtResponse, BenchResponse, EditorLibrary, Gift, NpcDraft, PreviewResponse, ReadNoteResponse, SaveResponse, SketchResponse, StateView, WorldReport } from '@blacksmith/shared';
 
 export class ApiError extends Error {}
 
@@ -27,13 +27,18 @@ export const api = {
   readNote: (note: string) => call<ReadNoteResponse>('god/read', { note }),
 };
 
+// Reference pictures are up to a megabyte, and only pictures and saves use them: the checks on every edit and the
+// bench turns go without (the browser checked each picture when it was dropped).
+const lean = (npc: NpcDraft): NpcDraft => ({ ...npc, art: { ...npc.art, references: [] } });
+
 export const editorApi = {
   library: () => call<EditorLibrary>('editor/library'),
-  preview: (npc: NpcDraft) => call<PreviewResponse>('editor/preview', { npc }),
-  say: (npc: NpcDraft, text: string) => call<BenchResponse>('editor/bench/say', { npc, text }),
-  tick: (npc: NpcDraft, ticks: number) => call<BenchResponse>('editor/bench/tick', { npc, ticks }),
+  preview: (npc: NpcDraft) => call<PreviewResponse>('editor/preview', { npc: lean(npc) }),
+  say: (npc: NpcDraft, text: string) => call<BenchResponse>('editor/bench/say', { npc: lean(npc), text }),
+  tick: (npc: NpcDraft, ticks: number) => call<BenchResponse>('editor/bench/tick', { npc: lean(npc), ticks }),
   reset: () => call<BenchResponse>('editor/bench/reset', {}),
   save: (npc: NpcDraft, overwrite = false) => call<SaveResponse>('editor/save', { npc, overwrite }),
+  sketch: (npc: NpcDraft, subject: string) => call<SketchResponse>('editor/sketch', { npc, subject }),
 };
 
 // The zod-free module, so the schemas stay out of the bundle. The NPCs' clock fact uses the same text.

@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import type { Contract, ItemArt } from '@blacksmith/shared';
+import type { Contract, ItemArt, NpcArt } from '@blacksmith/shared';
 import type { ImageClient, ImageStrength } from '../models/image';
 import { KENNEY_PALETTE } from './palette';
-import { artPrompt } from './prompt';
+import { artPrompt, drawPrompt } from './prompt';
 import { toSprite } from './sprite';
 
-export { artPrompt } from './prompt';
+export { artPrompt, drawPrompt } from './prompt';
 export { toSprite, type SpriteOptions } from './sprite';
 
 // Item pictures sit beside the ledger, never in it: the engine stays pure and a failed render changes nothing
@@ -25,8 +25,8 @@ export function createStudio(limits: StudioLimits = {}) {
 
   return {
     // Starts the picture for a made-to-order contract unless it has one, or the caps say no (then it stays a placeholder).
-    // Goods from stock get no picture. Returns the render so tests can wait for it; routes don't.
-    start(owner: ArtOwner, contract: Contract, client: ImageClient | null): Promise<void> | null {
+    // Goods from stock get no picture. `art` is the seller's. Returns the render so tests can wait for it; routes don't.
+    start(owner: ArtOwner, contract: Contract, client: ImageClient | null, art?: NpcArt): Promise<void> | null {
       if (contract.kind !== 'made_to_order') return null;
       const gallery = owner.art;
       if (gallery.has(contract.contract_id)) return null;
@@ -40,7 +40,7 @@ export function createStudio(limits: StudioLimits = {}) {
       owner.artRenders += 1;
       entry.status = 'rendering';
       return client
-        .generate({ prompt: artPrompt(contract), strength })
+        .generate({ prompt: artPrompt(contract, art), strength, references: art?.references })
         .then(({ png }) => {
           entry.png = toSprite(png, { palette: KENNEY_PALETTE });
           entry.status = 'ready';
@@ -51,6 +51,13 @@ export function createStudio(limits: StudioLimits = {}) {
         });
     },
   };
+}
+
+// A trial picture for the workshop: anything the creator names, in the draft's art, through the same sprite step.
+export async function sketch(client: ImageClient, subject: string, art: NpcArt | undefined, strength: ImageStrength = 'high') {
+  const prompt = drawPrompt(subject, art);
+  const { png, latency_ms } = await client.generate({ prompt, strength, references: art?.references });
+  return { sprite: toSprite(png, { palette: KENNEY_PALETTE }), prompt, latency_ms };
 }
 
 export const artUrl = (e: ArtEntry) => `/api/art/${e.id}.png`;

@@ -84,6 +84,17 @@ export const PLAYER_SPRITE = 85;
 export const NPC_SPRITES = [84, 86, 87, 88, 96, 97, 98, 99, 100, 108, 109, 110, 111, 112] as const;
 export const DEFAULT_SPRITE = 98;
 
+// How its item pictures look: a style line and up to three reference pictures, added to the prompt the code builds
+// from an accepted offer. The terms still decide what is drawn; the art only decides how. In a draft each reference is
+// a data URL (the browser shrinks a dropped picture first); in a file it is a name under npcs/art/.
+export const MAX_ART_STYLE = 300;
+export const MAX_REFERENCES = 3;
+export const MAX_REFERENCE_BYTES = 300 * 1024;
+export const REFERENCE_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
+export type NpcArt = { style: string; references: string[] };
+export const NO_ART: NpcArt = { style: '', references: [] };
+export const MAX_SKETCH_SUBJECT = 200;
+
 export const MAX_PERSONA_LENGTH = 6000;
 export const NPC_ID_PATTERN = '^[a-z][a-z0-9_]{0,40}$';
 // Actor ids an NPC can't take: the player, the actor of every reported world event (engine/happen.ts WORLD), and the
@@ -104,6 +115,7 @@ export type NpcDraft = {
   location: string; // its own place (forge, market…): where it is when its schedule says nothing
   schedule: ScheduleEntry[]; // where it goes during the day; its events happen wherever it is
   sprite: number; // its look: a character frame in Kenney's Tiny Dungeon sheet
+  art: NpcArt; // how the pictures of what it makes look
   start: Start; // its purse and stock in a new world
   catalogue: Catalogue; // what it sells; empty for an NPC that only talks
   triggers: Trigger[];
@@ -119,6 +131,9 @@ export type PreviewResponse =
 
 // `exists`: the id is already a file; the editor asks before saving again with `overwrite`.
 export type SaveResponse = { ok: boolean; errors: string[]; exists?: boolean };
+
+// A trial picture in the draft's art: the 32×32 sprite (a data URL) and the prompt that made it.
+export type SketchResponse = { ok: true; sprite: string; prompt: string; references: number; latency_ms: number } | { ok: false; errors: string[] };
 
 export type BenchAttempt = { content: string; ok: boolean; reason: string | null; latency_ms: number };
 
