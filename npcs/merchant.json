@@ -5,7 +5,7 @@
   "model_verbs": ["SAY", "OFFER", "COUNTER_OFFER", "REFUSE"],
   "facts": ["purse", "stock", "catalogue", "price_floor", "open_offers"],
   "perception_radius": 4,
-  "model": "muse_spark",
+  "model": "muse_spark_open",
   "effort": "low",
   "location": "market",
   "schedule": [

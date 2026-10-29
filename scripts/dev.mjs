@@ -14,11 +14,7 @@ const npm = (args, env) =>
 
 // The server is pinned to 8787 (web/vite.config.ts proxies there), whatever PORT the shell or a preview tool sets.
 const procs = ['server', 'web'].map((w) =>
-<<<<<<< Updated upstream
   npm(['run', 'dev', '-w', w], w === 'server' ? { ...process.env, PORT: '8787', NPC_EDITOR_SAVE: '1' } : process.env),
-=======
-  spawn('npm', ['run', 'dev', '-w', w], { stdio: 'inherit', shell: process.platform === 'win32', env: w === 'server' ? { ...process.env, PORT: '8787', NPC_EDITOR_SAVE: '1' } : process.env }),
->>>>>>> Stashed changes
 );
 // On Windows a kill stops npm but not the tsx and vite under it, so the whole tree goes.
 const kill = (p) => (windows ? spawn('taskkill', ['/pid', String(p.pid), '/T', '/F'], { stdio: 'ignore' }) : p.kill('SIGTERM'));
@@ -26,15 +22,7 @@ let stopping = false;
 const stop = (code = 0) => {
   if (stopping) return;
   stopping = true;
-<<<<<<< Updated upstream
   for (const p of procs) if (p.exitCode === null) kill(p);
-=======
-  // With a shell on Windows, kill() would stop only the shell, so take the whole process tree down.
-  for (const p of procs) {
-    if (process.platform === 'win32' && p.pid) spawn('taskkill', ['/pid', String(p.pid), '/T', '/F'], { stdio: 'ignore' });
-    else p.kill('SIGTERM');
-  }
->>>>>>> Stashed changes
   process.exitCode = code;
 };
 process.on('SIGINT', () => stop());
