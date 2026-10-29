@@ -22,7 +22,7 @@ const TURN_LIMITS = { timeoutMs: 20_000, maxAttempts: 2 };
 export function createModel(session: string, choice: ModelChoice): ModelClient {
   const env = loadEnv();
   const spark = choice === 'muse_spark';
-  const model = spark ? (env.SMITH_MODEL ?? 'muse-spark-1.3-contributor') : (env.VILLAGER_MODEL ?? 'meta-models/muse-spark-open');
+  const model = spark ? (env.SMITH_MODEL ?? 'muse-spark-1.3-contributor') : (env.VILLAGER_MODEL ?? 'meta-models/muse-spark-open-1026');
   const provider = spark ? 'meta' : 'baseten';
 
   if (env.REPLAY) return { client: replayClient(readLog(env.REPLAY).filter((e) => e.provider === provider)), model };

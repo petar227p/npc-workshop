@@ -38,7 +38,7 @@ Not built yet: the walkable village, villagers that gossip, and the live-site bu
 | Role | Model | Via |
 |---|---|---|
 | Blacksmith negotiation | Muse Spark 1.3 | Meta Model API |
-| Villagers, gossip, attackers | Muse Spark Open (`meta-models/muse-spark-open`) | Baseten |
+| Villagers, gossip, attackers | Muse Spark Open (`meta-models/muse-spark-open-1026`) | Baseten |
 | Item picture | Muse Image | Meta Model API |
 
 Muse Spark and Muse Spark Open always reason, so the clients send a low `reasoning_effort` and a generous token limit. Baseten does not enforce `json_schema` for Muse Spark Open, so every reply is Zod-validated with one repair retry. Latency and cost numbers from real calls are in [`docs/api-notes.md`](docs/api-notes.md); `npm run latency-test` reproduces them (about 50 calls, six minutes, roughly $0.20).
