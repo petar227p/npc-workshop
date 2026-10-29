@@ -1,9 +1,22 @@
-import { MAX_SAY_LENGTH, MAX_TRIGGER_HOURS, MODEL_INFO, type ModelChoice, type BenchResponse, type EditorLibrary, type PreviewResponse, type SaveResponse } from '@blacksmith/shared';
+import {
+  MAX_SAY_LENGTH,
+  MAX_SKETCH_SUBJECT,
+  MAX_TRIGGER_HOURS,
+  MODEL_INFO,
+  type ModelChoice,
+  type BenchResponse,
+  type EditorLibrary,
+  type PreviewResponse,
+  type SaveResponse,
+  type SketchResponse,
+} from '@blacksmith/shared';
 import type { Context, Hono } from 'hono';
 import { z } from 'zod';
 import { npcTurn, type Attempt, type NpcModel } from '../agents/npc';
+import { sketch } from '../art';
 import { createEngine, createWorld, timedTrigger, type World } from '../engine';
 import { answers, passTime } from '../game';
+import type { ImageClient } from '../models/image';
 import { buildNpc, player, type NpcDefinition, type NpcFiles } from '../npcs';
 import { busyMessage, toView, type Session } from '../sessions';
 import { PLACE_NAMES } from '../village';
@@ -17,14 +30,22 @@ const DraftBody = z.object({ npc: z.unknown() });
 const SaveBody = z.object({ npc: z.unknown(), overwrite: z.boolean().optional() });
 const BenchSayBody = z.object({ npc: z.unknown(), text: z.string().trim().min(1).max(MAX_SAY_LENGTH) });
 const BenchTickBody = z.object({ npc: z.unknown(), ticks: z.number().int().min(1).max(MAX_TRIGGER_HOURS) });
+const SketchBody = z.object({ npc: z.unknown(), subject: z.string().trim().min(1).max(MAX_SKETCH_SUBJECT) });
 
 // A bench persona is the visitor's own, so on the public site the bench could otherwise be used as a free
 // general-purpose model. Turns are capped per session and per minute across everyone, and the raw model
 // answer shown under the hood is clipped (a real one is well under this).
-export type BenchLimits = { perSession?: number; perMinute?: number; now?: () => number };
+// Trial pictures cost a cent each and take 10–20 s, so they have caps of their own.
+export type BenchLimits = { perSession?: number; perMinute?: number; sketchesPerSession?: number; sketchesPerMinute?: number; now?: () => number };
 const MAX_ATTEMPT_CHARS = 3000;
 
-type Deps = { modelFor: (s: Session, choice: ModelChoice) => NpcModel | null; canSave: boolean; files: NpcFiles; limits?: BenchLimits };
+type Deps = {
+  modelFor: (s: Session, choice: ModelChoice) => NpcModel | null;
+  artistFor: (s: Session) => ImageClient | null;
+  canSave: boolean;
+  files: NpcFiles;
+  limits?: BenchLimits;
+};
 
 // Saving writes into the repo, so only the editor page itself may ask: a JSON body forces a CORS preflight that
 // this server never answers, and browsers mark a request from another site. (Non-browser clients send neither.)
@@ -34,8 +55,9 @@ function fromThisSite(c: Context): boolean {
 }
 
 export function mountEditor(app: Hono<Env>, deps: Deps) {
-  const { perSession = 40, perMinute = 30, now = Date.now } = deps.limits ?? {};
+  const { perSession = 40, perMinute = 30, sketchesPerSession = 8, sketchesPerMinute = 20, now = Date.now } = deps.limits ?? {};
   let recent: number[] = []; // bench turns started in the last minute, across all visitors
+  let recentSketches: number[] = []; // trial pictures likewise
 
   const body = async <T>(c: Context<Env>, schema: z.ZodType<T>) => schema.safeParse(await c.req.json().catch(() => null));
   // The bench world holds the player and the draft, each with what it starts with.
@@ -161,6 +183,44 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
     if (s.busy) return busy(c);
     s.bench = null;
     return c.json({ ok: true, errors: [], outcome: null, attempts: [], events: [], view: benchView(s) } satisfies BenchResponse);
+  });
+
+  // Draws something in the draft's art, so its creator sees the style before an order comes in. Waits for the picture.
+  app.post('/api/editor/sketch', async (c) => {
+    const s = c.get('session');
+    const parsed = await body(c, SketchBody);
+    if (!parsed.success) return c.json({ error: `expected { npc, subject } with a subject of at most ${MAX_SKETCH_SUBJECT} characters` }, 400);
+    if (s.sketching) return c.json({ error: 'A picture is still being drawn.' }, 409);
+    const built = buildNpc(parsed.data.npc);
+    if (!built.ok) return c.json({ ok: false, errors: built.errors } satisfies SketchResponse);
+
+    if (s.sketches >= sketchesPerSession) return c.json({ error: `That's all ${sketchesPerSession} trial pictures for this visit.` }, 429);
+    const t = now();
+    recentSketches = recentSketches.filter((at) => t - at < 60_000);
+    if (recentSketches.length >= sketchesPerMinute) return c.json({ error: 'The workshop is busy right now. Try again in a minute.' }, 429);
+    const artist = deps.artistFor(s);
+    if (!artist) return c.json({ error: "Muse Image isn't available right now. Try again later." }, 503);
+    recentSketches.push(t);
+    s.sketches += 1;
+    s.sketching = true;
+    try {
+      const art = built.npc.art;
+      const r = await sketch(artist, parsed.data.subject.replace(/\s+/g, ' '), art);
+      return c.json({
+        ok: true,
+        sprite: `data:image/png;base64,${r.sprite.toString('base64')}`,
+        prompt: r.prompt,
+        references: art?.references.length ?? 0,
+        latency_ms: r.latency_ms,
+      } satisfies SketchResponse);
+    } catch (err) {
+      const message = (err as Error).message;
+      console.error(`trial picture failed: ${message}`);
+      const refused = message.includes('content_policy_violation');
+      return c.json({ error: refused ? 'Muse Image refused to draw that. Try other words or other references.' : "The picture didn't come out. Try again." }, 502);
+    } finally {
+      s.sketching = false;
+    }
   });
 
   app.post('/api/editor/save', async (c) => {

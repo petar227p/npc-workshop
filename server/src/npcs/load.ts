@@ -1,6 +1,6 @@
-import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { NpcDraftSchema, NpcFileSchema, type Catalogue, type ModelVerb, type NpcDraft, type Start } from '@blacksmith/shared';
+import { NpcDraftSchema, NpcFileSchema, type Catalogue, type ModelVerb, type NpcArt, type NpcDraft, type Start } from '@blacksmith/shared';
 import * as flat from '../agents/flat';
 import { verbs } from '../engine';
 import { PLACE_NAMES } from '../village';
@@ -8,8 +8,9 @@ import { factsFor } from './facts';
 import { historyFor } from './history';
 import { defineNpc, type NpcDefinition } from './types';
 
-// NPCs as data: npcs/<id>.json holds the settings, prompts/<id>.md the persona. Both are checked here and
-// built through defineNpc, so a file (or an editor draft) can only pick verbs and facts that exist in code.
+// NPCs as data: npcs/<id>.json holds the settings, prompts/<id>.md the persona, npcs/art/<id>-<n>.<ext> its reference
+// pictures. All are checked here and built through defineNpc, so a file (or an editor draft) can only pick verbs and
+// facts that exist in code.
 
 export type NpcDirs = { npcs: URL; prompts: URL };
 export const NPC_DIRS: NpcDirs = {
@@ -67,6 +68,7 @@ export function buildNpc(input: unknown, places: readonly string[] | null = PLAC
       location: d.location,
       schedule: d.schedule,
       sprite: d.sprite,
+      art: d.art,
       catalogue: d.catalogue,
       start: d.start,
       modelVerbs: d.model_verbs.map((v) => modelVerb(v, d.catalogue, d.start)),
@@ -95,10 +97,37 @@ export function toNpc(draft: NpcDraft): NpcDefinition {
   return built.npc;
 }
 
+const artDir = (dirs: NpcDirs) => new URL('art/', dirs.npcs);
+const MIME: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp' };
+const EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
+
+// A file names its pictures; a draft carries them. The draft check then holds the pictures to the same limits.
 export function readDraft(id: string, dirs: NpcDirs = NPC_DIRS): NpcDraft {
   const file = NpcFileSchema.parse(JSON.parse(readFileSync(new URL(`${id}.json`, dirs.npcs), 'utf8')));
   if (file.id !== id) throw new Error(`npcs/${id}.json has id '${file.id}'`);
-  return { ...file, persona: readFileSync(new URL(`${id}.md`, dirs.prompts), 'utf8') };
+  const references = file.art.references.map((name) => {
+    if (!name.startsWith(`${id}-`)) throw new Error(`npcs/${id}.json: reference '${name}' belongs to another NPC`);
+    const bytes = readFileSync(new URL(name, artDir(dirs)));
+    return `data:${MIME[name.slice(name.lastIndexOf('.') + 1)]};base64,${bytes.toString('base64')}`;
+  });
+  const persona = readFileSync(new URL(`${id}.md`, dirs.prompts), 'utf8');
+  const checked = NpcDraftSchema.parse({ ...file, art: { ...file.art, references }, persona });
+  return { ...checked, persona }; // as written: the check trims it
+}
+
+// Writes the draft's pictures as npcs/art/<id>-1.png… and removes the ones it no longer has. Returns their names.
+function writeArt(id: string, art: NpcArt, dirs: NpcDirs): string[] {
+  const dir = artDir(dirs);
+  mkdirSync(dir, { recursive: true });
+  const names = art.references.map((url, i) => {
+    const comma = url.indexOf(',');
+    const name = `${id}-${i + 1}.${EXT[url.slice('data:'.length, url.indexOf(';'))]}`;
+    writeAtomic(new URL(name, dir), Buffer.from(url.slice(comma + 1), 'base64'));
+    return name;
+  });
+  const old = new RegExp(`^${id}-[1-3]\\.(png|jpg|webp)$`);
+  for (const f of readdirSync(dir)) if (old.test(f) && !names.includes(f)) rmSync(new URL(f, dir));
+  return names;
 }
 
 export function npcIds(dirs: NpcDirs = NPC_DIRS): string[] {
@@ -109,9 +138,9 @@ export function npcIds(dirs: NpcDirs = NPC_DIRS): string[] {
 }
 
 // Write beside, then rename: a crash mid-save never leaves half a file for the next start to choke on.
-function writeAtomic(url: URL, text: string) {
+function writeAtomic(url: URL, data: string | Buffer) {
   const path = fileURLToPath(url);
-  writeFileSync(`${path}.tmp`, text);
+  writeFileSync(`${path}.tmp`, data);
   renameSync(`${path}.tmp`, path);
 }
 
@@ -125,9 +154,10 @@ export function npcFiles(dirs: NpcDirs = NPC_DIRS): NpcFiles {
     list: () => [...drafts.values()],
     has: (id) => drafts.has(id) || existsSync(new URL(`${id}.json`, dirs.npcs)),
     save(draft) {
-      const { persona, ...file } = draft;
-      // The persona first: a settings file is what makes an NPC, so it never appears without one.
+      const { persona, art, ...rest } = draft;
+      // The persona and pictures first: a settings file is what makes an NPC, so it never appears without them.
       writeAtomic(new URL(`${draft.id}.md`, dirs.prompts), persona.endsWith('\n') ? persona : `${persona}\n`);
+      const file = { ...rest, art: { style: art.style, references: writeArt(draft.id, art, dirs) } };
       writeAtomic(new URL(`${draft.id}.json`, dirs.npcs), `${JSON.stringify(file, null, 2)}\n`);
       drafts.set(draft.id, draft);
     },

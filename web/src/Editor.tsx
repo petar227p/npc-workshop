@@ -9,6 +9,7 @@ import {
   FACT_INFO,
   LEDGER_VERBS,
   MAX_PERSONA_LENGTH,
+  MAX_REFERENCES,
   MAX_TRIGGER_HOURS,
   MODEL_CHOICES,
   MODEL_INFO,
@@ -23,6 +24,7 @@ import {
 } from '@blacksmith/shared/src/npc-info';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { clockText, editorApi } from './api';
+import { ArtForm } from './ArtForm';
 import { CatalogueForm } from './CatalogueForm';
 import { ContractCard, gaveText, speechFirst } from './Chat';
 
@@ -44,6 +46,7 @@ const BLANK: NpcDraft = {
   location: 'square',
   schedule: [],
   sprite: DEFAULT_SPRITE,
+  art: { style: '', references: [] },
   start: { gold: 0, stock: {} },
   catalogue: {},
   triggers: [{ kind: 'on_spoken_to' }],
@@ -127,6 +130,7 @@ function loadStored(): NpcDraft | null {
       ? (v.schedule as Record<string, unknown>[]).filter((e) => typeof e?.from === 'number' && typeof e.place === 'string').map((e) => ({ from: e.from as number, place: e.place as string }))
       : BLANK.schedule,
     sprite: (NPC_SPRITES as readonly unknown[]).includes(v.sprite) ? (v.sprite as number) : BLANK.sprite,
+    art: readArt(v.art),
     // Drafts from before the picker were all on Muse Spark.
     model: (MODEL_CHOICES as readonly unknown[]).includes(v.model) ? (v.model as NpcDraft['model']) : 'muse_spark',
     effort: (EFFORT_CHOICES as readonly unknown[]).includes(v.effort) ? (v.effort as NpcDraft['effort']) : 'low',
@@ -139,6 +143,13 @@ function loadStored(): NpcDraft | null {
       unavailable: typeof fb.unavailable === 'string' ? fb.unavailable : BLANK.fallbacks.unavailable,
     },
   };
+}
+
+// Drafts from before the art box had none. A reference that isn't a picture is dropped; the server checks the rest.
+function readArt(x: unknown): NpcDraft['art'] {
+  const a = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>;
+  const references = Array.isArray(a.references) ? a.references.filter((r): r is string => typeof r === 'string' && r.startsWith('data:image/')) : [];
+  return { style: typeof a.style === 'string' ? a.style : '', references: references.slice(0, MAX_REFERENCES) };
 }
 
 function store(draft: NpcDraft) {
@@ -311,6 +322,12 @@ export function Editor() {
         </div>
         <Schedule places={places} home={draft.location} value={draft.schedule} onChange={(s) => set('schedule', s)} />
         <CatalogueForm value={draft} onChange={({ catalogue, start }) => setDraft((d) => ({ ...d, catalogue, start }))} />
+
+        <h3>How its pictures look</h3>
+        <p className="muted small">
+          When an order is accepted, Muse Image draws the item from its terms and the village turns it into a sprite. This only changes the look.
+        </p>
+        <ArtForm draft={draft} valid={valid} onChange={(art) => set('art', art)} />
 
         <h3>What it knows</h3>
         <div className="facts">

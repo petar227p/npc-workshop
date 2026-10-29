@@ -1,7 +1,7 @@
 import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
 import { mockImageClient } from '../../models/image';
-import { artPrompt, artView, createStudio, toSprite, type ArtOwner } from '..';
+import { artPrompt, artView, createStudio, drawPrompt, toSprite, type ArtOwner } from '..';
 import { KENNEY_PALETTE, OUTLINE } from '../palette';
 
 // A render like Muse Image's: an off-white background with a cross-shaped "sword" in the middle, a light
@@ -73,6 +73,12 @@ describe('artPrompt', () => {
     expect(p).toMatch(/pixel art/i);
     expect(p).toMatch(/plain white background/);
     expect(p).toContain('a fantasy sword called "Hammerhead Blade". A broad blade. Made of iron, sharkskin leather.');
+    expect(p).not.toMatch(/Art direction|reference/);
+  });
+
+  it("adds the seller's art between the fixed rules and the item", () => {
+    const p = drawPrompt('a lantern', { style: 'soot-black iron, ember glow', references: ['data:image/png;base64,AA==', 'data:image/png;base64,AA=='] });
+    expect(p).toMatch(/no hands\.\n\nArt direction: soot-black iron, ember glow\n\nMatch the look of the reference pictures: .* nothing else from them\.\n\nThe item: a lantern$/);
   });
 });
 
@@ -91,6 +97,13 @@ describe('studio', () => {
     expect(artView(o.art).c_001).toEqual({ status: 'ready', url: expect.stringMatching(/^\/api\/art\/[0-9a-f-]{36}\.png$/) });
     expect(client.prompts).toHaveLength(1);
     expect(client.prompts[0].strength).toBe('high');
+  });
+
+  it("draws in the seller's art, with its references", async () => {
+    const client = mockImageClient([render()]);
+    await createStudio().start(owner(), contract, client, { style: 'ember glow', references: ['data:image/png;base64,AA=='] });
+    expect(client.prompts[0].prompt).toContain('Art direction: ember glow');
+    expect(client.prompts[0].references).toEqual(['data:image/png;base64,AA==']);
   });
 
   it('a failed render leaves the placeholder', async () => {

@@ -1,4 +1,4 @@
-import { MAX_NOTE_LENGTH, MAX_SAY_LENGTH, type ActionResponse, type ArtResponse, type ModelChoice, type ReadNoteResponse } from '@blacksmith/shared';
+import { MAX_NOTE_LENGTH, MAX_REFERENCE_BYTES, MAX_REFERENCES, MAX_SAY_LENGTH, type ActionResponse, type ArtResponse, type ModelChoice, type ReadNoteResponse } from '@blacksmith/shared';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
@@ -20,6 +20,9 @@ const MAX_SKIP = 48;
 const MAX_BODY_BYTES = 16 * 1024; // the largest real body is a 500-character line
 // An editor draft: a 6000-character persona is up to 36 KB of JSON if every character is escaped (\u0001), plus the short fields.
 const MAX_EDITOR_BODY_BYTES = 64 * 1024;
+// Saving and trial pictures carry the draft's reference pictures too: up to three, each at most 300 KB as base64.
+const MAX_ART_BODY_BYTES = MAX_EDITOR_BODY_BYTES + MAX_REFERENCES * Math.ceil((MAX_REFERENCE_BYTES * 4) / 3 + 64);
+const ART_ROUTES = ['/api/editor/save', '/api/editor/sketch'];
 const ART_FILE = /^([0-9a-f-]{36})\.png$/;
 
 const SayBody = z.object({ text: z.string().max(MAX_SAY_LENGTH), npc: z.string().optional() }); // npc: who the player talks to; Brann by default
@@ -60,7 +63,9 @@ export function createApi(deps: ApiDeps) {
   const tooLarge = (c: Context) => c.json({ error: 'request too large' }, 413);
   const limit = bodyLimit({ maxSize: MAX_BODY_BYTES, onError: tooLarge });
   const editorLimit = bodyLimit({ maxSize: MAX_EDITOR_BODY_BYTES, onError: tooLarge });
-  app.use('/api/*', (c, next) => (c.req.path.startsWith('/api/editor/') ? editorLimit : limit)(c, next));
+  const artLimit = bodyLimit({ maxSize: MAX_ART_BODY_BYTES, onError: tooLarge });
+  const limitFor = (path: string) => (ART_ROUTES.includes(path) ? artLimit : path.startsWith('/api/editor/') ? editorLimit : limit);
+  app.use('/api/*', (c, next) => limitFor(c.req.path)(c, next));
 
   // Sessions are made on the first action, not the first look: a crawler or a curl loop of GETs stores nothing.
   app.use('/api/*', async (c, next) => {
@@ -160,7 +165,10 @@ export function createApi(deps: ApiDeps) {
     const r = playerAccepts(s.world, parsed.data.contract_id);
     s.world = r.world;
     // Work has started, so the item is settled: draw it while the clock runs. Not awaited.
-    if (r.ok) studio.start(s, s.world.contracts[parsed.data.contract_id], artistFor(s));
+    if (r.ok) {
+      const contract = s.world.contracts[parsed.data.contract_id];
+      studio.start(s, contract, artistFor(s), NPCS.find((n) => n.id === contract.seller)?.art);
+    }
     return respond(c, { ok: r.ok, reason: r.reason, outcome: null, events: r.events });
   });
 
@@ -234,7 +242,7 @@ export function createApi(deps: ApiDeps) {
     return respond(c, { ok: true, reason: null, outcome: null, events: [] });
   });
 
-  mountEditor(app, { modelFor, canSave: deps.canSaveNpcs ?? false, files: deps.npcFiles ?? NPC_FILES, limits: deps.bench });
+  mountEditor(app, { modelFor, artistFor, canSave: deps.canSaveNpcs ?? false, files: deps.npcFiles ?? NPC_FILES, limits: deps.bench });
 
   return app;
 }

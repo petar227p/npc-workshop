@@ -2,9 +2,10 @@ import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { BenchResponse, EditorLibrary, NpcDraft, PreviewResponse, SaveResponse, StateView } from '@blacksmith/shared';
+import { MAX_REFERENCE_BYTES, type BenchResponse, type EditorLibrary, type NpcDraft, type PreviewResponse, type SaveResponse, type SketchResponse, type StateView } from '@blacksmith/shared';
+import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
-import { mockClient, type ChatClient, type ChatRequest } from '../../models';
+import { mockClient, mockImageClient, type ChatClient, type ChatRequest } from '../../models';
 import { npcFiles, readDraft } from '../../npcs';
 import { createApi, type ApiDeps } from '../api';
 
@@ -39,6 +40,7 @@ const miller: NpcDraft = {
   location: 'cottage',
   schedule: [],
   sprite: 98,
+  art: { style: '', references: [] },
   start: { gold: 5, stock: {} },
   catalogue: {},
   triggers: [{ kind: 'on_spoken_to' }],
@@ -73,6 +75,14 @@ function setup(replies: string[] = [], deps: Partial<ApiDeps> = {}, client: Chat
 }
 
 // An empty npcs/ + prompts/ pair in a temp folder, so save tests never touch the repo.
+// A render with something in it (the sprite step refuses an empty one), and a tiny reference picture.
+function render(): Buffer {
+  const png = new PNG({ width: 60, height: 60 });
+  for (let y = 0; y < 60; y++) for (let x = 0; x < 60; x++) png.data.set(x > 20 && x < 40 && y > 10 && y < 50 ? [120, 90, 60, 255] : [237, 236, 231, 255], (y * 60 + x) * 4);
+  return PNG.sync.write(png);
+}
+const pngUrl = (width = 2) => `data:image/png;base64,${PNG.sync.write(new PNG({ width, height: 2 })).toString('base64')}`;
+
 function tempFiles() {
   const root = mkdtempSync(join(tmpdir(), 'npcs-'));
   const dirs = { npcs: pathToFileURL(`${root}/`), prompts: pathToFileURL(`${root}/`) };
@@ -327,5 +337,67 @@ describe('NPC editor api', () => {
       ['SAID', 'miller'],
       ['EMOTED', 'player'],
     ]);
+  });
+
+  describe('art', () => {
+    const styled = (references: string[] = [pngUrl()]): NpcDraft => ({ ...miller, art: { style: '  dusty  flour\nsacks ', references } });
+
+    it("a trial picture is drawn in the draft's art and comes back as a sprite", async () => {
+      const artist = mockImageClient([render()]);
+      const { send } = setup([], { makeArtist: () => artist });
+      const r = await send<SketchResponse>('/api/editor/sketch', { npc: styled(), subject: 'a  sack of\nflour' });
+      expect(r.status).toBe(200);
+      expect(r.json).toMatchObject({ ok: true, sprite: expect.stringMatching(/^data:image\/png;base64,/), references: 1 });
+      // The style is one line, so it can't open a section of its own; the subject is the item.
+      const req = artist.prompts[0];
+      expect(req.prompt).toContain('Art direction: dusty flour sacks');
+      expect(req.prompt).toMatch(/Match the look of the reference picture:/);
+      expect(req.prompt).toMatch(/The item: a sack of flour$/);
+      expect(req.references).toEqual([pngUrl()]);
+    });
+
+    it('trial pictures are capped per visit, and need Muse Image and a valid draft', async () => {
+      const { send } = setup([], { makeArtist: () => mockImageClient([render(), render()]), bench: { sketchesPerSession: 1 } });
+      expect((await send<SketchResponse>('/api/editor/sketch', { npc: { ...miller, name: '' }, subject: 'flour' })).json).toMatchObject({ ok: false });
+      expect((await send<SketchResponse>('/api/editor/sketch', { npc: miller, subject: 'flour' })).json.ok).toBe(true);
+      const capped = await send<{ error: string }>('/api/editor/sketch', { npc: miller, subject: 'flour' });
+      expect(capped.status).toBe(429);
+      expect(capped.json.error).toMatch(/trial pictures/);
+
+      const none = await setup().send<{ error: string }>('/api/editor/sketch', { npc: miller, subject: 'flour' });
+      expect(none.status).toBe(503);
+    });
+
+    it('a failed or refused picture says so', async () => {
+      const artist = mockImageClient([new Error('image 400: {"error":{"code":"content_policy_violation"}}')]);
+      const r = await setup([], { makeArtist: () => artist }).send<{ error: string }>('/api/editor/sketch', { npc: miller, subject: 'flour' });
+      expect(r.status).toBe(502);
+      expect(r.json.error).toMatch(/refused/);
+    });
+
+    it('references must be small PNG, JPEG or WebP pictures, at most three', async () => {
+      const { send } = setup();
+      const check = async (references: string[]) => (await send<PreviewResponse>('/api/editor/preview', { npc: styled(references) })).json.errors;
+      expect(await check(['data:text/html;base64,PGI+'])).toEqual(['art.references.0: a PNG, JPEG or WebP picture']);
+      expect(await check([pngUrl(), pngUrl(), pngUrl(), pngUrl()])).toEqual(['art.references: at most 3 reference pictures']);
+      // Too big for the preview route's body limit, and for a reference.
+      const big = `data:image/png;base64,${'A'.repeat(Math.ceil((MAX_REFERENCE_BYTES * 4) / 3) + 8)}`;
+      expect((await send('/api/editor/preview', { npc: styled([big]) })).status).toBe(413);
+      const r = await setup([], { makeArtist: () => mockImageClient([]) }).send<SketchResponse>('/api/editor/sketch', { npc: styled([big]), subject: 'flour' });
+      expect(r.json).toEqual({ ok: false, errors: ['art.references.0: a reference picture is at most 300 KB'] });
+    });
+
+    it('saving writes the references beside the file and reads them back; dropped ones are removed', async () => {
+      const { dirs, files, path } = tempFiles();
+      const { send } = setup([], { canSaveNpcs: true, npcFiles: files });
+      const two = styled([pngUrl(), pngUrl(3)]);
+      expect((await send<SaveResponse>('/api/editor/save', { npc: two })).json.ok).toBe(true);
+      expect(JSON.parse(readFileSync(path('miller.json'), 'utf8')).art).toEqual({ style: 'dusty flour sacks', references: ['miller-1.png', 'miller-2.png'] });
+      expect(readDraft('miller', dirs).art).toEqual({ style: 'dusty flour sacks', references: [pngUrl(), pngUrl(3)] });
+
+      expect((await send<SaveResponse>('/api/editor/save', { npc: styled([pngUrl(3)]), overwrite: true })).json.ok).toBe(true);
+      expect(existsSync(path('art/miller-2.png'))).toBe(false);
+      expect(readDraft('miller', dirs).art.references).toEqual([pngUrl(3)]);
+    });
   });
 });

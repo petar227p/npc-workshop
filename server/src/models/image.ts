@@ -3,7 +3,8 @@ import { ModelError } from './types';
 // Muse Image. One picture per accepted contract, so no retries: a failed render just leaves the placeholder.
 
 export type ImageStrength = 'low' | 'high';
-export type ImageRequest = { prompt: string; strength?: ImageStrength };
+// references: data URLs of pictures whose look the render should match. Only the edits endpoint takes them.
+export type ImageRequest = { prompt: string; strength?: ImageStrength; references?: readonly string[] };
 export type ImageResult = { png: Buffer; latency_ms: number };
 
 export interface ImageClient {
@@ -15,14 +16,20 @@ export type ImageClientOptions = { baseURL: string; apiKey: string; model: strin
 
 export function createImageClient(opts: ImageClientOptions): ImageClient {
   const doFetch = opts.fetch ?? globalThis.fetch;
-  const url = `${opts.baseURL.replace(/\/$/, '')}/images/generations`;
+  const base = opts.baseURL.replace(/\/$/, '');
   return {
     model: opts.model,
     async generate(req) {
       const started = Date.now();
+      // Reference pictures go to /images/edits: /images/generations answers 400 to `images`, whatever the docs say.
+      // Its image and web search are off, so a render only ever looks at the pictures it was given.
+      const refs = req.references ?? [];
+      const withRefs = refs.length > 0
+        ? { images: refs.map((image_url) => ({ image_url })), tool_enablement: { enable_image_search: false, enable_web_search: false, enable_shell: false } }
+        : {};
       let res: Response;
       try {
-        res = await doFetch(url, {
+        res = await doFetch(`${base}/images/${refs.length > 0 ? 'edits' : 'generations'}`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${opts.apiKey}`, 'Content-Type': 'application/json' },
           // `size` only sets the aspect ratio (a square comes back 1600×1600). Unknown fields are a 400.
@@ -34,6 +41,7 @@ export function createImageClient(opts: ImageClientOptions): ImageClient {
             response_format: 'b64_json',
             output_format: 'png',
             reasoning_strength: req.strength ?? 'high',
+            ...withRefs,
           }),
           signal: AbortSignal.timeout(opts.timeoutMs ?? 90_000),
         });
