@@ -74,16 +74,19 @@ function VillagePage() {
   }, [drawing]);
 
   // Passing time can wait on NPCs acting on their own, so every action locks the buttons until it's back.
+  // True when the action went through, so a form can keep what was typed when it didn't.
   const [waiting, setWaiting] = useState(false);
-  const run = useCallback(async (p: Promise<ActionResponse>) => {
+  const run = useCallback(async (p: Promise<ActionResponse>): Promise<boolean> => {
     setError(null);
     setWaiting(true);
     try {
       const r = await p;
       setView(r.view);
       if (!r.ok && r.reason) setError(r.reason);
+      return r.ok;
     } catch (e) {
       setError((e as Error).message);
+      return false;
     } finally {
       setWaiting(false);
     }

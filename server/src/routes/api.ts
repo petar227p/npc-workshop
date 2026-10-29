@@ -207,16 +207,23 @@ export function createApi(deps: ApiDeps) {
   });
 
   // God mode in plain words: Muse Spark fills in the report form from a note. Nothing is logged until the form is sent.
+  // It is a model call like a turn, so it takes the same lock: one at a time, and the clock waits for it.
   app.post('/api/god/read', async (c) => {
     const s = c.get('session');
     const parsed = await body(c, NoteBody);
     if (!parsed.success) return c.json({ error: `expected { note } of at most ${MAX_NOTE_LENGTH} characters` }, 400);
+    if (s.busy) return busy(c);
     const model = modelFor(s, 'muse_spark');
     if (!model) return c.json({ error: "The chronicler isn't available right now. Fill in the form yourself." }, 503);
-    const people = [player.id, ...NPCS.map((n) => n.id)].map((id) => ({ id, name: nameOf(id) }));
-    const report = await readNote(parsed.data.note, model, { places: PLACE_NAMES, people, now: s.world.tick });
-    if (!report) return c.json({ error: "The chronicler couldn't make sense of that. Try other words, or fill in the form yourself." }, 502);
-    return c.json({ report } satisfies ReadNoteResponse);
+    s.busy = { by: 'npc', name: 'The chronicler' };
+    try {
+      const people = [player.id, ...NPCS.map((n) => n.id)].map((id) => ({ id, name: nameOf(id) }));
+      const report = await readNote(parsed.data.note, model, { places: PLACE_NAMES, people, now: s.world.tick });
+      if (!report) return c.json({ error: "The chronicler couldn't make sense of that. Try other words, or fill in the form yourself." }, 502);
+      return c.json({ report } satisfies ReadNoteResponse);
+    } finally {
+      s.busy = null;
+    }
   });
 
   app.post('/api/reset', (c) => {

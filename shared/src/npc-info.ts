@@ -86,7 +86,9 @@ export const DEFAULT_SPRITE = 98;
 
 export const MAX_PERSONA_LENGTH = 6000;
 export const NPC_ID_PATTERN = '^[a-z][a-z0-9_]{0,40}$';
-export const RESERVED_IDS = ['player'] as const; // actor ids an NPC can't take
+// Actor ids an NPC can't take: the player, the actor of every reported world event (engine/happen.ts WORLD), and the
+// clock that delivers finished work. An NPC with one of them would count as having done what they did.
+export const RESERVED_IDS = ['player', 'world', 'clock'] as const;
 
 // An NPC as the editor and the files hold it. `persona` is stored beside it in prompts/<id>.md.
 export type NpcDraft = {

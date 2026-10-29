@@ -43,7 +43,7 @@ export const NpcFileSchema = z
     id: z
       .string()
       .regex(new RegExp(NPC_ID_PATTERN), 'lowercase letters, digits and _, starting with a letter')
-      .refine((id) => !(RESERVED_IDS as readonly string[]).includes(id), 'that id is taken by the player'),
+      .refine((id) => !(RESERVED_IDS as readonly string[]).includes(id), `that id is taken: ${RESERVED_IDS.join(', ')} are the engine's own`),
     name: z.string().trim().min(1).max(40),
     verbs: z.array(z.enum(LEDGER_VERBS)).min(1).refine(unique, 'listed twice'),
     model_verbs: z.array(z.enum(MODEL_VERBS)).min(1).refine(unique, 'listed twice'),

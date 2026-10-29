@@ -9,7 +9,7 @@ import { api } from './api';
 // itself; here you type it. The engine logs it with whoever saw it, and gossip carries it from there. "Read it" has
 // Muse Spark fill in the form from your own words; nothing happens until you send it.
 
-type Props = { view: StateView; disabled: boolean; onReport: (r: WorldReport) => void };
+type Props = { view: StateView; disabled: boolean; onReport: (r: WorldReport) => Promise<boolean> }; // true once logged
 
 const show = (name: string) => name.replace(/_/g, ' ');
 const AGO = [0, 1, 2, 3, 6, 12, 24, 48].filter((h) => h <= MAX_HOURS_AGO);
@@ -65,9 +65,10 @@ export function God({ view, disabled, onReport }: Props) {
     }
   };
 
-  const send = () => {
+  // The form empties only once the engine has logged it: a refused report (or a busy village) keeps what was typed.
+  const send = async () => {
     const seen_by: Sighting = seen === 'only' ? { kind: 'only', ids: only } : { kind: seen };
-    onReport({ text, place: where, involved, seen_by, notable, hours_ago: hoursAgo });
+    if (!(await onReport({ text, place: where, involved, seen_by, notable, hours_ago: hoursAgo }))) return;
     setText('');
     setPlace('');
     setInvolved([]);

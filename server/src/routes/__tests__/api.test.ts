@@ -445,6 +445,32 @@ describe('api', () => {
       expect(((await b.send('/api/state')).json as StateView).events).toEqual([]);
     });
 
+    it('reading a note is a model call like a turn: it takes the lock, so another reading, the clock and a report wait', async () => {
+      let release!: () => void;
+      const gate = new Promise<void>((r) => (release = r));
+      const reply = JSON.stringify({ text: 'A cart lost a wheel.', place: 'square', involved: [], seen_by: 'nearby', notable: false, hours_ago: 0 });
+      const slow: ChatClient = {
+        provider: 'mock',
+        async chat(req) {
+          await gate;
+          return { model: req.model, content: reply, reasoning: null, finish_reason: 'stop', usage: null, latency_ms: 0 };
+        },
+      };
+      const { app } = setup(() => slow);
+      const b = browser(app);
+      await b.send('/api/reset', {}); // an action, so the browser holds its session cookie before the slow reading
+      const reading = b.send('/api/god/read', { note: 'A cart lost a wheel by the well.' });
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(await b.send('/api/god/read', { note: 'And another.' })).toMatchObject({ status: 409, json: { error: 'The chronicler is still answering.' } });
+      expect((await b.send('/api/tick', { ticks: 1 })).status).toBe(409);
+      expect((await b.send('/api/god', dragon)).status).toBe(409);
+
+      release();
+      expect((await reading).status).toBe(200);
+      expect(((await b.send('/api/state')).json as StateView).busy).toBe(false);
+    });
+
     it('a reading that will not do is a 502, an empty note a 400', async () => {
       const { app } = setup(() => mockClient([JSON.stringify({ text: 'Somewhere.', place: 'moon', involved: [], seen_by: 'nearby', notable: false, hours_ago: 0 })]));
       const b = browser(app);
