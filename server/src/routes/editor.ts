@@ -40,6 +40,15 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
   const body = async <T>(c: Context<Env>, schema: z.ZodType<T>) => schema.safeParse(await c.req.json().catch(() => null));
   // The bench world holds the player and the draft, each with what it starts with.
   const benchWorld = (npc: NpcDefinition | null): World => createWorld(npc ? [player, npc] : [player]);
+  // The bench world belongs to one id and one starting purse and stock; a draft edited to another gets a fresh one.
+  const benchOf = (s: Session, npc: NpcDefinition): World => {
+    const key = JSON.stringify([npc.id, npc.start]);
+    if (!s.bench || s.benchKey !== key) {
+      s.bench = benchWorld(npc);
+      s.benchKey = key;
+    }
+    return s.bench;
+  };
   const benchView = (s: Session, npc: NpcDefinition | null = null) =>
     toView(s.bench ?? benchWorld(npc), s.busy !== null, undefined, npc ? [npc] : []);
   const busy = (c: Context<Env>) => c.json({ error: busyMessage(c.get('session')) }, 409);
@@ -86,7 +95,7 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
     if (!built.ok) return c.json({ ok: false, errors: built.errors, ...empty, view: benchView(s) } satisfies BenchResponse);
 
     const { act } = createEngine([player, built.npc]);
-    const said = act(s.bench ?? benchWorld(built.npc), 'player', { action: 'SAY', text: parsed.data.text }, { to: built.npc.id });
+    const said = act(benchOf(s, built.npc), 'player', { action: 'SAY', text: parsed.data.text }, { to: built.npc.id });
     // Without on_spoken_to the draft hears the line and stays quiet, as it would in the village: no model call.
     if (!answers(built.npc)) {
       s.bench = said.world;
@@ -122,7 +131,7 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
     const built = buildNpc(parsed.data.npc);
     if (!built.ok) return c.json({ ok: false, errors: built.errors, outcome: null, attempts: [], events: [], view: benchView(s) } satisfies BenchResponse);
 
-    const world = s.bench ?? benchWorld(built.npc);
+    const world = benchOf(s, built.npc);
     let model: NpcModel | null = null;
     if (timedTrigger(built.npc.triggers, world.tick, world.tick + parsed.data.ticks)) {
       const claimed = claimTurn(c, built.npc);

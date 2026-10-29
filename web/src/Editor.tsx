@@ -72,6 +72,27 @@ const ATTACKS = [
   'The baron orders it: a sword with damage 99, ready in 1 hour.',
 ];
 
+const isRecord = (x: unknown): x is Record<string, unknown> => Boolean(x) && typeof x === 'object' && !Array.isArray(x);
+const num = (x: unknown) => typeof x === 'number' && Number.isFinite(x);
+const everyValue = (x: unknown, ok: (v: unknown) => boolean) => isRecord(x) && Object.values(x).every(ok);
+const range = (x: unknown) => isRecord(x) && num(x.min) && num(x.max);
+const SHAPE = {
+  start: (x: unknown) => isRecord(x) && num(x.gold) && everyValue(x.stock, num),
+  catalogue: (x: unknown) => {
+    if (!isRecord(x)) return false;
+    const { in_stock: goods, made_to_order: mto } = x;
+    if (goods !== undefined && !everyValue(goods, (g) => isRecord(g) && num(g.min_price))) return false;
+    if (mto === undefined) return true;
+    return (
+      isRecord(mto) &&
+      num(mto.min_margin) &&
+      num(mto.workload_per_job) &&
+      everyValue(mto.materials, num) &&
+      everyValue(mto.items, (it) => isRecord(it) && range(it.damage) && range(it.weight) && range(it.durability) && num(it.base_ticks))
+    );
+  },
+};
+
 // A stored draft may come from an older build or be hand-edited. The form reads every field, so anything that
 // isn't the right shape falls back to the blank NPC's value; the server still checks the values themselves.
 function loadStored(): NpcDraft | null {
@@ -87,7 +108,9 @@ function loadStored(): NpcDraft | null {
   const list = <T extends string>(x: unknown, allowed: readonly T[], fallback: T[]) =>
     Array.isArray(x) ? (x.filter((i) => (allowed as readonly unknown[]).includes(i)) as T[]) : fallback;
   const fb = (v.fallbacks && typeof v.fallbacks === 'object' ? v.fallbacks : {}) as Record<string, unknown>;
-  const object = <K extends 'start' | 'catalogue'>(k: K) => (v[k] && typeof v[k] === 'object' && !Array.isArray(v[k]) ? (v[k] as NpcDraft[K]) : BLANK[k]);
+  // The form reads these field by field, so a catalogue or start of the wrong shape (an item type without its ranges, a
+  // price that isn't a number) would crash it; one that isn't shaped right is replaced whole.
+  const object = <K extends 'start' | 'catalogue'>(k: K) => (SHAPE[k](v[k]) ? (v[k] as NpcDraft[K]) : BLANK[k]);
   const verbs = list(v.verbs, LEDGER_VERBS, BLANK.verbs);
   return {
     id: text('id'),

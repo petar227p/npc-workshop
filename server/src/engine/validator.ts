@@ -47,12 +47,16 @@ export function materialCost(mto: MadeToOrder, materials: Record<string, number>
   return Object.entries(materials).reduce((sum, [m, n]) => sum + (own(mto.materials, m) ?? 0) * n, 0);
 }
 
+// The margin is a fraction like 0.1; 50 * 1.1 is 55.00000000000001 in floats and would round up to 56, so the
+// sums run in whole tenths of a percent.
+const permille = (fraction: number) => Math.round(fraction * 1000);
+
 export function minPrice(mto: MadeToOrder, materials: Record<string, number>): number {
-  return Math.ceil(materialCost(mto, materials) * (1 + mto.min_margin));
+  return Math.ceil((materialCost(mto, materials) * (1000 + permille(mto.min_margin))) / 1000);
 }
 
 export function minDeliveryTicks(world: World, seller: string, mto: MadeToOrder, itemType: string): number {
-  return Math.ceil(mto.items[itemType].base_ticks * (1 + mto.workload_per_job * activeJobs(world, seller)));
+  return Math.ceil((mto.items[itemType].base_ticks * (1000 + permille(mto.workload_per_job) * activeJobs(world, seller))) / 1000);
 }
 
 const list = (r: Record<string, unknown> | undefined) => Object.keys(r ?? {}).join(', ') || 'nothing';
@@ -81,7 +85,7 @@ function checkMadeToOrder(world: World, self: Actor, t: MadeToOrderTerms): strin
 
   const floor = minPrice(mto, t.materials_used);
   if (t.price < floor) {
-    return `price ${t.price} is below the minimum of ${floor} (materials ${materialCost(mto, t.materials_used)} + ${mto.min_margin * 100}% margin)`;
+    return `price ${t.price} is below the minimum of ${floor} (materials ${materialCost(mto, t.materials_used)} + ${permille(mto.min_margin) / 10}% margin)`;
   }
 
   const minTicks = minDeliveryTicks(world, self.id, mto, t.item_type);
