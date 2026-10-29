@@ -17,6 +17,7 @@ export type Session = {
   id: string;
   world: World;
   bench: World | null;
+  benchKey: string | null; // which draft's id and starting stock `bench` was made for
   busy: Busy;
   benchTurns: number;
   models: Partial<Record<ModelChoice, NpcModel>>; // made on first use, one per model choice
@@ -34,6 +35,7 @@ const newSession = (id: string, lastSeen: number): Session => ({
   id,
   world: newVillage(),
   bench: null,
+  benchKey: null,
   busy: null,
   benchTurns: 0,
   models: {},

@@ -59,7 +59,7 @@ export const FACTS: Record<FactBlock, Block> = {
   },
   price_floor: (_world, _npc, _customer, catalogue) => {
     const lines: string[] = [];
-    if (catalogue.made_to_order) lines.push(`Price floor for made-to-order work: material cost + ${catalogue.made_to_order.min_margin * 100}%, rounded up.`);
+    if (catalogue.made_to_order) lines.push(`Price floor for made-to-order work: material cost + ${Math.round(catalogue.made_to_order.min_margin * 1000) / 10}%, rounded up.`);
     if (catalogue.in_stock) lines.push('Price floor for goods: the minimum price each, times the quantity.');
     return lines.join('\n') || null;
   },

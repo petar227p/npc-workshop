@@ -121,6 +121,14 @@ describe('NPC editor api', () => {
     expect(village.json.events).toEqual([]);
   });
 
+  it('a draft edited to start with other stock gets a fresh bench world, not the first one', async () => {
+    const { send } = setup([say('Flour.'), say('More flour.')]);
+    const first = await send<BenchResponse>('/api/editor/bench/say', { npc: miller, text: 'Hi' });
+    const richer = { ...miller, start: { ...miller.start, gold: miller.start.gold + 500 } };
+    const second = await send<BenchResponse>('/api/editor/bench/say', { npc: richer, text: 'Hi' });
+    expect(second.json.view.events.length).toBe(first.json.events.length);
+  });
+
   it('the bench voices a draft with the model it picked, one client per model per visit', async () => {
     const { send, client, choices } = setup([say('Flour.'), say('Steel.'), say('More flour.')]);
     await send('/api/editor/bench/say', { npc: miller, text: 'Hi' });

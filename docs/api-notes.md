@@ -7,7 +7,7 @@ Read from the official docs on 2026-10-27. Anything marked **verify** wasn't sta
 | Role | Provider | Model id | Endpoint |
 |---|---|---|---|
 | Smith negotiation | Meta Model API | `muse-spark-1.3` | `POST https://api.meta.ai/v1/chat/completions` |
-| Villagers, gossip, crier, attackers | Baseten | `meta-models/muse-spark-open` (**verify**, see below) | `POST https://inference.baseten.co/v1/chat/completions` |
+| Villagers, gossip, crier, attackers | Baseten | `meta-models/muse-spark-open-1026` (hackathon key only works with this id) | `POST https://inference.baseten.co/v1/chat/completions` |
 | Item picture | Meta Model API | `muse-image-1.0` | `POST https://api.meta.ai/v1/images/generations` |
 | Voice order (optional) | Meta Model API | `muse-voice-transcribe-1.0` | `POST https://api.meta.ai/v1/asr/transcribe` |
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advance, availableStock, createEngine, createWorld, MAX_PROPOSED_CHARS, minDeliveryTicks, replay, verbs, type World } from '../index';
+import { advance, availableStock, createEngine, createWorld, MAX_PROPOSED_CHARS, minDeliveryTicks, minPrice, replay, verbs, type World } from '../index';
 import { FORGE, FORGE_START, hammerhead, hammerheadTerms, merchant, player, smith } from './fixtures';
 
 const ACTORS = [smith, player];
@@ -369,5 +369,17 @@ describe('in-stock sales', () => {
     let w = sell(world(), {}).world;
     w = both(w, 'player', { action: 'ACCEPT', contract_id: 'c_001' }).world;
     expect(both(w, 'merchant', { action: 'START_WORK', contract_id: 'c_001' }).reason).toMatch(/a sale from stock/);
+  });
+});
+
+describe('price floor rounding', () => {
+  // 50 * 1.1 is 55.00000000000001 in floats, which used to round up to 56.
+  it.each([
+    [0.1, 50, 55],
+    [0.35, 20, 27],
+    [0.2, 50, 60],
+  ])('a margin of %s on %s gold of materials is %s', (min_margin, cost, floor) => {
+    const mto = { materials: { iron: cost }, items: {}, min_margin, workload_per_job: 0.5 };
+    expect(minPrice(mto as never, { iron: 1 })).toBe(floor);
   });
 });

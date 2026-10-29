@@ -36,7 +36,7 @@ const ALL: Record<string, Setup[]> = {
   'smith-contrib': chat('smith-contrib', meta, 'muse-spark-1.3-contributor', PRICES.contrib, ['minimal', 'low', 'medium']),
   'smith-standard': chat('smith-standard', meta, 'muse-spark-1.3', PRICES.standard, ['minimal', 'low', 'medium']),
   // Baseten has no 'minimal' effort for Spark Open.
-  open: chat('open', baseten, env.VILLAGER_MODEL ?? 'meta-models/muse-spark-open', PRICES.open, ['low', 'medium']),
+  open: chat('open', baseten, env.VILLAGER_MODEL ?? 'meta-models/muse-spark-open-1026', PRICES.open, ['low', 'medium']),
   image: [
     { kind: 'image', name: 'image low', strength: 'low' },
     { kind: 'image', name: 'image high', strength: 'high' },
