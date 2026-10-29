@@ -1,15 +1,17 @@
-import { MAX_SAY_LENGTH, type ActionResponse, type ArtResponse, type ModelChoice } from '@blacksmith/shared';
+import { MAX_NOTE_LENGTH, MAX_SAY_LENGTH, type ActionResponse, type ArtResponse, type ModelChoice, type ReadNoteResponse } from '@blacksmith/shared';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { getCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
+import { readNote } from '../agents/note';
 import type { NpcModel } from '../agents/npc';
 import { artView, createStudio, type StudioLimits } from '../art';
 import { placeAt } from '../engine';
-import { answers, passTime, playerAccepts, playerGives, playerSays, playerSpeaks } from '../game';
+import { answers, passTime, playerAccepts, playerGives, playerSays, playerSpeaks, worldReports } from '../game';
 import type { ImageClient } from '../models/image';
-import { NPC_FILES, NPCS, newVillage, smith as brann, type NpcFiles } from '../npcs';
+import { NPC_FILES, NPCS, nameOf, newVillage, player, smith as brann, type NpcFiles } from '../npcs';
+import { PLACE_NAMES } from '../village';
 import { busyMessage, createSessionStore, guestSession, toView, type Session, type SessionLimits } from '../sessions';
 import { mountEditor, type BenchLimits } from './editor';
 
@@ -24,6 +26,7 @@ const SayBody = z.object({ text: z.string().max(MAX_SAY_LENGTH), npc: z.string()
 const AcceptBody = z.object({ contract_id: z.string() });
 const TickBody = z.object({ ticks: z.number().int().min(1).max(MAX_SKIP) });
 const GiveBody = z.object({ to: z.string(), gift: z.unknown() }); // the engine checks the gift itself
+const NoteBody = z.object({ note: z.string().trim().min(1).max(MAX_NOTE_LENGTH) });
 
 export type Env = { Variables: { session: Session } };
 
@@ -185,6 +188,35 @@ export function createApi(deps: ApiDeps) {
     const r = playerGives(s.world, parsed.data.to, parsed.data.gift);
     s.world = r.world;
     return respond(c, { ok: r.ok, reason: r.reason, outcome: null, events: r.events });
+  });
+
+  // God mode: something happened that no verb covers. The engine checks the report (the body is passed as it came) and
+  // logs it; whoever it gave news to share at their own place may act on it, so the world is locked until they have.
+  app.post('/api/god', async (c) => {
+    const s = c.get('session');
+    const raw: unknown = await c.req.json().catch(() => null);
+    if (s.busy) return busy(c);
+    s.busy = { by: 'npc', name: 'The village' };
+    try {
+      const r = await worldReports(s.world, raw, (choice) => modelFor(s, choice));
+      s.world = r.world;
+      return respond(c, { ok: r.ok, reason: r.reason, outcome: null, events: r.events });
+    } finally {
+      s.busy = null;
+    }
+  });
+
+  // God mode in plain words: Muse Spark fills in the report form from a note. Nothing is logged until the form is sent.
+  app.post('/api/god/read', async (c) => {
+    const s = c.get('session');
+    const parsed = await body(c, NoteBody);
+    if (!parsed.success) return c.json({ error: `expected { note } of at most ${MAX_NOTE_LENGTH} characters` }, 400);
+    const model = modelFor(s, 'muse_spark');
+    if (!model) return c.json({ error: "The chronicler isn't available right now. Fill in the form yourself." }, 503);
+    const people = [player.id, ...NPCS.map((n) => n.id)].map((id) => ({ id, name: nameOf(id) }));
+    const report = await readNote(parsed.data.note, model, { places: PLACE_NAMES, people, now: s.world.tick });
+    if (!report) return c.json({ error: "The chronicler couldn't make sense of that. Try other words, or fill in the form yourself." }, 502);
+    return c.json({ report } satisfies ReadNoteResponse);
   });
 
   app.post('/api/reset', (c) => {

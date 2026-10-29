@@ -214,6 +214,7 @@ export function Ledger({ view }: { view: StateView }) {
 
 function kind(e: EngineEvent) {
   if (e.type === 'ACTION_REJECTED') return 'reject';
+  if (e.type === 'HAPPENED') return 'happened';
   if (e.type === 'CLOCK_ADVANCED') return 'clock';
   return 'event';
 }
@@ -228,6 +229,13 @@ function why(t: Trigger): string {
   if (t.kind === 'on_meet') return 'met someone with news';
   if (t.kind === 'on_new_memory') return 'heard news';
   return 'spoken to';
+}
+
+// Who a reported world event reached: everyone who sees anything, or the ones named.
+function seenBy(e: Extract<EngineEvent, { type: 'HAPPENED' }>, view: StateView): string {
+  if (e.data.seen_by === 'everyone') return 'the whole village saw it';
+  const npcs = e.witnesses.filter((id) => id !== 'player');
+  return npcs.length ? `seen by ${npcs.map((id) => nameOf(view, id)).join(', ')}` : 'nobody saw it';
 }
 
 function describe(e: EngineEvent, view: StateView): string {
@@ -263,6 +271,10 @@ function describe(e: EngineEvent, view: StateView): string {
       return `${who} announced ${e.data.event_id} (${pct(e.data.confidence)} sure): "${e.data.summary}"`;
     case 'EMOTED':
       return `${who} ${e.data.text}`;
+    case 'HAPPENED': {
+      const late = e.data.reported_tick > e.tick ? `, reported ${e.data.reported_tick - e.tick} h later` : '';
+      return `${e.data.notable ? 'Big news' : 'Happened'} at the ${e.location.replace(/_/g, ' ')}: ${e.data.text} (${seenBy(e, view)}${late})`;
+    }
     case 'SAID':
       return e.data.text;
   }

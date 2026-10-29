@@ -4,10 +4,11 @@ import type { World } from './state';
 // What an NPC knows, read straight from the log: nothing is stored apart from it, so a memory can't be planted.
 // It knows an event it took part in or witnessed (sure), or one somebody passed on to it (less sure each retelling).
 
-// What is worth talking about. Talk itself isn't: news is about deeds (sales, deliveries, gifts, refusals).
+// What is worth talking about. Talk itself isn't: news is about deeds (sales, deliveries, gifts, refusals) and
+// whatever the game reports happened (a boss slain, a fire).
 // A sale from stock is one piece of news: its GOODS_DELIVERED always comes with the CONTRACT_ACCEPTED that already
 // says what was bought, so it isn't news twice.
-export const MEMORABLE = new Set<EventType>(['CONTRACT_ACCEPTED', 'ITEM_DELIVERED', 'GIVEN', 'GIFT_REFUSED', 'CONTRACT_REFUSED']);
+export const MEMORABLE = new Set<EventType>(['CONTRACT_ACCEPTED', 'ITEM_DELIVERED', 'GIVEN', 'GIFT_REFUSED', 'CONTRACT_REFUSED', 'HAPPENED']);
 
 // Each retelling keeps this share of the teller's confidence.
 export const DECAY = 0.7;
@@ -48,13 +49,21 @@ export function memoriesOf(world: World, npcId: string): Memory[] {
 
 export const memoryOf = (world: World, npcId: string, eventId: string) => memoriesOf(world, npcId).find((m) => m.event_id === eventId) ?? null;
 
-// What it has in mind: its newest memories, newest first. Its facts list these and a meeting offers only these, so a
-// cue never names news the model can't read.
+// Big news: a reported world event marked notable (a boss slain, a death). It stays in mind however much happens after it.
+export const notableIds = (world: World) => new Set(world.events.filter((e) => e.type === 'HAPPENED' && e.data.notable).map((e) => e.id));
+
+// What it has in mind: its newest memories, newest first, but up to NOTABLE_KEPT pieces of big news first, so a busy
+// market day can't push the troll out of its head. Its facts list these and a meeting offers only these, so a cue
+// never names news the model can't read.
 export const IN_MIND = 8;
-export const inMind = (world: World, npcId: string): Memory[] =>
-  memoriesOf(world, npcId)
-    .sort((a, b) => b.learned - a.learned)
-    .slice(0, IN_MIND);
+export const NOTABLE_KEPT = 4;
+export function inMind(world: World, npcId: string): Memory[] {
+  const newest = memoriesOf(world, npcId).sort((a, b) => b.learned - a.learned);
+  const notable = notableIds(world);
+  const kept = newest.filter((m) => notable.has(m.event_id)).slice(0, NOTABLE_KEPT);
+  const rest = newest.filter((m) => !kept.includes(m)).slice(0, IN_MIND - kept.length);
+  return [...kept, ...rest].sort((a, b) => b.learned - a.learned);
+}
 
 // The events it has passed on itself (told, retold or announced), whenever and however it was asked.
 export const passedOnBy = (world: World, npcId: string) =>

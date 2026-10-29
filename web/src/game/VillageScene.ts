@@ -183,6 +183,9 @@ export class VillageScene extends Phaser.Scene {
       case 'GIFT_REFUSED':
         this.bubble(e.actor, 'Not my trade. Keep it.', 3500);
         break;
+      case 'HAPPENED':
+        this.happened(e.location, e.data.text);
+        break;
       case 'ITEM_DELIVERED': {
         const seller = view.contracts.find((c) => c.contract_id === e.data.contract_id)?.seller;
         if (seller) this.bubble(seller, `Your ${e.data.item.item_name} is ready!`, 5000);
@@ -190,6 +193,17 @@ export class VillageScene extends Phaser.Scene {
         break;
       }
     }
+  }
+
+  // A reported world event: a ring spreads from where it happened, with what happened over it for a while.
+  private happened(placeName: string, text: string) {
+    const place = placeNamed(this.village, placeName);
+    if (!place) return;
+    const [x, y] = [(place.x + place.w / 2) * TILE, (place.y + place.h / 2) * TILE];
+    const ring = this.add.circle(x, y, TILE, 0xb48ce0, 0.25).setStrokeStyle(1, 0xb48ce0).setDepth(2);
+    this.tweens.add({ targets: ring, radius: TILE * 5, alpha: 0, duration: 2200, repeat: 1, onComplete: () => ring.destroy() });
+    const label = this.makeText(text.length > 80 ? `${text.slice(0, 78)}…` : text, '#f6ecd8', '#4a2f6b').setPosition(Math.round(x), Math.round(y - 6));
+    this.tweens.add({ targets: label, alpha: 0, delay: 6000, duration: 1000, onComplete: () => label.destroy() });
   }
 
   // The finished item rises above whoever made it, flies to the player and hangs over them for a moment.

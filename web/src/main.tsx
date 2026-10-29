@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { api } from './api';
 import { Chat, type Pending } from './Chat';
 import { Editor } from './Editor';
+import { God } from './God';
 
 // Phaser is most of the bundle, so the village loads on its own and the workshop doesn't wait for it.
 const Village = lazy(() => import('./game/Village').then((m) => ({ default: m.Village })));
@@ -118,6 +119,7 @@ function VillagePage() {
       <aside className="side-col">
         <ForgePanel view={view} disabled={busy} onSkip={(n) => run(api.tick(n))} onReset={() => run(api.reset())} />
         <Inventory view={view} disabled={busy} onGive={give} />
+        <God view={view} disabled={busy} onReport={(r) => run(api.report(r))} />
         <News view={view} />
         <Stock view={view} />
         <Ledger view={view} />

@@ -1,6 +1,7 @@
 import type { Action } from '@blacksmith/shared';
 import type { ZodError, ZodType } from 'zod';
 import { commit, type EngineEvent, type Sense } from './events';
+import { reported } from './happen';
 import type { World } from './state';
 import { placeAt } from './schedule';
 import { own, reject, type ActOptions, type Actor, type ActorOf, type Verdict } from './validator';
@@ -8,7 +9,8 @@ import { own, reject, type ActOptions, type Actor, type ActorOf, type Verdict } 
 export { advance } from './clock';
 export { entryAt, placeAt } from './schedule';
 export { apply, commit, replay, type EngineEvent, type EventDraft, type Sense } from './events';
-export { DECAY, decayed, IN_MIND, inMind, isPassedOn, MEMORABLE, memoriesOf, memoryOf, newsFor, passedOnBy, type Memory } from './memory';
+export { DECAY, decayed, IN_MIND, inMind, isPassedOn, MEMORABLE, memoriesOf, memoryOf, newsFor, NOTABLE_KEPT, notableIds, passedOnBy, type Memory } from './memory';
+export { WORLD } from './happen';
 export { senses, type Distance } from './perception';
 export * from './state';
 export { hasNews, lastFired, lastFiredAt, meeting, timedTrigger, triggerFired, type Meeting, type TimedTrigger } from './triggers';
@@ -37,6 +39,7 @@ function verbOf(raw: unknown): string | null {
 
 type Actors = Record<string, Actor>;
 export type Act = (world: World, actor: string, raw: unknown, opts?: ActOptions) => ActResult;
+export type Report = (world: World, raw: unknown) => ActResult;
 
 // Who may do what comes from the actors passed in (see npcs/), not from the engine.
 // A verb the actor doesn't list is rejected before its schema or rule ever runs.
@@ -59,7 +62,10 @@ function check(actors: Actors, world: World, actor: string, raw: unknown, opts: 
 // A rejection is logged as ACTION_REJECTED (no witnesses) and its reason comes back so the agent can voice it.
 // Actors are keyed by their own id; two with one id is a definition error, not a silent overwrite.
 // `sense` records who witnessed each accepted event (perception.ts); without it nobody does.
-export function createEngine(list: readonly Actor[], config: { sense?: Sense } = {}): { act: Act } {
+// `report` is the other door: a world event the game reports (happen.ts). A bad report changes nothing and isn't
+// logged, since nobody in the world proposed it; the reason goes back to whoever sent it.
+// `places` are where a report may say something happened; without them, anywhere.
+export function createEngine(list: readonly Actor[], config: { sense?: Sense; places?: readonly string[] } = {}): { act: Act; report: Report } {
   const actors: Actors = {};
   for (const a of list) {
     if (Object.hasOwn(actors, a.id)) throw new Error(`two actors have the id '${a.id}'`);
@@ -82,6 +88,11 @@ export function createEngine(list: readonly Actor[], config: { sense?: Sense } =
         },
       ]);
       return { ...rejected, ok: false, reason: verdict.reason };
+    },
+    report(world, raw) {
+      const r = reported(world, raw, list, config);
+      if (!r.ok) return { world, events: [], ok: false, reason: r.reason };
+      return { ...commit(world, [r.draft]), ok: true, reason: null };
     },
   };
 }

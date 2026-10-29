@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { MAX_EMOTE_LENGTH, MAX_NEWS_LENGTH, MAX_SAY_LENGTH } from './limits';
+import type { WorldReport } from './events';
+import { MAX_EMOTE_LENGTH, MAX_HAPPENED_LENGTH, MAX_HOURS_AGO, MAX_NEWS_LENGTH, MAX_SAY_LENGTH } from './limits';
 import { GiftSchema, TermsSchema } from './trade';
 
 // Shapes from the handoff. The model proposes these; the server validates them before anything changes.
@@ -56,6 +57,24 @@ export const ActionSchema = z.discriminatedUnion('action', [
 ]);
 export type Action = z.infer<typeof ActionSchema>;
 export type ActionOf<V extends Action['action']> = Extract<Action, { action: V }>;
+
+// A world event as a game (or god mode) reports it. One line: the text goes into NPCs' facts, so a line break can't
+// forge another entry there. Whether the place and the people exist is the engine's check. A game need only send the
+// text and the place: by default nobody in particular took part, whoever was near enough saw it, just now, small news.
+const ids = z.array(z.string()).max(50);
+export const WorldReportSchema: z.ZodType<WorldReport, z.ZodTypeDef, unknown> = z.object({
+  text: z
+    .string()
+    .transform((s) => s.replace(/\s+/g, ' ').trim())
+    .pipe(z.string().min(1).max(MAX_HAPPENED_LENGTH)),
+  place: z.string(),
+  involved: ids.default([]),
+  seen_by: z
+    .discriminatedUnion('kind', [z.object({ kind: z.literal('nearby') }), z.object({ kind: z.literal('only'), ids }), z.object({ kind: z.literal('everyone') })])
+    .default({ kind: 'nearby' }),
+  notable: z.boolean().default(false),
+  hours_ago: z.number().int().min(0).max(MAX_HOURS_AGO).default(0),
+});
 
 export const EventSchema = z.object({
   id: z.string(),
