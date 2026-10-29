@@ -15,6 +15,18 @@ export type Item = Pick<MadeToOrderTerms, 'item_name' | 'item_type' | 'descripti
 // can be (the teller's own confidence, less a share for each retelling). Set by code, never by the model.
 export type News = { event_id: string; summary: string; confidence: number };
 
+// Something that happened that no verb covers (a boss slain at the gate, a fire at the farm), reported by the game,
+// or typed in god mode. Who saw it: anyone near enough to (perception), only these, or the whole village.
+export type Sighting = { kind: 'nearby' } | { kind: 'only'; ids: string[] } | { kind: 'everyone' };
+export type WorldReport = {
+  text: string;
+  place: string;
+  involved: string[]; // who took part; they know it too
+  seen_by: Sighting;
+  notable: boolean; // big news: it stays in mind however much happens after it
+  hours_ago: number; // reported late: who saw it is worked out from where everyone was then
+};
+
 type Base<T extends string, D> = {
   id: string;
   tick: number;
@@ -40,6 +52,7 @@ export type EngineEvent =
   | Base<'TOLD', News> // target: who was told
   | Base<'RETOLD', News> // to everyone around: its witnesses heard it
   | Base<'ANNOUNCED', News> // cried at the actor's own place: its witnesses heard it
+  | Base<'HAPPENED', { text: string; involved: string[]; seen_by: Sighting['kind']; notable: boolean; reported_tick: number }> // actor: 'world'; narrative only. tick: when it happened; reported_tick: when it was logged (later, if reported late)
   | Base<'TRIGGER_FIRED', { trigger: Trigger }> // an NPC acting on its own; its turn's events follow
   | Base<'ACTION_REJECTED', { verb: string | null; reason: string; proposed: unknown }>
   | Base<'CLOCK_ADVANCED', { from: number }>;
@@ -65,6 +78,7 @@ export type NewsView = { event_id: string; tick: number; place: string; text: st
 export type StateView = {
   tick: number;
   people: PersonView[];
+  places: string[]; // the named places on the village map, as the server reads them (where god mode can say something happened)
   news: NewsView[]; // the latest events anyone knows about, newest first
   gold: number;
   goods: Record<string, number>; // the player's own stock (bought in-stock goods)
@@ -77,6 +91,9 @@ export type StateView = {
 };
 
 export type ArtResponse = { art: StateView['art'] };
+
+// God mode's reading of a note in plain words: a report to check and send, not yet in the log.
+export type ReadNoteResponse = { report: WorldReport };
 
 export type ActionResponse = {
   ok: boolean;

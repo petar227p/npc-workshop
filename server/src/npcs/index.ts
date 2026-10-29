@@ -1,5 +1,5 @@
 import { createEngine, createWorld, senses, type World } from '../engine';
-import { placeDistance } from '../village';
+import { PLACE_NAMES, placeDistance } from '../village';
 import { npcFiles, toNpc } from './load';
 import { registerNames } from './news';
 import { player } from './player';
@@ -11,9 +11,9 @@ export const ACTORS = [player, ...NPCS];
 
 registerNames(NPCS);
 
-// Who witnesses what: each NPC's perception radius on the village map.
+// Who witnesses what: each NPC's perception radius on the village map. Reported world events happen at its places.
 export const sense = senses(ACTORS, placeDistance);
-export const { act } = createEngine(ACTORS, { sense });
+export const { act, report } = createEngine(ACTORS, { sense, places: PLACE_NAMES });
 
 // A fresh village world: every actor's starting purse and stock.
 export const newVillage = (): World => createWorld(ACTORS);

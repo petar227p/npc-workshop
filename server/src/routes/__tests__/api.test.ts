@@ -1,7 +1,8 @@
-import type { ActionResponse, ArtResponse, StateView } from '@blacksmith/shared';
+import { MAX_HAPPENED_LENGTH, type ActionResponse, type ArtResponse, type ReadNoteResponse, type StateView } from '@blacksmith/shared';
 import { PNG } from 'pngjs';
 import { describe, expect, it, vi } from 'vitest';
 import { mockClient, mockImageClient, type ChatClient } from '../../models';
+import { PLACE_NAMES } from '../../village';
 import { clientIpReader, createApi, type ApiDeps } from '../api';
 
 const offer = JSON.stringify({
@@ -404,5 +405,95 @@ describe('api', () => {
     const r = (await browser(app).send('/api/tick', { ticks: 24 })).json as ActionResponse;
     expect(r.events.map((e) => e.type)).toEqual(['CLOCK_ADVANCED']);
     expect(made).toEqual([]);
+  });
+
+  describe('god mode', () => {
+    const dragon = { text: 'A dragon flew low over the village and burned the old mill.', place: 'gate', involved: [], seen_by: { kind: 'everyone' } };
+
+    it('logs what happened with who saw it, shows it in who-knows-what, and the crier at its board acts on it', async () => {
+      const { app } = setup(() => mockClient([new Error('down')])); // the crier's turn falls back to its safe line
+      const r = (await browser(app).send('/api/god', dragon)).json as ActionResponse;
+      expect(r.ok).toBe(true);
+      expect(r.events[0]).toMatchObject({ type: 'HAPPENED', actor: 'world', location: 'gate', data: { text: dragon.text, seen_by: 'everyone' } });
+      const story = r.view.news[0];
+      expect(story.text).toContain(dragon.text);
+      expect(story.knowers.map((k) => k.id).sort()).toEqual(['bard', 'cottager', 'crier', 'farmer', 'keeper', 'merchant', 'smith']);
+      expect(r.events.slice(1).map((e) => [e.type, e.actor])).toContainEqual(['TRIGGER_FIRED', 'crier']); // 08:00: it is at the notice board
+      expect(r.view.gold).toBe(200);
+    });
+
+    it('a report the engine refuses changes nothing and says why', async () => {
+      const { app, made } = setup();
+      const r = (await browser(app).send('/api/god', { ...dragon, place: 'moon' })).json as ActionResponse;
+      expect(r).toMatchObject({ ok: false, reason: "there's no place called 'moon' in the village", events: [] });
+      expect(r.view.events).toEqual([]);
+      expect(made).toEqual([]);
+    });
+
+    it('reads a note in plain words into a report to check, logging nothing', async () => {
+      // 30 hours ago at 08:00 on the first day is before the village's story: read as just now.
+      const reply = JSON.stringify({ text: 'The stranger slew the troll at the gate.', place: 'gate', involved: ['player'], seen_by: 'nearby', notable: true, hours_ago: 30 });
+      const client = mockClient([reply]);
+      const { app } = setup(() => client);
+      const b = browser(app);
+      const r = await b.send('/api/god/read', { note: 'I killed the troll outside the gate' });
+      const read = { text: 'The stranger slew the troll at the gate.', place: 'gate', involved: ['player'], seen_by: { kind: 'nearby' }, notable: true, hours_ago: 0 };
+      expect(r).toMatchObject({ status: 200, json: { report: read } });
+      const schema = client.requests[0].json_schema!.schema as { properties: { place: { enum: string[] }; involved: { items: { enum: string[] } } } };
+      expect(schema.properties.place.enum).toContain('notice_board');
+      expect(schema.properties.involved.items.enum).toEqual(expect.arrayContaining(['player', 'smith', 'bard']));
+      expect(client.requests[0].messages.at(-1)!.content).toContain('I killed the troll outside the gate');
+      expect(((await b.send('/api/state')).json as StateView).events).toEqual([]);
+    });
+
+    it('reading a note is a model call like a turn: it takes the lock, so another reading, the clock and a report wait', async () => {
+      let release!: () => void;
+      const gate = new Promise<void>((r) => (release = r));
+      const reply = JSON.stringify({ text: 'A cart lost a wheel.', place: 'square', involved: [], seen_by: 'nearby', notable: false, hours_ago: 0 });
+      const slow: ChatClient = {
+        provider: 'mock',
+        async chat(req) {
+          await gate;
+          return { model: req.model, content: reply, reasoning: null, finish_reason: 'stop', usage: null, latency_ms: 0 };
+        },
+      };
+      const { app } = setup(() => slow);
+      const b = browser(app);
+      await b.send('/api/reset', {}); // an action, so the browser holds its session cookie before the slow reading
+      const reading = b.send('/api/god/read', { note: 'A cart lost a wheel by the well.' });
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(await b.send('/api/god/read', { note: 'And another.' })).toMatchObject({ status: 409, json: { error: 'The chronicler is still answering.' } });
+      expect((await b.send('/api/tick', { ticks: 1 })).status).toBe(409);
+      expect((await b.send('/api/god', dragon)).status).toBe(409);
+
+      release();
+      expect((await reading).status).toBe(200);
+      expect(((await b.send('/api/state')).json as StateView).busy).toBe(false);
+    });
+
+    it('a reading longer than a report may be is cut at a word, not thrown away', async () => {
+      const long = `The stranger ${'fought the troll for a long time and '.repeat(10)}won.`;
+      const reply = JSON.stringify({ text: long, place: 'gate', involved: ['player'], seen_by: 'nearby', notable: true, hours_ago: 0 });
+      const { app } = setup(() => mockClient([reply]));
+      const r = await browser(app).send('/api/god/read', { note: 'I fought the troll for ages and won' });
+      expect(r.status).toBe(200);
+      const { text } = (r.json as ReadNoteResponse).report;
+      expect(text.length).toBeLessThanOrEqual(MAX_HAPPENED_LENGTH);
+      expect(text).toMatch(/^The stranger fought the troll .* \w+…$/);
+      expect(long.startsWith(text.slice(0, -1))).toBe(true);
+    });
+
+    it("the view names the map's places, so god mode's Where needs no map of its own", async () => {
+      const view = (await browser(setup().app).send('/api/state')).json as StateView;
+      expect(view.places).toEqual(PLACE_NAMES);
+    });
+
+    it('a reading that will not do is a 502, an empty note a 400', async () => {
+      const { app } = setup(() => mockClient([JSON.stringify({ text: 'Somewhere.', place: 'moon', involved: [], seen_by: 'nearby', notable: false, hours_ago: 0 })]));
+      const b = browser(app);
+      expect((await b.send('/api/god/read', { note: 'something happened on the moon' })).status).toBe(502);
+      expect((await b.send('/api/god/read', { note: '  ' })).status).toBe(400);
+    });
   });
 });

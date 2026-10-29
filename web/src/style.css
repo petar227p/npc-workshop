@@ -9,6 +9,7 @@
   --accent: #e8a547;
   --ok: #8cc56a;
   --bad: #e06a5a;
+  --god: #b48ce0;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -95,6 +96,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .ledger li.event { border-color: var(--accent); }
 .ledger li.reject { border-color: var(--bad); color: #f3c4bc; }
 .ledger li.clock { color: var(--muted); }
+.ledger li.happened { border-color: var(--god); }
 .ledger time { color: var(--muted); margin-right: 6px; font-family: 'Pixelify Sans', monospace; }
 .story + .story { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .story-head { font-size: 13px; overflow-wrap: anywhere; }
@@ -193,3 +195,9 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .sprite { width: 36px; height: 36px; padding: 0; border: 2px solid transparent; border-radius: 6px; background: var(--panel-2) url(/assets/dungeon/tilemap_packed.png) no-repeat; background-size: 384px 352px; image-rendering: pixelated; }
 .sprite.on { border-color: var(--accent); }
 .field .inline { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+/* God mode */
+.god .field textarea { resize: vertical; }
+.god-read { margin: -4px 0 10px; }
+.god-people { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 10px; }
+.god-people .check { font-size: 12px; }
+.god-notable { align-self: center; margin: 8px 0 10px; }

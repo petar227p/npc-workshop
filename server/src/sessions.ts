@@ -5,6 +5,7 @@ import { artView, type Gallery } from './art';
 import { availableStock, memoriesOf, placeAt, type World } from './engine';
 import { nameOf, newVillage, summarize, type NpcSpec } from './npcs';
 import type { ImageClient } from './models/image';
+import { PLACE_NAMES } from './village';
 
 // One world per browser, in memory. `busy` locks the world while an NPC is thinking, so a tick or an
 // accept can't land on a world that NPC's turn is about to overwrite.
@@ -135,6 +136,7 @@ export function toView(world: World, busy: boolean, art: Gallery = new Map(), ca
   return {
     tick: world.tick,
     people: cast.map((n) => ({ id: n.id, name: n.name, sprite: n.sprite ?? DEFAULT_SPRITE, place: placeAt(n, world.tick), model: n.model })),
+    places: [...PLACE_NAMES],
     news: newsView(world, cast),
     gold: world.gold[customer] ?? 0,
     goods: { ...(world.stock[customer] ?? {}) },

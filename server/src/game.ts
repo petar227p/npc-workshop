@@ -1,6 +1,6 @@
 import { npcTurn, type NpcModel, type TurnResult } from './agents/npc';
-import { advance, type Act, type ActResult, type EngineEvent, type Sense, type World } from './engine';
-import { act, NPCS, sense, smith, type NpcDefinition } from './npcs';
+import { advance, type Act, type ActResult, type EngineEvent, type Report, type Sense, type World } from './engine';
+import { act, NPCS, report, sense, smith, type NpcDefinition } from './npcs';
 import { runTriggers, type TownDeps, type TownResult } from './town';
 
 // What the player can do. Routes call these; each returns the new world plus the events it produced.
@@ -51,4 +51,19 @@ export async function passTime(
   const moved = advance(world, ticks, opts.sense === null ? undefined : (opts.sense ?? sense));
   const town = await runTriggers(moved.world, world.tick, opts.npcs ?? NPCS, { act: opts.act ?? act, modelFor, cap: opts.cap });
   return { ...town, events: [...moved.events, ...town.events] };
+}
+
+// God mode, or a game reporting something no verb covers: the engine logs it with whoever saw it, then anyone it gave
+// news to share at their own place acts on it (the bard at the tavern), as after the clock moves. Nobody has moved and
+// no timer came round, so nobody else does. A report the engine won't take changes nothing.
+export async function worldReports(
+  world: World,
+  raw: unknown,
+  modelFor: TownDeps['modelFor'],
+  opts: { npcs?: readonly NpcDefinition[]; act?: Act; report?: Report; cap?: number } = {},
+): Promise<TownResult & { ok: boolean; reason: string | null }> {
+  const r = (opts.report ?? report)(world, raw);
+  if (!r.ok) return { world, events: [], turns: 0, outcome: null, attempts: [], ok: false, reason: r.reason };
+  const town = await runTriggers(r.world, world.tick, opts.npcs ?? NPCS, { act: opts.act ?? act, modelFor, cap: opts.cap });
+  return { ...town, events: [...r.events, ...town.events], ok: true, reason: null };
 }

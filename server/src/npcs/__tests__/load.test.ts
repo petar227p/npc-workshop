@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createEngine, createWorld, verbs } from '../../engine';
+import { createEngine, createWorld, verbs, WORLD } from '../../engine';
 import { NO_FACTS } from '../facts';
 import { buildNpc, newVillage, player, readDraft, smith } from '../index';
 import { toNpc } from '../load';
@@ -9,6 +9,15 @@ describe('NPC files', () => {
     const built = buildNpc(readDraft('smith'));
     expect(built.ok && built.npc.schema).toEqual(smith.schema);
     expect(built.ok && built.npc.facts(newVillage(), 'player')).toBe(smith.facts(newVillage(), 'player'));
+  });
+
+  it("can't take an id the engine's own actors use: the player, reported world events, the clock", () => {
+    const farmer = readDraft('farmer');
+    for (const id of [player.id, WORLD, 'clock']) {
+      const built = buildNpc({ ...farmer, id });
+      expect(built.ok).toBe(false);
+      expect(!built.ok && built.errors.join('\n')).toMatch(/^id: that id is taken/);
+    }
   });
 
   it('facts are the chosen blocks in a fixed order, or a plain line when none are chosen', () => {

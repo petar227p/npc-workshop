@@ -11,7 +11,7 @@ export type EventDraft = DistributiveOmit<EngineEvent, 'id'>;
 
 export function apply(world: World, event: EngineEvent): World {
   const w = structuredClone(world);
-  w.tick = event.tick;
+  w.tick = Math.max(w.tick, event.tick); // an event reported late keeps its own time; the clock never goes back for it
   w.events.push(event);
 
   switch (event.type) {
@@ -87,6 +87,7 @@ export function apply(world: World, event: EngineEvent): World {
     case 'TOLD':
     case 'RETOLD':
     case 'ANNOUNCED':
+    case 'HAPPENED': // narrative only: what it changes is who knows it
     case 'SAID':
     case 'EMOTED':
     case 'GIFT_REFUSED':

@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { api } from './api';
 import { Chat, type Pending } from './Chat';
 import { Editor } from './Editor';
+import { God } from './God';
 
 // Phaser is most of the bundle, so the village loads on its own and the workshop doesn't wait for it.
 const Village = lazy(() => import('./game/Village').then((m) => ({ default: m.Village })));
@@ -73,20 +74,34 @@ function VillagePage() {
   }, [drawing]);
 
   // Passing time can wait on NPCs acting on their own, so every action locks the buttons until it's back.
+  // True when the action went through, so a form can keep what was typed when it didn't.
   const [waiting, setWaiting] = useState(false);
-  const run = useCallback(async (p: Promise<ActionResponse>) => {
+  const run = useCallback(async (p: Promise<ActionResponse>): Promise<boolean> => {
     setError(null);
     setWaiting(true);
     try {
       const r = await p;
       setView(r.view);
       if (!r.ok && r.reason) setError(r.reason);
+      return r.ok;
     } catch (e) {
       setError((e as Error).message);
+      return false;
     } finally {
       setWaiting(false);
     }
   }, []);
+
+  // Reading a note waits on Muse Spark and holds the village's lock, so it locks the buttons like any action.
+  const readNote = async (note: string) => {
+    setError(null);
+    setWaiting(true);
+    try {
+      return (await api.readNote(note)).report;
+    } finally {
+      setWaiting(false);
+    }
+  };
 
   const say = async (text: string) => {
     setPending({ text, npc: talkTo });
@@ -118,6 +133,7 @@ function VillagePage() {
       <aside className="side-col">
         <ForgePanel view={view} disabled={busy} onSkip={(n) => run(api.tick(n))} onReset={() => run(api.reset())} />
         <Inventory view={view} disabled={busy} onGive={give} />
+        <God view={view} disabled={busy} onRead={readNote} onReport={(r) => run(api.report(r))} />
         <News view={view} />
         <Stock view={view} />
         <Ledger view={view} />

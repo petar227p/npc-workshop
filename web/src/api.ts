@@ -1,4 +1,4 @@
-import type { ActionResponse, ArtResponse, BenchResponse, EditorLibrary, Gift, NpcDraft, PreviewResponse, SaveResponse, StateView } from '@blacksmith/shared';
+import type { ActionResponse, ArtResponse, BenchResponse, EditorLibrary, Gift, NpcDraft, PreviewResponse, ReadNoteResponse, SaveResponse, StateView, WorldReport } from '@blacksmith/shared';
 
 export class ApiError extends Error {}
 
@@ -23,6 +23,8 @@ export const api = {
   tick: (ticks: number) => call<ActionResponse>('tick', { ticks }),
   give: (to: string, gift: Gift) => call<ActionResponse>('give', { to, gift }),
   reset: () => call<ActionResponse>('reset', {}),
+  report: (r: WorldReport) => call<ActionResponse>('god', r),
+  readNote: (note: string) => call<ReadNoteResponse>('god/read', { note }),
 };
 
 export const editorApi = {

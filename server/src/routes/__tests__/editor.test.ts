@@ -98,7 +98,7 @@ describe('NPC editor api', () => {
       npc: { ...miller, id: 'player', facts: ['clock', 'secrets'] },
     });
     expect(bad.json.ok).toBe(false);
-    expect(bad.json.errors.join('\n')).toMatch(/id: that id is taken by the player/);
+    expect(bad.json.errors.join('\n')).toMatch(/id: that id is taken: player, world, clock are the engine's own/);
     expect(bad.json.errors.join('\n')).toMatch(/facts\.1: Invalid enum value/);
 
     const loose = await send<PreviewResponse>('/api/editor/preview', { npc: { ...miller, model_verbs: ['SAY', 'REFUSE'] } });
