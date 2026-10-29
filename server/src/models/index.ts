@@ -17,9 +17,12 @@ export type Models = { smith: ModelClient; villager: ModelClient };
 // Worst case per call ≈ 2 × 20 s + backoff; a rejected answer means at most one more call.
 const TURN_LIMITS = { timeoutMs: 20_000, maxAttempts: 2 };
 
+// Batch scripts nobody waits on (the exploit suite) can be patient instead: ~1 min of backoff rides out a per-minute limit.
+export const BATCH_LIMITS = { timeoutMs: 60_000, maxAttempts: 8 };
+
 // One model choice's client from env, each call recorded to logs/<session>.jsonl. REPLAY=<file> plays a recorded
 // log instead. Only that choice's key is needed, so an NPC on Muse Spark works without a Baseten key and back.
-export function createModel(session: string, choice: ModelChoice): ModelClient {
+export function createModel(session: string, choice: ModelChoice, limits: { timeoutMs: number; maxAttempts: number } = TURN_LIMITS): ModelClient {
   const env = loadEnv();
   const spark = choice === 'muse_spark';
   const model = spark ? (env.SMITH_MODEL ?? 'muse-spark-1.3-contributor') : (env.VILLAGER_MODEL ?? 'meta-models/muse-spark-open-1026');
@@ -31,7 +34,7 @@ export function createModel(session: string, choice: ModelChoice): ModelClient {
   const apiKey = env[keyName];
   if (!apiKey) throw new Error(`${keyName} is not set (see .env.example)`);
   const baseURL = spark ? (env.META_BASE_URL ?? 'https://api.meta.ai/v1') : (env.BASETEN_BASE_URL ?? 'https://inference.baseten.co/v1');
-  return { client: withRecorder(createClient({ provider, baseURL, apiKey, ...TURN_LIMITS }), `${REPO_ROOT}logs/${session}.jsonl`), model };
+  return { client: withRecorder(createClient({ provider, baseURL, apiKey, ...limits }), `${REPO_ROOT}logs/${session}.jsonl`), model };
 }
 
 // Both clients, for scripts.
