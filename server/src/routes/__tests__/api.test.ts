@@ -386,13 +386,17 @@ describe('api', () => {
     const { app } = setup();
     const b = browser(app);
     const start = (await b.send('/api/state')).json as StateView;
-    expect(start.people).toEqual([
-      { id: 'merchant', name: 'Mira', sprite: 99, place: 'market', model: 'muse_spark_open' },
-      { id: 'smith', name: 'Brann', sprite: 86, place: 'forge', model: 'muse_spark' },
-    ]);
+    expect(start.people).toEqual(
+      expect.arrayContaining([
+        { id: 'merchant', name: 'Mira', sprite: 99, place: 'market', model: 'muse_spark_open' },
+        { id: 'smith', name: 'Brann', sprite: 86, place: 'forge', model: 'muse_spark' },
+        { id: 'farmer', name: 'Tobin', sprite: 88, place: 'farm', model: 'muse_spark_open' },
+      ]),
+    );
     const evening = (await b.send('/api/tick', { ticks: 11 })).json as ActionResponse; // 19:00
     expect(evening.view.people.find((p) => p.id === 'merchant')?.place).toBe('tavern');
     expect(evening.view.people.find((p) => p.id === 'smith')?.place).toBe('forge');
+    expect(evening.view.people.find((p) => p.id === 'farmer')?.place).toBe('tavern');
   });
 
   it('passing time calls no model while nobody in the village is on a timer', async () => {

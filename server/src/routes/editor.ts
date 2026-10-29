@@ -141,7 +141,7 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
     s.busy = { by: 'bench' };
     try {
       const { act } = createEngine([player, built.npc]);
-      const r = await passTime(world, parsed.data.ticks, () => model, { npcs: [built.npc], act });
+      const r = await passTime(world, parsed.data.ticks, () => model, { npcs: [built.npc], act, sense: null });
       s.bench = r.world;
       return c.json({
         ok: true,

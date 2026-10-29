@@ -1,6 +1,6 @@
 import { npcTurn, type NpcModel, type TurnResult } from './agents/npc';
-import { advance, type Act, type ActResult, type EngineEvent, type World } from './engine';
-import { act, NPCS, smith, type NpcDefinition } from './npcs';
+import { advance, type Act, type ActResult, type EngineEvent, type Sense, type World } from './engine';
+import { act, NPCS, sense, smith, type NpcDefinition } from './npcs';
 import { runTriggers, type TownDeps, type TownResult } from './town';
 
 // What the player can do. Routes call these; each returns the new world plus the events it produced.
@@ -37,17 +37,18 @@ export function playerGives(world: World, to: string, gift: unknown): ActResult 
 }
 
 export function skipTime(world: World, ticks: number): { world: World; events: EngineEvent[] } {
-  return advance(world, ticks);
+  return advance(world, ticks, sense);
 }
 
-// The clock moves, then any NPC whose timer came round acts on its own (capped per tick; see town/).
+// The clock moves (the village sees whatever it delivers), then any NPC whose trigger fires acts on its own
+// (capped per tick; see town/). `sense: null` for a world outside the village, where nobody witnesses anything.
 export async function passTime(
   world: World,
   ticks: number,
   modelFor: TownDeps['modelFor'],
-  opts: { npcs?: readonly NpcDefinition[]; act?: Act; cap?: number } = {},
+  opts: { npcs?: readonly NpcDefinition[]; act?: Act; cap?: number; sense?: Sense | null } = {},
 ): Promise<TownResult> {
-  const moved = advance(world, ticks);
+  const moved = advance(world, ticks, opts.sense === null ? undefined : (opts.sense ?? sense));
   const town = await runTriggers(moved.world, world.tick, opts.npcs ?? NPCS, { act: opts.act ?? act, modelFor, cap: opts.cap });
   return { ...town, events: [...moved.events, ...town.events] };
 }

@@ -1,0 +1,72 @@
+{
+  "id": "keeper",
+  "name": "Edda",
+  "verbs": [
+    "SAY",
+    "EMOTE",
+    "TELL"
+  ],
+  "model_verbs": [
+    "SAY",
+    "EMOTE",
+    "TELL"
+  ],
+  "facts": [
+    "clock",
+    "memories"
+  ],
+  "perception_radius": 8,
+  "model": "muse_spark_open",
+  "effort": "low",
+  "location": "chapel",
+  "schedule": [
+    {
+      "from": 7,
+      "place": "chapel"
+    },
+    {
+      "from": 10,
+      "place": "market"
+    },
+    {
+      "from": 12,
+      "place": "chapel"
+    },
+    {
+      "from": 15,
+      "place": "square"
+    },
+    {
+      "from": 17,
+      "place": "chapel"
+    },
+    {
+      "from": 20,
+      "place": "tavern"
+    },
+    {
+      "from": 23,
+      "place": "chapel"
+    }
+  ],
+  "sprite": 100,
+  "start": {
+    "gold": 5,
+    "stock": {}
+  },
+  "catalogue": {},
+  "triggers": [
+    {
+      "kind": "on_spoken_to"
+    },
+    {
+      "kind": "on_meet",
+      "cue": "Someone has just come by. Pass on one piece of news they haven't heard (TELL), in a sentence or two, the way neighbours gossip. Pick the freshest."
+    }
+  ],
+  "cue": "Reply to the customer's last words. If they ask what's new, pass on something you know (TELL).",
+  "fallbacks": {
+    "rejected": "Forgive me, dear, I lost my thread.",
+    "unavailable": "Not now, dear, the bell needs ringing."
+  }
+}

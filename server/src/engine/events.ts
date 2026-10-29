@@ -83,6 +83,10 @@ export function apply(world: World, event: EngineEvent): World {
       }
       break;
     }
+    // News changes no state: who knows what is read from the log itself (memory.ts).
+    case 'TOLD':
+    case 'RETOLD':
+    case 'ANNOUNCED':
     case 'SAID':
     case 'EMOTED':
     case 'GIFT_REFUSED':
@@ -94,12 +98,17 @@ export function apply(world: World, event: EngineEvent): World {
   return w;
 }
 
-// Assigns sequential ids and applies drafts in order.
-export function commit(world: World, drafts: EventDraft[]): { world: World; events: EngineEvent[] } {
+// Who saw an event: worked out from where everyone is at its tick (perception.ts). Without one, nobody did.
+export type Sense = (draft: EventDraft) => string[];
+
+// Assigns sequential ids and applies drafts in order. `sense` fills in each event's witnesses as it is committed, so
+// the log records who saw what and replay never has to work it out again.
+export function commit(world: World, drafts: EventDraft[], sense?: Sense): { world: World; events: EngineEvent[] } {
   const events: EngineEvent[] = [];
   let w = world;
   for (const draft of drafts) {
-    const event = { ...draft, id: `e_${String(w.events.length + 1).padStart(4, '0')}` } as EngineEvent;
+    const seen = sense ? { ...draft, witnesses: sense(draft) } : draft;
+    const event = { ...seen, id: `e_${String(w.events.length + 1).padStart(4, '0')}` } as EngineEvent;
     w = apply(w, event);
     events.push(event);
   }

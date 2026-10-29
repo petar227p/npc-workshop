@@ -1,8 +1,9 @@
-import { commit, type EngineEvent, type EventDraft } from './events';
+import { commit, type EngineEvent, type EventDraft, type Sense } from './events';
 import { isMadeToOrder, type World } from './state';
 
 // Moves time forward. Deliveries happen here, by code, at their due tick; the item is a copy of the contract.
-export function advance(world: World, ticks: number): { world: World; events: EngineEvent[] } {
+// `sense`: who saw each delivery, from where everyone was at its tick.
+export function advance(world: World, ticks: number, sense?: Sense): { world: World; events: EngineEvent[] } {
   if (!Number.isInteger(ticks) || ticks <= 0) throw new Error(`advance needs a positive whole number of ticks, got ${ticks}`);
   const to = world.tick + ticks;
 
@@ -42,5 +43,5 @@ export function advance(world: World, ticks: number): { world: World; events: En
     data: { from: world.tick },
   });
 
-  return commit(world, drafts);
+  return commit(world, drafts, sense);
 }

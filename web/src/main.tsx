@@ -7,7 +7,7 @@ import { Editor } from './Editor';
 
 // Phaser is most of the bundle, so the village loads on its own and the workshop doesn't wait for it.
 const Village = lazy(() => import('./game/Village').then((m) => ({ default: m.Village })));
-import { Forge as ForgePanel, Inventory, Ledger, Stock } from './Side';
+import { Forge as ForgePanel, Inventory, Ledger, News, Stock } from './Side';
 import './style.css';
 
 type Page = 'village' | 'workshop';
@@ -118,6 +118,7 @@ function VillagePage() {
       <aside className="side-col">
         <ForgePanel view={view} disabled={busy} onSkip={(n) => run(api.tick(n))} onReset={() => run(api.reset())} />
         <Inventory view={view} disabled={busy} onGive={give} />
+        <News view={view} />
         <Stock view={view} />
         <Ledger view={view} />
       </aside>

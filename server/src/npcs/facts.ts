@@ -1,5 +1,6 @@
 import { clockText, type Catalogue, type Contract, type FactBlock } from '@blacksmith/shared';
 import { activeJobs, availableStock, minDeliveryTicks, type World } from '../engine';
+import { memoriesText } from './news';
 
 // The facts an NPC can be told, one block each. Code-owned numbers, so the model can quote prices and limits that will pass.
 // A definition picks blocks by name; their text is joined in this order. Every block reads the NPC's own catalogue and stock.
@@ -69,6 +70,8 @@ export const FACTS: Record<FactBlock, Block> = {
     const offers = open.length ? open.map((c) => `- ${c.contract_id}: ${describe(c)}`).join('\n') : '- none';
     return `Your open offers to this customer:\n${offers}`;
   },
+  // What it saw or was told, with the event ids TELL, RETELL and ANNOUNCE must cite.
+  memories: (world, npcId) => memoriesText(world, npcId),
 };
 
 export const NO_FACTS = 'Nothing else is known right now.';

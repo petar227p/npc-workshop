@@ -11,6 +11,10 @@ export type Item = Pick<MadeToOrderTerms, 'item_name' | 'item_type' | 'descripti
   delivered_tick: number;
 };
 
+// News passed on: the event it is about (one the teller knew), the teller's words for it, and how sure the listener
+// can be (the teller's own confidence, less a share for each retelling). Set by code, never by the model.
+export type News = { event_id: string; summary: string; confidence: number };
+
 type Base<T extends string, D> = {
   id: string;
   tick: number;
@@ -33,6 +37,9 @@ export type EngineEvent =
   | Base<'GOODS_DELIVERED', { contract_id: string; good: string; qty: number }>
   | Base<'GIVEN', { gift: Gift; item_name: string | null }> // target: who got it; item_name for an item, so the log can name it
   | Base<'GIFT_REFUSED', { gift: Gift; item_name: string | null; reason: string }> // actor: who wouldn't take it; target: the giver, who keeps it
+  | Base<'TOLD', News> // target: who was told
+  | Base<'RETOLD', News> // to everyone around: its witnesses heard it
+  | Base<'ANNOUNCED', News> // cried at the actor's own place: its witnesses heard it
   | Base<'TRIGGER_FIRED', { trigger: Trigger }> // an NPC acting on its own; its turn's events follow
   | Base<'ACTION_REJECTED', { verb: string | null; reason: string; proposed: unknown }>
   | Base<'CLOCK_ADVANCED', { from: number }>;
@@ -51,9 +58,14 @@ export type ItemArt = { status: 'rendering' | 'ready' | 'unavailable'; url: stri
 // An NPC in the village and the place it is at this tick, worked out by the server. The browser walks it there.
 export type PersonView = { id: string; name: string; sprite: number; place: string; model: ModelChoice }; // model: who voices it, for the chat's badge
 
+// Who knows about one event and how: saw it, or was told (by whom, in what words, how sure).
+export type KnowerView = { id: string; name: string; how: 'witnessed' | 'told_by'; told_by: string | null; confidence: number; claim: string | null };
+export type NewsView = { event_id: string; tick: number; place: string; text: string; knowers: KnowerView[] }; // text: what really happened
+
 export type StateView = {
   tick: number;
   people: PersonView[];
+  news: NewsView[]; // the latest events anyone knows about, newest first
   gold: number;
   goods: Record<string, number>; // the player's own stock (bought in-stock goods)
   shops: { id: string; name: string; stock: Record<string, number> }[]; // each seller's unreserved stock

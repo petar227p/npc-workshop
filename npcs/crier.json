@@ -1,0 +1,50 @@
+{
+  "id": "crier",
+  "name": "Osric",
+  "verbs": [
+    "SAY",
+    "ANNOUNCE"
+  ],
+  "model_verbs": [
+    "SAY",
+    "ANNOUNCE"
+  ],
+  "facts": [
+    "clock",
+    "memories"
+  ],
+  "perception_radius": 12,
+  "model": "muse_spark_open",
+  "effort": "low",
+  "location": "notice_board",
+  "schedule": [
+    {
+      "from": 8,
+      "place": "notice_board"
+    },
+    {
+      "from": 20,
+      "place": "gate"
+    }
+  ],
+  "sprite": 87,
+  "start": {
+    "gold": 5,
+    "stock": {}
+  },
+  "catalogue": {},
+  "triggers": [
+    {
+      "kind": "on_spoken_to"
+    },
+    {
+      "kind": "on_new_memory",
+      "cue": "You have news the village hasn't heard from you. Cry the freshest piece from the notice board now (ANNOUNCE), plainly and loudly."
+    }
+  ],
+  "cue": "Reply to the customer's last words. You cry news only at the notice board (ANNOUNCE), and only what you know.",
+  "fallbacks": {
+    "rejected": "Hear ye... no, wait. Let me check my notes.",
+    "unavailable": "Not now, I'm saving my voice."
+  }
+}

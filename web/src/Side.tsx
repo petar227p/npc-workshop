@@ -1,4 +1,4 @@
-import type { ContractView, EngineEvent, Gift, ItemArt, MadeToOrderView, StateView } from '@blacksmith/shared';
+import type { ContractView, EngineEvent, Gift, ItemArt, MadeToOrderView, StateView, Trigger } from '@blacksmith/shared';
 import { useState } from 'react';
 import { clockText } from './api';
 import { gaveText, giftText, goodName, nameOf } from './Chat';
@@ -164,6 +164,35 @@ function ItemPicture({ name, art }: { name: string; art: ItemArt | undefined }) 
   return <div className={`portrait item-art${drawing ? ' drawing' : ''}`} title={drawing ? 'Being drawn…' : name} />;
 }
 
+// Gossip: for the latest events anyone knows about, who knows and how. Seen with their own eyes, or told (by whom, in
+// what words, how sure). The words drift as news passes on; the event each telling cites can't.
+export function News({ view }: { view: StateView }) {
+  return (
+    <section className="panel news">
+      <h2>Who knows what</h2>
+      {view.news.length === 0 && <div className="muted">Nobody has seen anything worth talking about yet.</div>}
+      {view.news.map((n) => (
+        <div key={n.event_id} className="story">
+          <div className="story-head">
+            <span className="tag">{n.event_id}</span> {n.text}
+          </div>
+          <ul>
+            {n.knowers.map((k) => (
+              <li key={k.id}>
+                <span className="who">{k.name}</span>
+                <span className="bar confidence" title={`${pct(k.confidence)} sure`}>
+                  <div style={{ width: pct(k.confidence) }} />
+                </span>
+                <span className="muted small">{k.how === 'witnessed' ? 'saw it' : `${pct(k.confidence)}, from ${k.told_by}: "${k.claim}"`}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 // Every event, newest first. Rejections are where the "model proposes, code decides" story shows.
 export function Ledger({ view }: { view: StateView }) {
   const rows = view.events.filter((e) => e.type !== 'SAID').reverse();
@@ -192,6 +221,15 @@ function kind(e: EngineEvent) {
 const offered = (c: ContractView | Extract<EngineEvent, { type: 'CONTRACT_PROPOSED' }>['data']['contract']) =>
   c.kind === 'made_to_order' ? `${c.item_name}, ${c.price} gold, ${c.delivery_ticks} h` : `${c.qty} × ${goodName(c.good)}, ${c.price} gold`;
 
+const pct = (c: number) => `${Math.round(c * 100)}%`;
+
+function why(t: Trigger): string {
+  if (t.kind === 'every_hours') return `every ${t.hours} h`;
+  if (t.kind === 'on_meet') return 'met someone with news';
+  if (t.kind === 'on_new_memory') return 'heard news';
+  return 'spoken to';
+}
+
 function describe(e: EngineEvent, view: StateView): string {
   const who = nameOf(view, e.actor);
   switch (e.type) {
@@ -216,7 +254,13 @@ function describe(e: EngineEvent, view: StateView): string {
     case 'GIFT_REFUSED':
       return `${who} refused ${giftText(e.data)} from ${e.target === 'player' ? 'you' : nameOf(view, e.target ?? '')} (${e.data.reason})`;
     case 'TRIGGER_FIRED':
-      return e.data.trigger.kind === 'every_hours' ? `${who} acts on their own (every ${e.data.trigger.hours} h)` : `${who} acts on their own`;
+      return `${who} acts on their own (${why(e.data.trigger)})`;
+    case 'TOLD':
+      return `${who} told ${nameOf(view, e.target ?? '')} about ${e.data.event_id} (${pct(e.data.confidence)} sure): "${e.data.summary}"`;
+    case 'RETOLD':
+      return `${who} retold ${e.data.event_id} to everyone around (${pct(e.data.confidence)} sure): "${e.data.summary}"`;
+    case 'ANNOUNCED':
+      return `${who} announced ${e.data.event_id} (${pct(e.data.confidence)} sure): "${e.data.summary}"`;
     case 'EMOTED':
       return `${who} ${e.data.text}`;
     case 'SAID':
