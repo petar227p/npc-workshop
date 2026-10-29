@@ -1,6 +1,6 @@
 import type { Trigger } from '@blacksmith/shared';
 import type { EventDraft } from './events';
-import { memoriesOf, newsFor } from './memory';
+import { memoriesOf, newsFor, passedOnBy } from './memory';
 import type { World } from './state';
 import { placeAt } from './schedule';
 import { placeOf, type Actor } from './validator';
@@ -53,11 +53,14 @@ export function meeting(world: World, npc: Placed, others: readonly Placed[], fr
   return null;
 }
 
-// It has learned something since it last acted on its own, and is at its own place to share it (the bard at the tavern).
+// It has learned something since it last acted on its own that it hasn't passed on yet, and is at its own place to
+// share it (the bard at the tavern). News it already told, even when asked, isn't news again because someone tells it
+// more surely.
 export function hasNews(world: World, npc: Placed): boolean {
   if (placeAt(npc, world.tick) !== placeOf(npc)) return false;
   const since = lastFiredAt(world, npc.id);
-  return memoriesOf(world, npc.id).some((m) => m.learned > since);
+  const shared = passedOnBy(world, npc.id);
+  return memoriesOf(world, npc.id).some((m) => m.learned > since && !shared.has(m.event_id));
 }
 
 export function triggerFired(world: World, npc: Pick<Actor, 'id' | 'location' | 'schedule'>, trigger: Trigger): EventDraft {

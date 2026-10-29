@@ -8,7 +8,7 @@ import { own, reject, type ActOptions, type Actor, type ActorOf, type Verdict } 
 export { advance } from './clock';
 export { entryAt, placeAt } from './schedule';
 export { apply, commit, replay, type EngineEvent, type EventDraft, type Sense } from './events';
-export { DECAY, decayed, isPassedOn, MEMORABLE, memoriesOf, memoryOf, newsFor, type Memory } from './memory';
+export { DECAY, decayed, IN_MIND, inMind, isPassedOn, MEMORABLE, memoriesOf, memoryOf, newsFor, passedOnBy, type Memory } from './memory';
 export { senses, type Distance } from './perception';
 export * from './state';
 export { hasNews, lastFired, lastFiredAt, meeting, timedTrigger, triggerFired, type Meeting, type TimedTrigger } from './triggers';

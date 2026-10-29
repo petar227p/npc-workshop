@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createEngine, createWorld, DECAY, hasNews, meeting, memoriesOf, memoryOf, replay, senses, triggerFired, commit, verbs, type Actor, type World } from '../index';
-import { hammerhead, player, smith } from './fixtures';
+import { createEngine, createWorld, DECAY, hasNews, IN_MIND, meeting, memoriesOf, memoryOf, replay, senses, triggerFired, commit, verbs, type Actor, type World } from '../index';
+import { hammerhead, merchant, player, smith } from './fixtures';
 
-// A tiny map: the forge and the square are close, the tavern a little further, the farm far off.
-const D: Record<string, number> = { 'forge|square': 5, 'square|tavern': 6, 'forge|tavern': 9 };
+// A tiny map: the forge and the square are close, the market just off the square, the tavern a little further, the farm far off.
+const D: Record<string, number> = { 'forge|square': 5, 'market|square': 4, 'square|tavern': 6, 'forge|tavern': 9 };
 const distance = (a: string, b: string) => (a === b ? 0 : (D[`${a}|${b}`] ?? D[`${b}|${a}`] ?? 30));
 
 const talk = [verbs.SAY, verbs.TELL];
@@ -14,7 +14,8 @@ const keeper: Actor = { id: 'keeper', verbs: talk, location: 'farm', schedule: [
 const bard: Actor = { id: 'bard', verbs: [verbs.SAY, verbs.RETELL], location: 'tavern', start, perception_radius: 5 }; // the square is 6 away: out of earshot
 const crier: Actor = { id: 'crier', verbs: [verbs.SAY, verbs.ANNOUNCE], location: 'square', schedule: [{ from: 8, place: 'square' }, { from: 20, place: 'farm' }], start, perception_radius: 3 };
 const forge: Actor = { ...smith, perception_radius: 2 };
-const ACTORS = [forge, player, farmer, keeper, bard, crier];
+const stranger: Actor = { ...player, verbs: [verbs.SAY, verbs.ACCEPT, verbs.GIVE] };
+const ACTORS = [forge, stranger, farmer, keeper, bard, crier, merchant];
 const sense = senses(ACTORS, distance);
 const { act } = createEngine(ACTORS, { sense });
 
@@ -44,6 +45,24 @@ describe('perception', () => {
     expect(memoriesOf(w, 'farmer')).toEqual([]);
     const rejected = act(w, 'smith', { action: 'DELIVER', contract_id: 'c_001' });
     expect(rejected.events[0]).toMatchObject({ type: 'ACTION_REJECTED', witnesses: [] });
+  });
+
+  it('the player has no place of its own: what it says or gives happens where the one it deals with is, so others see it', () => {
+    const gave = act(createWorld(ACTORS), 'player', { action: 'GIVE', to: 'smith', gift: { kind: 'gold', amount: 5 } }, { to: 'smith' });
+    expect(gave.events[0]).toMatchObject({ type: 'GIVEN', location: 'forge' });
+    expect(gave.events[0].witnesses.sort()).toEqual(['farmer', 'smith']); // the farmer at the square, 5 away
+    expect(memoryOf(gave.world, 'farmer', gave.events[0].id)).toMatchObject({ how_learned: 'witnessed' });
+    const said = act(createWorld(ACTORS), 'player', { action: 'SAY', text: 'Fine goats.' }, { to: 'keeper' }); // 08:00: the keeper is at the farm
+    expect(said.events[0].location).toBe('farm');
+  });
+
+  it('a sale from stock is one piece of news: the handover comes with the payment', () => {
+    const torches = { action: 'OFFER', terms: { kind: 'in_stock', good: 'torch', qty: 2, price: 6, remarks: 'Fresh pitch.' } };
+    const offered = act(createWorld(ACTORS), 'merchant', torches).world;
+    const bought = act(offered, 'player', { action: 'ACCEPT', contract_id: 'c_001' });
+    expect(bought.events.map((e) => e.type)).toEqual(['CONTRACT_ACCEPTED', 'GOODS_DELIVERED']);
+    expect(bought.events[1].witnesses).toContain('farmer'); // seen, but the payment already says what was bought
+    for (const who of ['farmer', 'merchant', 'player']) expect(memoriesOf(bought.world, who).map((m) => m.event_id)).toEqual([bought.events[0].id]);
   });
 
   it('the log keeps who saw what: replaying it gives the same witnesses without sensing again', () => {
@@ -121,6 +140,22 @@ describe('gossip triggers', () => {
     expect(meeting(told, farmer, ACTORS, 1)).toBeNull(); // she's heard it now
   });
 
+  it('a meeting offers only the news it has in mind, newest first, the same list its facts show', () => {
+    // The farmer sees the stranger hand out more coins at the square than it keeps in mind.
+    const coins = Array.from({ length: IN_MIND + 3 }, (_, i) => ({
+      type: 'GIVEN' as const,
+      tick: 0,
+      actor: 'player',
+      target: 'crier',
+      location: 'square',
+      witnesses: ['farmer'],
+      data: { gift: { kind: 'gold' as const, amount: i + 1 }, item_name: null },
+    }));
+    const seen = commit(createWorld(ACTORS), coins).world;
+    const ids = seen.events.map((e) => e.id);
+    expect(meeting(later(seen, 2), farmer, ACTORS, 1)).toEqual({ with: 'keeper', news: ids.slice(-IN_MIND).reverse() });
+  });
+
   it('on new memory: only once it has learned something since it last acted on its own, and at its own place', () => {
     const { world, id } = sold();
     const atTen = later(world, 2);
@@ -130,5 +165,19 @@ describe('gossip triggers', () => {
     const fired = commit(told, [triggerFired(told, crier, { kind: 'on_new_memory', cue: 'Cry it.' })]).world;
     expect(hasNews(fired, crier)).toBe(false); // it has acted on it
     expect(hasNews(later(told, 10), crier)).toBe(false); // 20:00, away from the board
+  });
+
+  it('news it has passed on, even when asked, is not news again, nor when someone tells it more surely', () => {
+    const { world, id } = sold();
+    const toKeeper = tell(later(world, 2), 'farmer', 'keeper', id).world; // 10:00 at the square: 70%
+    const toCrier = tell(toKeeper, 'keeper', 'crier', id).world; // 49%
+    expect(hasNews(toCrier, crier)).toBe(true);
+    // Asked for news, it cries it: a reply, not a turn of its own, but the news is out.
+    const cried = act(toCrier, 'crier', { action: 'ANNOUNCE', event_id: id, summary: 'Hear ye!' }).world;
+    expect(hasNews(cried, crier)).toBe(false);
+    // The farmer, who saw it, tells it too: surer now, but the same news.
+    const surer = tell(cried, 'farmer', 'crier', id).world;
+    expect(memoryOf(surer, 'crier', id)?.confidence).toBe(0.7);
+    expect(hasNews(surer, crier)).toBe(false);
   });
 });

@@ -117,7 +117,13 @@ function nextContractId(world: World): string {
   return `c_${String(Object.keys(world.contracts).length + 1).padStart(3, '0')}`;
 }
 
-const at = (world: World, self: Actor) => ({ tick: world.tick, actor: self.id, location: placeAt(self, world.tick), witnesses: [] as string[] });
+// An event happens where its actor is at that tick. An actor with no place of its own (the player) is wherever the one
+// it deals with is, so what it says or gives there can be witnessed.
+const at = (world: World, self: Actor, other?: Actor) => {
+  const here = placeAt(self, world.tick);
+  return { tick: world.tick, actor: self.id, location: here === 'village' && other ? placeAt(other, world.tick) : here, witnesses: [] as string[] };
+};
+const talkingTo = (opts: ActOptions, actorOf: ActorOf) => (opts.to ? actorOf(opts.to) : undefined);
 
 function proposal(world: World, self: Actor, terms: Terms, customer: string, replaces: string | null): EventDraft {
   return {
@@ -131,14 +137,20 @@ function proposal(world: World, self: Actor, terms: Terms, customer: string, rep
 export const SAY: VerbDef<'SAY'> = {
   verb: 'SAY',
   schema: ACTION_SCHEMAS.SAY,
-  rule: (world, self, action, opts) => ({ ok: true, events: [{ ...at(world, self), type: 'SAID', target: opts.to ?? null, data: { text: action.text } }] }),
+  rule: (world, self, action, opts, actorOf) => ({
+    ok: true,
+    events: [{ ...at(world, self, talkingTo(opts, actorOf)), type: 'SAID', target: opts.to ?? null, data: { text: action.text } }],
+  }),
 };
 
 // Flavour: a gesture changes nothing, so it is always allowed.
 export const EMOTE: VerbDef<'EMOTE'> = {
   verb: 'EMOTE',
   schema: ACTION_SCHEMAS.EMOTE,
-  rule: (world, self, action, opts) => ({ ok: true, events: [{ ...at(world, self), type: 'EMOTED', target: opts.to ?? null, data: { text: action.text } }] }),
+  rule: (world, self, action, opts, actorOf) => ({
+    ok: true,
+    events: [{ ...at(world, self, talkingTo(opts, actorOf)), type: 'EMOTED', target: opts.to ?? null, data: { text: action.text } }],
+  }),
 };
 
 export const OFFER: VerbDef<'OFFER'> = {
@@ -276,7 +288,7 @@ export const GIVE: VerbDef<'GIVE'> = {
     const receiver = actorOf(to);
     const reason = receiver ? refuses(receiver, g, item?.item_type ?? null) : null;
     if (receiver && reason) return { ok: true, events: [{ ...at(world, receiver), type: 'GIFT_REFUSED', target: self.id, data: { ...data, reason } }] };
-    return { ok: true, events: [{ ...at(world, self), type: 'GIVEN', target: to, data }] };
+    return { ok: true, events: [{ ...at(world, self, receiver), type: 'GIVEN', target: to, data }] };
   },
 };
 

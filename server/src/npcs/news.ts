@@ -1,5 +1,5 @@
 import { clockText, type EngineEvent, type Gift } from '@blacksmith/shared';
-import { memoriesOf, type World } from '../engine';
+import { inMind, type World } from '../engine';
 
 // Events as news: what really happened, in words an NPC (or the who-knows panel) can read. Names come from the NPC
 // files; npcs/index.ts registers them at start, so this module imports none of them.
@@ -27,8 +27,6 @@ export function summarize(world: World, e: EngineEvent): string | null {
       const c = contract(e.data.contract_id);
       return `${nameOf(c?.seller ?? 'someone')} handed ${nameOf(e.target ?? '')} the finished ${e.data.item.item_name} ${when}`;
     }
-    case 'GOODS_DELIVERED':
-      return `${nameOf(e.actor)} sold ${nameOf(e.target ?? '')} ${e.data.qty} × ${show(e.data.good)} ${when}`;
     case 'GIVEN':
       return `${nameOf(e.actor)} gave ${nameOf(e.target ?? '')} ${gift(e.data.gift, e.data.item_name)} ${when}`;
     case 'GIFT_REFUSED':
@@ -41,14 +39,11 @@ export function summarize(world: World, e: EngineEvent): string | null {
 }
 
 const pct = (c: number) => `${Math.round(c * 100)}%`;
-const MEMORIES_SHOWN = 8;
 
-// The memories fact block: what it knows, newest first. What it saw reads as what happened; what it was told reads as
-// the words it was told in, since that is all it has.
+// The memories fact block: what it has in mind, newest first (engine/memory.ts inMind). What it saw reads as what
+// happened; what it was told reads as the words it was told in, since that is all it has.
 export function memoriesText(world: World, npcId: string): string {
-  const known = memoriesOf(world, npcId)
-    .sort((a, b) => b.learned - a.learned)
-    .slice(0, MEMORIES_SHOWN);
+  const known = inMind(world, npcId);
   if (known.length === 0) return 'News you know: none yet. You have nothing to pass on, so never claim you have.';
   const byId = new Map(world.events.map((e) => [e.id, e]));
   const lines = known.map((m) => {

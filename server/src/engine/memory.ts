@@ -5,7 +5,9 @@ import type { World } from './state';
 // It knows an event it took part in or witnessed (sure), or one somebody passed on to it (less sure each retelling).
 
 // What is worth talking about. Talk itself isn't: news is about deeds (sales, deliveries, gifts, refusals).
-export const MEMORABLE = new Set<EventType>(['CONTRACT_ACCEPTED', 'ITEM_DELIVERED', 'GOODS_DELIVERED', 'GIVEN', 'GIFT_REFUSED', 'CONTRACT_REFUSED']);
+// A sale from stock is one piece of news: its GOODS_DELIVERED always comes with the CONTRACT_ACCEPTED that already
+// says what was bought, so it isn't news twice.
+export const MEMORABLE = new Set<EventType>(['CONTRACT_ACCEPTED', 'ITEM_DELIVERED', 'GIVEN', 'GIFT_REFUSED', 'CONTRACT_REFUSED']);
 
 // Each retelling keeps this share of the teller's confidence.
 export const DECAY = 0.7;
@@ -46,10 +48,27 @@ export function memoriesOf(world: World, npcId: string): Memory[] {
 
 export const memoryOf = (world: World, npcId: string, eventId: string) => memoriesOf(world, npcId).find((m) => m.event_id === eventId) ?? null;
 
-// Events `teller` knows and `listener` doesn't: what there is to tell when they meet.
+// What it has in mind: its newest memories, newest first. Its facts list these and a meeting offers only these, so a
+// cue never names news the model can't read.
+export const IN_MIND = 8;
+export const inMind = (world: World, npcId: string): Memory[] =>
+  memoriesOf(world, npcId)
+    .sort((a, b) => b.learned - a.learned)
+    .slice(0, IN_MIND);
+
+// The events it has passed on itself (told, retold or announced), whenever and however it was asked.
+export const passedOnBy = (world: World, npcId: string) =>
+  new Set(
+    world.events
+      .filter(isPassedOn)
+      .filter((e) => e.actor === npcId)
+      .map((e) => e.data.event_id),
+  );
+
+// Events `teller` has in mind and `listener` doesn't know, newest first: what there is to tell when they meet.
 export function newsFor(world: World, teller: string, listener: string): string[] {
   const theirs = new Set(memoriesOf(world, listener).map((m) => m.event_id));
-  return memoriesOf(world, teller)
+  return inMind(world, teller)
     .map((m) => m.event_id)
     .filter((id) => !theirs.has(id));
 }
