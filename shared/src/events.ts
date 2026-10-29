@@ -78,6 +78,7 @@ export type NewsView = { event_id: string; tick: number; place: string; text: st
 export type StateView = {
   tick: number;
   people: PersonView[];
+  places: string[]; // the named places on the village map, as the server reads them (where god mode can say something happened)
   news: NewsView[]; // the latest events anyone knows about, newest first
   gold: number;
   goods: Record<string, number>; // the player's own stock (bought in-stock goods)

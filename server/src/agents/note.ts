@@ -33,6 +33,15 @@ export function noteSchema(places: readonly string[], people: readonly Person[])
   };
 }
 
+// A reading longer than a report may be is cut at a word, not thrown away: the person checks the form before sending.
+function clip(text: string): string {
+  const line = text.replace(/\s+/g, ' ').trim();
+  if (line.length <= MAX_HAPPENED_LENGTH) return line;
+  const cut = line.slice(0, MAX_HAPPENED_LENGTH - 1);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > 0 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
 // The report the model read from `note`, or null when its answer won't do (or the model is down): the form stays the
 // person's to fill in. `now`: the world's tick, so "this morning" can be counted back, but never past the first hour.
 export async function readNote(
@@ -57,10 +66,11 @@ export async function readNote(
       max_tokens: 4096,
       json_schema: { name: 'world_event', schema: noteSchema(ctx.places, ctx.people) },
     });
-    const out = JSON.parse(res.content) as { seen_by?: unknown; hours_ago?: unknown };
+    const out = JSON.parse(res.content) as { text?: unknown; seen_by?: unknown; hours_ago?: unknown };
     // A time the world hasn't got back to is the furthest back it has, not a failed reading.
     const ago = typeof out.hours_ago === 'number' ? Math.max(0, Math.min(earliest, Math.round(out.hours_ago))) : out.hours_ago;
-    const parsed = WorldReportSchema.safeParse({ ...out, seen_by: { kind: out.seen_by }, hours_ago: ago });
+    const text = typeof out.text === 'string' ? clip(out.text) : out.text;
+    const parsed = WorldReportSchema.safeParse({ ...out, text, seen_by: { kind: out.seen_by }, hours_ago: ago });
     if (!parsed.success) return null;
     // The schema's enums should hold these to the lists; a reply that strays is no reading, whatever the provider let by.
     const ids = new Set(ctx.people.map((p) => p.id));

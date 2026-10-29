@@ -1,7 +1,8 @@
-import type { ActionResponse, ArtResponse, StateView } from '@blacksmith/shared';
+import { MAX_HAPPENED_LENGTH, type ActionResponse, type ArtResponse, type ReadNoteResponse, type StateView } from '@blacksmith/shared';
 import { PNG } from 'pngjs';
 import { describe, expect, it, vi } from 'vitest';
 import { mockClient, mockImageClient, type ChatClient } from '../../models';
+import { PLACE_NAMES } from '../../village';
 import { clientIpReader, createApi, type ApiDeps } from '../api';
 
 const offer = JSON.stringify({
@@ -469,6 +470,23 @@ describe('api', () => {
       release();
       expect((await reading).status).toBe(200);
       expect(((await b.send('/api/state')).json as StateView).busy).toBe(false);
+    });
+
+    it('a reading longer than a report may be is cut at a word, not thrown away', async () => {
+      const long = `The stranger ${'fought the troll for a long time and '.repeat(10)}won.`;
+      const reply = JSON.stringify({ text: long, place: 'gate', involved: ['player'], seen_by: 'nearby', notable: true, hours_ago: 0 });
+      const { app } = setup(() => mockClient([reply]));
+      const r = await browser(app).send('/api/god/read', { note: 'I fought the troll for ages and won' });
+      expect(r.status).toBe(200);
+      const { text } = (r.json as ReadNoteResponse).report;
+      expect(text.length).toBeLessThanOrEqual(MAX_HAPPENED_LENGTH);
+      expect(text).toMatch(/^The stranger fought the troll .* \w+…$/);
+      expect(long.startsWith(text.slice(0, -1))).toBe(true);
+    });
+
+    it("the view names the map's places, so god mode's Where needs no map of its own", async () => {
+      const view = (await browser(setup().app).send('/api/state')).json as StateView;
+      expect(view.places).toEqual(PLACE_NAMES);
     });
 
     it('a reading that will not do is a 502, an empty note a 400', async () => {

@@ -92,6 +92,17 @@ function VillagePage() {
     }
   }, []);
 
+  // Reading a note waits on Muse Spark and holds the village's lock, so it locks the buttons like any action.
+  const readNote = async (note: string) => {
+    setError(null);
+    setWaiting(true);
+    try {
+      return (await api.readNote(note)).report;
+    } finally {
+      setWaiting(false);
+    }
+  };
+
   const say = async (text: string) => {
     setPending({ text, npc: talkTo });
     await run(api.say(text, talkTo));
@@ -122,7 +133,7 @@ function VillagePage() {
       <aside className="side-col">
         <ForgePanel view={view} disabled={busy} onSkip={(n) => run(api.tick(n))} onReset={() => run(api.reset())} />
         <Inventory view={view} disabled={busy} onGive={give} />
-        <God view={view} disabled={busy} onReport={(r) => run(api.report(r))} />
+        <God view={view} disabled={busy} onRead={readNote} onReport={(r) => run(api.report(r))} />
         <News view={view} />
         <Stock view={view} />
         <Ledger view={view} />

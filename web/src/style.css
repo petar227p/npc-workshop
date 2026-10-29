@@ -200,4 +200,4 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .god-read { margin: -4px 0 10px; }
 .god-people { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 10px; }
 .god-people .check { font-size: 12px; }
-.god-notable { align-self: center; margin-top: 8px; }
+.god-notable { align-self: center; margin: 8px 0 10px; }

@@ -58,8 +58,8 @@ export const ActionSchema = z.discriminatedUnion('action', [
 export type Action = z.infer<typeof ActionSchema>;
 export type ActionOf<V extends Action['action']> = Extract<Action, { action: V }>;
 
-// A world event as a game (or god mode) reports it. One line: the text goes into NPCs' facts, so a line break can't
-// forge another entry there. Whether the place and the people exist is the engine's check. A game need only send the
+// A world event as a game (or god mode) reports it. One line, and quoted where NPCs read it (npcs/news.ts), so the text
+// can't forge another entry in their facts. Whether the place and the people exist is the engine's check. A game need only send the
 // text and the place: by default nobody in particular took part, whoever was near enough saw it, just now, small news.
 const ids = z.array(z.string()).max(50);
 export const WorldReportSchema: z.ZodType<WorldReport, z.ZodTypeDef, unknown> = z.object({

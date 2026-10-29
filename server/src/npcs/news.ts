@@ -33,8 +33,9 @@ export function summarize(world: World, e: EngineEvent): string | null {
       return `${nameOf(e.actor)} handed back ${gift(e.data.gift, e.data.item_name)} from ${nameOf(e.target ?? '')} ${when}`;
     case 'CONTRACT_REFUSED':
       return `${nameOf(e.actor)} turned down ${nameOf(e.target ?? '')}'s order ${when}`;
+    // The game's (or god mode's) own words, quoted like a claim it was told, so they read as one report, not as lines.
     case 'HAPPENED':
-      return `${e.data.text} ${when}`;
+      return `${JSON.stringify(e.data.text)} ${when}`;
     default:
       return null;
   }
@@ -49,10 +50,12 @@ export function memoriesText(world: World, npcId: string): string {
   if (known.length === 0) return 'News you know: none yet. You have nothing to pass on, so never claim you have.';
   const byId = new Map(world.events.map((e) => [e.id, e]));
   const big = notableIds(world);
+  // Only what it saw itself is marked big news: told it, all it has is the teller's words.
   const lines = known.map((m) => {
-    const news = big.has(m.event_id) ? ', big news' : '';
-    if (m.how_learned === 'witnessed') return `- ${m.event_id}: you saw it (sure${news}). ${summarize(world, byId.get(m.event_id)!) ?? ''}`;
-    return `- ${m.event_id}: ${nameOf(m.told_by ?? '')} told you (${pct(m.confidence)} sure${news}): ${JSON.stringify(m.claim)}`;
+    if (m.how_learned === 'witnessed') {
+      return `- ${m.event_id}: you saw it (sure${big.has(m.event_id) ? ', big news' : ''}). ${summarize(world, byId.get(m.event_id)!) ?? ''}`;
+    }
+    return `- ${m.event_id}: ${nameOf(m.told_by ?? '')} told you (${pct(m.confidence)} sure): ${JSON.stringify(m.claim)}`;
   });
   return `News you know. To pass one on, give its id in event_id; the ledger checks you really know it:\n${lines.join('\n')}`;
 }

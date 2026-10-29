@@ -1,33 +1,21 @@
-import type { Sighting, StateView, TiledMap, WorldReport } from '@blacksmith/shared';
-// The zod-free modules, so the schemas stay out of the bundle.
+import type { Sighting, StateView, WorldReport } from '@blacksmith/shared';
+// The zod-free module, so the schemas stay out of the bundle.
 import { MAX_HAPPENED_LENGTH, MAX_HOURS_AGO, MAX_NOTE_LENGTH } from '@blacksmith/shared/src/limits';
-import { readVillage } from '@blacksmith/shared/src/village';
-import { useEffect, useState } from 'react';
-import { api } from './api';
+import { useState } from 'react';
 
 // God mode: tell the engine something happened that no verb covers (a boss slain, a fire). A game would report it
 // itself; here you type it. The engine logs it with whoever saw it, and gossip carries it from there. "Read it" has
 // Muse Spark fill in the form from your own words; nothing happens until you send it.
 
-type Props = { view: StateView; disabled: boolean; onReport: (r: WorldReport) => Promise<boolean> }; // true once logged
+// onRead: the report Muse Spark reads from a note (the page is locked while it reads); onReport: true once logged.
+type Props = { view: StateView; disabled: boolean; onRead: (note: string) => Promise<WorldReport>; onReport: (r: WorldReport) => Promise<boolean> };
 
 const show = (name: string) => name.replace(/_/g, ' ');
 const AGO = [0, 1, 2, 3, 6, 12, 24, 48].filter((h) => h <= MAX_HOURS_AGO);
 const agoText = (h: number) => (h === 0 ? 'Just now' : h === 1 ? 'An hour ago' : `${h} hours ago`);
 
-// The map's places, as the server reads them from the same file.
-function usePlaces(): string[] {
-  const [places, setPlaces] = useState<string[]>([]);
-  useEffect(() => {
-    fetch('/assets/village.tmj')
-      .then((r) => r.json())
-      .then((m: TiledMap) => setPlaces(readVillage(m).places.map((p) => p.name)), () => {});
-  }, []);
-  return places;
-}
-
-export function God({ view, disabled, onReport }: Props) {
-  const places = usePlaces();
+export function God({ view, disabled, onRead, onReport }: Props) {
+  const places = view.places;
   const [text, setText] = useState('');
   const [place, setPlace] = useState('');
   const [involved, setInvolved] = useState<string[]>([]);
@@ -50,7 +38,7 @@ export function God({ view, disabled, onReport }: Props) {
     setReading(true);
     setNote(null);
     try {
-      const { report } = await api.readNote(text);
+      const report = await onRead(text);
       setText(report.text);
       setPlace(report.place);
       setInvolved(report.involved);

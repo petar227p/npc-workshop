@@ -16,8 +16,9 @@ export type Reported = { ok: true; draft: EventDraft } | { ok: false; reason: st
 
 const parseReason = (error: ZodError) => error.issues.map((i) => `${i.path.join('.') || 'report'}: ${i.message}`).join('; ');
 
-// Who saw it. Those who took part always know; past that, whoever perception puts near enough, only the ones named,
-// or everyone who sees anything at all (the actors with a perception radius). In the actors' own order, once each.
+// Who saw it. Those who took part always know, wherever their schedule had them: the game says they were there, the
+// one exception to places coming from schedules alone. Past that, whoever perception puts near enough, only the ones
+// named, or everyone who sees anything at all (the actors with a perception radius). In the actors' own order, once each.
 function witnesses(r: WorldReport, draft: EventDraft, actors: readonly Actor[], sense: Sense | undefined): string[] {
   const seen = new Set(r.involved);
   if (r.seen_by.kind === 'nearby') sense?.(draft).forEach((id) => seen.add(id));
