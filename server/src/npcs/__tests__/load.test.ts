@@ -129,4 +129,10 @@ describe('two sellers', () => {
     expect(brann).not.toMatch(/c_002/);
     expect(desk.npc.history(w, 'player')).toMatch(/\[Customer accepted c_002 and paid 60 gold\]\n\[Work began on c_002/);
   });
+
+  it('passing news on needs the memories facts, or the NPC could never know an event id to cite', () => {
+    const farmer = readDraft('farmer');
+    expect(buildNpc(farmer).ok).toBe(true);
+    expect(buildNpc({ ...farmer, facts: ['clock'] })).toEqual({ ok: false, errors: ['TELL needs the "News it knows" facts, or it can\'t know an event id to pass on'] });
+  });
 });

@@ -1,4 +1,4 @@
-import { MAX_EMOTE_LENGTH, MAX_SAY_LENGTH, type Catalogue, type MadeToOrder, type OfferKind, type Verb } from '@blacksmith/shared';
+import { MAX_EMOTE_LENGTH, MAX_NEWS_LENGTH, MAX_SAY_LENGTH, type Catalogue, type MadeToOrder, type OfferKind, type Verb } from '@blacksmith/shared';
 
 // Meta's strict mode forbids a root anyOf, so a model answers in one flat object: the verb, the spoken line,
 // and the union of the fields its verbs use (nullable). Each verb here says which fields it reads and how
@@ -109,6 +109,17 @@ export function GIVE(goods: readonly string[]): FlatVerb {
     toAction: (out) => ({ action: 'GIVE', to: null, gift: out.gift }),
   };
 }
+
+// News: the model names the event it is passing on; its spoken line is its wording of it. A TELL goes to whoever it
+// is talking to, for the same reason a gift does.
+const news = (verb: 'TELL' | 'RETELL' | 'ANNOUNCE'): FlatVerb => ({
+  verb,
+  fields: { event_id: str },
+  toAction: (out) => ({ action: verb, ...(verb === 'TELL' ? { to: null } : {}), event_id: out.event_id, summary: out.say.slice(0, MAX_NEWS_LENGTH) }),
+});
+export const TELL = news('TELL');
+export const RETELL = news('RETELL');
+export const ANNOUNCE = news('ANNOUNCE');
 
 export const REFUSE: FlatVerb = {
   verb: 'REFUSE',

@@ -1,15 +1,17 @@
 import type { Action } from '@blacksmith/shared';
 import type { ZodError, ZodType } from 'zod';
-import { commit, type EngineEvent } from './events';
+import { commit, type EngineEvent, type Sense } from './events';
 import type { World } from './state';
 import { placeAt } from './schedule';
 import { own, reject, type ActOptions, type Actor, type ActorOf, type Verdict } from './validator';
 
 export { advance } from './clock';
 export { entryAt, placeAt } from './schedule';
-export { apply, commit, replay, type EngineEvent, type EventDraft } from './events';
+export { apply, commit, replay, type EngineEvent, type EventDraft, type Sense } from './events';
+export { DECAY, decayed, IN_MIND, inMind, isPassedOn, MEMORABLE, memoriesOf, memoryOf, newsFor, passedOnBy, type Memory } from './memory';
+export { senses, type Distance } from './perception';
 export * from './state';
-export { lastFired, timedTrigger, triggerFired, type TimedTrigger } from './triggers';
+export { hasNews, lastFired, lastFiredAt, meeting, timedTrigger, triggerFired, type Meeting, type TimedTrigger } from './triggers';
 export * as verbs from './verbs';
 export { minDeliveryTicks, minPrice, materialCost, placeOf, type ActOptions, type Actor, type AnyVerbDef, type Verdict, type VerbDef } from './validator';
 
@@ -56,7 +58,8 @@ function check(actors: Actors, world: World, actor: string, raw: unknown, opts: 
 // The one door into the world for agents and the player: role check → parse → rule → commit.
 // A rejection is logged as ACTION_REJECTED (no witnesses) and its reason comes back so the agent can voice it.
 // Actors are keyed by their own id; two with one id is a definition error, not a silent overwrite.
-export function createEngine(list: readonly Actor[]): { act: Act } {
+// `sense` records who witnessed each accepted event (perception.ts); without it nobody does.
+export function createEngine(list: readonly Actor[], config: { sense?: Sense } = {}): { act: Act } {
   const actors: Actors = {};
   for (const a of list) {
     if (Object.hasOwn(actors, a.id)) throw new Error(`two actors have the id '${a.id}'`);
@@ -65,7 +68,7 @@ export function createEngine(list: readonly Actor[]): { act: Act } {
   return {
     act(world, actor, raw, opts = {}) {
       const verdict = check(actors, world, actor, raw, opts);
-      if (verdict.ok) return { ...commit(world, verdict.events), ok: true, reason: null };
+      if (verdict.ok) return { ...commit(world, verdict.events, config.sense), ok: true, reason: null };
 
       const rejected = commit(world, [
         {

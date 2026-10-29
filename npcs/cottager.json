@@ -1,0 +1,68 @@
+{
+  "id": "cottager",
+  "name": "Wren",
+  "verbs": [
+    "SAY",
+    "EMOTE",
+    "TELL"
+  ],
+  "model_verbs": [
+    "SAY",
+    "EMOTE",
+    "TELL"
+  ],
+  "facts": [
+    "clock",
+    "memories"
+  ],
+  "perception_radius": 8,
+  "model": "muse_spark_open",
+  "effort": "low",
+  "location": "cottage",
+  "schedule": [
+    {
+      "from": 0,
+      "place": "cottage"
+    },
+    {
+      "from": 9,
+      "place": "square"
+    },
+    {
+      "from": 11,
+      "place": "cottage"
+    },
+    {
+      "from": 16,
+      "place": "market"
+    },
+    {
+      "from": 18,
+      "place": "cottage"
+    },
+    {
+      "from": 21,
+      "place": "tavern"
+    }
+  ],
+  "sprite": 98,
+  "start": {
+    "gold": 5,
+    "stock": {}
+  },
+  "catalogue": {},
+  "triggers": [
+    {
+      "kind": "on_spoken_to"
+    },
+    {
+      "kind": "on_meet",
+      "cue": "Someone has just come by. Pass on one piece of news they haven't heard (TELL), in a sentence or two, the way neighbours gossip. Pick the freshest."
+    }
+  ],
+  "cue": "Reply to the customer's last words. If they ask what's new, pass on something you know (TELL).",
+  "fallbacks": {
+    "rejected": "Wait, wait, I'll get it right. Ask me again?",
+    "unavailable": "Can't stop, the washing's on the line!"
+  }
+}

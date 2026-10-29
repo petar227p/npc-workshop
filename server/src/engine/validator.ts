@@ -1,6 +1,7 @@
 import { ACTION_SCHEMAS, STATS, type Action, type ActionOf, type Catalogue, type Gift, type InStockTerms, type Item, type MadeToOrder, type MadeToOrderTerms, type ScheduleEntry, type Start, type Terms } from '@blacksmith/shared';
 import type { ZodType } from 'zod';
 import type { EventDraft } from './events';
+import { decayed, memoryOf } from './memory';
 import { placeAt } from './schedule';
 import { activeJobs, availableStock, type World } from './state';
 
@@ -29,6 +30,7 @@ export type Actor = {
   schedule?: readonly ScheduleEntry[]; // where it is during the day; its own place when this says nothing
   catalogue?: Catalogue; // what it sells; OFFER checks terms against it
   start?: Start; // its purse and stock in a new world
+  perception_radius?: number; // in tiles: how far from its place it sees what happens; without one it witnesses nothing
 };
 
 export type ActorOf = (id: string) => Actor | undefined;
@@ -115,7 +117,13 @@ function nextContractId(world: World): string {
   return `c_${String(Object.keys(world.contracts).length + 1).padStart(3, '0')}`;
 }
 
-const at = (world: World, self: Actor) => ({ tick: world.tick, actor: self.id, location: placeAt(self, world.tick), witnesses: [] as string[] });
+// An event happens where its actor is at that tick. An actor with no place of its own (the player) is wherever the one
+// it deals with is, so what it says or gives there can be witnessed.
+const at = (world: World, self: Actor, other?: Actor) => {
+  const here = placeAt(self, world.tick);
+  return { tick: world.tick, actor: self.id, location: here === 'village' && other ? placeAt(other, world.tick) : here, witnesses: [] as string[] };
+};
+const talkingTo = (opts: ActOptions, actorOf: ActorOf) => (opts.to ? actorOf(opts.to) : undefined);
 
 function proposal(world: World, self: Actor, terms: Terms, customer: string, replaces: string | null): EventDraft {
   return {
@@ -129,14 +137,20 @@ function proposal(world: World, self: Actor, terms: Terms, customer: string, rep
 export const SAY: VerbDef<'SAY'> = {
   verb: 'SAY',
   schema: ACTION_SCHEMAS.SAY,
-  rule: (world, self, action, opts) => ({ ok: true, events: [{ ...at(world, self), type: 'SAID', target: opts.to ?? null, data: { text: action.text } }] }),
+  rule: (world, self, action, opts, actorOf) => ({
+    ok: true,
+    events: [{ ...at(world, self, talkingTo(opts, actorOf)), type: 'SAID', target: opts.to ?? null, data: { text: action.text } }],
+  }),
 };
 
 // Flavour: a gesture changes nothing, so it is always allowed.
 export const EMOTE: VerbDef<'EMOTE'> = {
   verb: 'EMOTE',
   schema: ACTION_SCHEMAS.EMOTE,
-  rule: (world, self, action, opts) => ({ ok: true, events: [{ ...at(world, self), type: 'EMOTED', target: opts.to ?? null, data: { text: action.text } }] }),
+  rule: (world, self, action, opts, actorOf) => ({
+    ok: true,
+    events: [{ ...at(world, self, talkingTo(opts, actorOf)), type: 'EMOTED', target: opts.to ?? null, data: { text: action.text } }],
+  }),
 };
 
 export const OFFER: VerbDef<'OFFER'> = {
@@ -274,6 +288,61 @@ export const GIVE: VerbDef<'GIVE'> = {
     const receiver = actorOf(to);
     const reason = receiver ? refuses(receiver, g, item?.item_type ?? null) : null;
     if (receiver && reason) return { ok: true, events: [{ ...at(world, receiver), type: 'GIFT_REFUSED', target: self.id, data: { ...data, reason } }] };
-    return { ok: true, events: [{ ...at(world, self), type: 'GIVEN', target: to, data }] };
+    return { ok: true, events: [{ ...at(world, self, receiver), type: 'GIVEN', target: to, data }] };
+  },
+};
+
+const show = (place: string) => place.replace(/_/g, ' ');
+
+// The news it cites must be an event it knows: one it saw, or one passed on to it. What it says about it is its own
+// wording (a retelling may drift), but the event id can't be made up, and the listener is told how sure to be: the
+// teller's own confidence less a share, never more.
+function passOn(world: World, self: Actor, eventId: string): { confidence: number } | string {
+  const m = memoryOf(world, self.id, eventId);
+  if (!m) return `${self.id} knows of no event ${eventId}; it can only pass on what it saw or was told`;
+  return { confidence: decayed(m.confidence) };
+}
+
+// Told to one listener, who must be with it: at the same place now. The player has no place; whoever it talks to is with it.
+export const TELL: VerbDef<'TELL'> = {
+  verb: 'TELL',
+  schema: ACTION_SCHEMAS.TELL,
+  rule(world, self, action, opts, actorOf) {
+    const to = action.to ?? opts.to;
+    if (!to) return reject(`${self.id} is talking to nobody in particular; TELL needs a listener (RETELL or ANNOUNCE speak to everyone around)`);
+    if (to === self.id) return reject(`${self.id} can't tell itself`);
+    const listener = actorOf(to);
+    if (!listener) return reject(`there's nobody called '${to}' here to tell`);
+    const here = placeAt(self, world.tick);
+    if (listener.location !== undefined && placeAt(listener, world.tick) !== here) {
+      return reject(`${to} is at the ${show(placeAt(listener, world.tick))}, not here at the ${show(here)}`);
+    }
+    const news = passOn(world, self, action.event_id);
+    if (typeof news === 'string') return reject(news);
+    return { ok: true, events: [{ ...at(world, self), type: 'TOLD', target: to, data: { event_id: action.event_id, summary: action.summary, ...news } }] };
+  },
+};
+
+// Told to everyone around: whoever witnesses the telling hears it.
+export const RETELL: VerbDef<'RETELL'> = {
+  verb: 'RETELL',
+  schema: ACTION_SCHEMAS.RETELL,
+  rule(world, self, action) {
+    const news = passOn(world, self, action.event_id);
+    if (typeof news === 'string') return reject(news);
+    return { ok: true, events: [{ ...at(world, self), type: 'RETOLD', target: null, data: { event_id: action.event_id, summary: action.summary, ...news } }] };
+  },
+};
+
+// Cried to everyone around, and only from its own place: a crier speaks from the notice board, not in the tavern.
+export const ANNOUNCE: VerbDef<'ANNOUNCE'> = {
+  verb: 'ANNOUNCE',
+  schema: ACTION_SCHEMAS.ANNOUNCE,
+  rule(world, self, action) {
+    const here = placeAt(self, world.tick);
+    if (here !== placeOf(self)) return reject(`${self.id} announces only at its own place, the ${show(placeOf(self))}; it is at the ${show(here)}`);
+    const news = passOn(world, self, action.event_id);
+    if (typeof news === 'string') return reject(news);
+    return { ok: true, events: [{ ...at(world, self), type: 'ANNOUNCED', target: null, data: { event_id: action.event_id, summary: action.summary, ...news } }] };
   },
 };

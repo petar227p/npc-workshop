@@ -60,6 +60,7 @@ function readTriggers(x: unknown): Trigger[] {
   for (const t of x as Record<string, unknown>[]) {
     if (t?.kind === 'on_spoken_to') out.push({ kind: 'on_spoken_to' });
     if (t?.kind === 'every_hours' && typeof t.hours === 'number' && typeof t.cue === 'string') out.push({ kind: 'every_hours', hours: t.hours, cue: t.cue });
+    if ((t?.kind === 'on_meet' || t?.kind === 'on_new_memory') && typeof t.cue === 'string') out.push({ kind: t.kind, cue: t.cue });
   }
   return out;
 }
@@ -473,32 +474,59 @@ function Schedule({ places, home, value, onChange }: { places: string[]; home: s
   );
 }
 
+type CueTrigger = Extract<Trigger, { kind: 'on_meet' | 'on_new_memory' }>;
+const DEFAULT_CUE: Record<CueTrigger['kind'], string> = {
+  on_meet: "Someone has just come by. Pass on one piece of news they haven't heard (TELL).",
+  on_new_memory: "You've heard news since you last acted on your own. Share it with everyone around (RETELL or ANNOUNCE).",
+};
+
 function Triggers({ triggers, onChange }: { triggers: Trigger[]; onChange: (t: Trigger[]) => void }) {
   const spoken = triggers.some((t) => t.kind === 'on_spoken_to');
   const timer = triggers.find((t): t is Extract<Trigger, { kind: 'every_hours' }> => t.kind === 'every_hours');
-  // Always in the same order (spoken to, then the timer), so saved files don't churn.
-  const emit = (s: boolean, t: typeof timer) => onChange([...(s ? [{ kind: 'on_spoken_to' } as const] : []), ...(t ? [t] : [])]);
-  // Unticking the timer keeps its hours and cue here, so ticking it again brings them back.
-  const lastTimer = useRef(timer ?? DEFAULT_TIMER);
-  if (timer) lastTimer.current = timer;
+  const meet = triggers.find((t): t is Extract<Trigger, { kind: 'on_meet' }> => t.kind === 'on_meet');
+  const heard = triggers.find((t): t is Extract<Trigger, { kind: 'on_new_memory' }> => t.kind === 'on_new_memory');
+  const now = { spoken, timer, meet, heard };
+  // Always in the same order (spoken to, the timer, meeting, news), so saved files don't churn.
+  const emit = (n: typeof now) =>
+    onChange([...(n.spoken ? [{ kind: 'on_spoken_to' } as const] : []), ...(n.timer ? [n.timer] : []), ...(n.meet ? [n.meet] : []), ...(n.heard ? [n.heard] : [])]);
+  // Unticking a trigger keeps its settings here, so ticking it again brings them back.
+  const last = useRef({ timer: timer ?? DEFAULT_TIMER, on_meet: meet ?? { kind: 'on_meet' as const, cue: DEFAULT_CUE.on_meet }, on_new_memory: heard ?? { kind: 'on_new_memory' as const, cue: DEFAULT_CUE.on_new_memory } });
+  if (timer) last.current.timer = timer;
+  if (meet) last.current.on_meet = meet;
+  if (heard) last.current.on_new_memory = heard;
   // The hours as typed: a box being edited may be empty or out of range; only a usable number reaches the draft,
   // and leaving the box shows the draft's value again.
   const [hoursText, setHoursText] = useState<string | null>(null);
   const typeHours = (text: string) => {
     setHoursText(text);
     const n = Number(text);
-    if (timer && Number.isInteger(n) && n >= 1 && n <= MAX_TRIGGER_HOURS) emit(spoken, { ...timer, hours: n });
+    if (timer && Number.isInteger(n) && n >= 1 && n <= MAX_TRIGGER_HOURS) emit({ ...now, timer: { ...timer, hours: n } });
   };
+  const cued = (kind: CueTrigger['kind'], t: CueTrigger | undefined, set: (t: CueTrigger | undefined) => typeof now) => (
+    <>
+      <label className="check">
+        <input type="checkbox" checked={t !== undefined} onChange={(e) => emit(set(e.target.checked ? last.current[kind] : undefined))} />
+        <span>
+          <b>{TRIGGER_INFO[kind].label}</b> <span className="muted">{TRIGGER_INFO[kind].description}</span>
+        </span>
+      </label>
+      {t && (
+        <Field label={`Cue ${kind === 'on_meet' ? 'on meeting someone' : 'on hearing news'}`} hint="what it should do then">
+          <input value={t.cue} maxLength={300} onChange={(e) => emit(set({ ...t, cue: e.target.value }))} />
+        </Field>
+      )}
+    </>
+  );
   return (
     <div className="facts">
       <label className="check">
-        <input type="checkbox" checked={spoken} onChange={(e) => emit(e.target.checked, timer)} />
+        <input type="checkbox" checked={spoken} onChange={(e) => emit({ ...now, spoken: e.target.checked })} />
         <span>
           <b>{TRIGGER_INFO.on_spoken_to.label}</b> <span className="muted">{TRIGGER_INFO.on_spoken_to.description}</span>
         </span>
       </label>
       <label className="check">
-        <input type="checkbox" checked={timer !== undefined} onChange={(e) => emit(spoken, e.target.checked ? lastTimer.current : undefined)} />
+        <input type="checkbox" checked={timer !== undefined} onChange={(e) => emit({ ...now, timer: e.target.checked ? last.current.timer : undefined })} />
         <span>
           <b>{TRIGGER_INFO.every_hours.label}</b> <span className="muted">{TRIGGER_INFO.every_hours.description}</span>
         </span>
@@ -516,13 +544,15 @@ function Triggers({ triggers, onChange }: { triggers: Trigger[]; onChange: (t: T
             />
           </Field>
           <Field label="Cue on the timer" hint="what it should do, unasked">
-            <input value={timer.cue} maxLength={300} onChange={(e) => emit(spoken, { ...timer, cue: e.target.value })} />
+            <input value={timer.cue} maxLength={300} onChange={(e) => emit({ ...now, timer: { ...timer, cue: e.target.value } })} />
           </Field>
         </div>
       )}
-      {!spoken && !timer && (
+      {cued('on_meet', meet, (t) => ({ ...now, meet: t as typeof meet }))}
+      {cued('on_new_memory', heard, (t) => ({ ...now, heard: t as typeof heard }))}
+      {triggers.length === 0 && (
         <div className="note bad" role="alert">
-          With neither ticked it never acts: it hears what is said to it and stays silent.
+          With nothing ticked it never acts: it hears what is said to it and stays silent.
         </div>
       )}
     </div>

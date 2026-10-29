@@ -96,6 +96,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .ledger li.reject { border-color: var(--bad); color: #f3c4bc; }
 .ledger li.clock { color: var(--muted); }
 .ledger time { color: var(--muted); margin-right: 6px; font-family: 'Pixelify Sans', monospace; }
+.story + .story { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.story-head { font-size: 13px; overflow-wrap: anywhere; }
+.story ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.story li { display: grid; grid-template-columns: 4.5em 3.5em 1fr; gap: 8px; align-items: center; }
+.story .who { color: var(--accent); }
+.story .confidence { margin-top: 0; }
+.story .muted { overflow-wrap: anywhere; }
 
 /* Page tabs */
 .tabs { display: flex; gap: 4px; margin-left: auto; }

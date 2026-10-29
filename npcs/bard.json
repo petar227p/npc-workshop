@@ -1,0 +1,52 @@
+{
+  "id": "bard",
+  "name": "Pell",
+  "verbs": [
+    "SAY",
+    "EMOTE",
+    "RETELL"
+  ],
+  "model_verbs": [
+    "SAY",
+    "EMOTE",
+    "RETELL"
+  ],
+  "facts": [
+    "clock",
+    "memories"
+  ],
+  "perception_radius": 5,
+  "model": "muse_spark_open",
+  "effort": "low",
+  "location": "tavern",
+  "schedule": [
+    {
+      "from": 2,
+      "place": "cottage"
+    },
+    {
+      "from": 18,
+      "place": "tavern"
+    }
+  ],
+  "sprite": 84,
+  "start": {
+    "gold": 5,
+    "stock": {}
+  },
+  "catalogue": {},
+  "triggers": [
+    {
+      "kind": "on_spoken_to"
+    },
+    {
+      "kind": "on_new_memory",
+      "cue": "You've picked up a new tale since you last performed. Tell it to everyone in the tavern now (RETELL): the newest one you heard, with a bard's flourish, but built on what you were told."
+    }
+  ],
+  "cue": "Reply to the customer's last words. If they ask for a tale, tell everyone one you know (RETELL).",
+  "fallbacks": {
+    "rejected": "A bard forgets a verse now and then. Another time!",
+    "unavailable": "My lute's out of tune, friend. In a moment."
+  }
+}

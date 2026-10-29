@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { DEFAULT_SPRITE, type ContractView, type ModelChoice, type StateView } from '@blacksmith/shared';
+import { DEFAULT_SPRITE, type ContractView, type KnowerView, type ModelChoice, type NewsView, type StateView } from '@blacksmith/shared';
 import type { NpcModel } from './agents/npc';
 import { artView, type Gallery } from './art';
-import { availableStock, placeAt, type World } from './engine';
-import { newVillage, type NpcSpec } from './npcs';
+import { availableStock, memoriesOf, placeAt, type World } from './engine';
+import { nameOf, newVillage, summarize, type NpcSpec } from './npcs';
 import type { ImageClient } from './models/image';
 
 // One world per browser, in memory. `busy` locks the world while an NPC is thinking, so a tick or an
@@ -99,6 +99,29 @@ export function createSessionStore(limits: SessionLimits = {}) {
 }
 
 const VIEW_EVENTS = 300;
+const NEWS_SHOWN = 6;
+
+// The latest events anyone in the cast knows about, each with who knows it and how sure they are.
+function newsView(world: World, cast: Cast): NewsView[] {
+  const knowers = new Map<string, KnowerView[]>();
+  for (const n of cast) {
+    for (const m of memoriesOf(world, n.id)) {
+      const k: KnowerView = { id: n.id, name: n.name, how: m.how_learned, told_by: m.told_by && nameOf(m.told_by), confidence: m.confidence, claim: m.claim };
+      knowers.set(m.event_id, [...(knowers.get(m.event_id) ?? []), k]);
+    }
+  }
+  return world.events
+    .filter((e) => knowers.has(e.id))
+    .slice(-NEWS_SHOWN)
+    .reverse()
+    .map((e) => ({
+      event_id: e.id,
+      tick: e.tick,
+      place: e.location,
+      text: summarize(world, e) ?? e.type,
+      knowers: knowers.get(e.id)!.sort((a, b) => b.confidence - a.confidence),
+    }));
+}
 
 // The NPCs a view shows: their names label each seller's stock (an actor without one is shown by its id),
 // and where they are comes from their schedule.
@@ -112,10 +135,12 @@ export function toView(world: World, busy: boolean, art: Gallery = new Map(), ca
   return {
     tick: world.tick,
     people: cast.map((n) => ({ id: n.id, name: n.name, sprite: n.sprite ?? DEFAULT_SPRITE, place: placeAt(n, world.tick), model: n.model })),
+    news: newsView(world, cast),
     gold: world.gold[customer] ?? 0,
     goods: { ...(world.stock[customer] ?? {}) },
+    // Villagers who own nothing have an empty stock: no panel for them.
     shops: Object.keys(world.stock)
-      .filter((id) => id !== customer)
+      .filter((id) => id !== customer && Object.keys(world.stock[id]).length > 0)
       .map((id) => ({ id, name: names[id] ?? id, stock: availableStock(world, id) })),
     contracts,
     items: world.items.filter((i) => i.owner === customer),

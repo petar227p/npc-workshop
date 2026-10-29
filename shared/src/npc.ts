@@ -34,6 +34,8 @@ const ScheduleSchema = z
 const TriggerSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('on_spoken_to') }).strict(),
   z.object({ kind: z.literal('every_hours'), hours: z.number().int().min(1).max(MAX_TRIGGER_HOURS), cue }).strict(),
+  z.object({ kind: z.literal('on_meet'), cue }).strict(),
+  z.object({ kind: z.literal('on_new_memory'), cue }).strict(),
 ]);
 
 export const NpcFileSchema = z

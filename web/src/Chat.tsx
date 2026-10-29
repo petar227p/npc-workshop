@@ -20,8 +20,8 @@ type Props = {
 // A Tiny Dungeon character frame at 3x, as the portrait's background.
 const portraitStyle = (frame: number) => ({ backgroundPosition: `-${(frame % 12) * 48}px -${Math.floor(frame / 12) * 48}px` });
 
-// Display names come with each seller's stock in the view.
-export const nameOf = (view: StateView, id: string) => view.shops.find((s) => s.id === id)?.name ?? id;
+// Display names come with the people in the view (and each seller's stock).
+export const nameOf = (view: StateView, id: string) => view.people.find((p) => p.id === id)?.name ?? view.shops.find((s) => s.id === id)?.name ?? id;
 
 export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRef }: Props) {
   const [text, setText] = useState('');
@@ -57,9 +57,9 @@ export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRe
           <label className="chat-name">
             <span className="sr-only">Talking to </span>
             <select value={talkTo} onChange={(e) => onTalkTo(e.target.value)} disabled={thinking} aria-label="Who you talk to">
-              {view.shops.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
+              {view.people.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
                 </option>
               ))}
             </select>
@@ -110,6 +110,8 @@ export function between(e: EngineEvent, npc: string, view: StateView): boolean {
     case 'GIVEN':
     case 'GIFT_REFUSED':
       return toPlayer || (e.actor === 'player' && e.target === npc);
+    case 'TOLD':
+      return toPlayer;
     case 'CONTRACT_PROPOSED':
     case 'CONTRACT_REFUSED':
     case 'WORK_STARTED':
@@ -155,6 +157,13 @@ function Entry({ event: e, view, disabled, onAccept }: { event: EngineEvent; vie
       );
     case 'GIVEN':
       return <div className="note ok">{gaveText(e, view)}</div>;
+    // The line itself is the SAID after it; this is the ledger's side: which event, how sure.
+    case 'TOLD':
+      return (
+        <div className="note">
+          {nameOf(view, e.actor)} passes on news ({e.data.event_id}, {Math.round(e.data.confidence * 100)}% sure).
+        </div>
+      );
     case 'GIFT_REFUSED':
       return <div className="note">{refusedText(e, view)}</div>;
     case 'CONTRACT_PROPOSED': {

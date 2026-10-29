@@ -4,11 +4,11 @@ import type { Catalogue, Start } from './trade';
 // What the NPC editor can build from, as plain constants (no zod), so the browser can import them.
 // Rules behind each verb and fact block live in server code; the editor only picks from these lists.
 
-export const LEDGER_VERBS = ['SAY', 'EMOTE', 'OFFER', 'COUNTER_OFFER', 'REFUSE', 'ACCEPT', 'START_WORK', 'GIVE'] as const;
+export const LEDGER_VERBS = ['SAY', 'EMOTE', 'OFFER', 'COUNTER_OFFER', 'REFUSE', 'ACCEPT', 'START_WORK', 'GIVE', 'TELL', 'RETELL', 'ANNOUNCE'] as const;
 export type LedgerVerb = (typeof LEDGER_VERBS)[number];
 
 // The verbs a model can answer with (each has a flat-schema mapping on the server). ACCEPT and START_WORK are code-only.
-export const MODEL_VERBS = ['SAY', 'EMOTE', 'OFFER', 'COUNTER_OFFER', 'REFUSE', 'GIVE'] as const satisfies readonly LedgerVerb[];
+export const MODEL_VERBS = ['SAY', 'EMOTE', 'OFFER', 'COUNTER_OFFER', 'REFUSE', 'GIVE', 'TELL', 'RETELL', 'ANNOUNCE'] as const satisfies readonly LedgerVerb[];
 export type ModelVerb = (typeof MODEL_VERBS)[number];
 
 export const VERB_INFO: Record<LedgerVerb, string> = {
@@ -20,9 +20,12 @@ export const VERB_INFO: Record<LedgerVerb, string> = {
   ACCEPT: 'Take an offer made to it: pays, and gets in-stock goods at once. Customers use this, not sellers.',
   START_WORK: 'Start the timer on an accepted made-to-order job. Needed when the catalogue has made-to-order items.',
   GIVE: 'Hand over gold, goods or an item it owns, for nothing: a quest reward, a gift. The ledger checks it has them. Not for sellers: an NPC with a catalogue can\'t have it, or it could be talked into giving its stock away.',
+  TELL: 'Pass news on to whoever it is talking to. It must cite an event it saw or was told about, and the listener must be with it. Each retelling is less sure. Needs the "News it knows" facts.',
+  RETELL: 'Tell a piece of news to everyone around, the way a bard sings it. Same check: only an event it knows. The wording may drift; the event it cites can\'t.',
+  ANNOUNCE: 'Cry a piece of news to everyone around, only at its own place (the crier at the notice board). Only events it knows.',
 };
 
-export const FACT_BLOCKS = ['clock', 'purse', 'stock', 'inventory', 'catalogue', 'price_floor', 'open_offers'] as const;
+export const FACT_BLOCKS = ['clock', 'purse', 'stock', 'inventory', 'catalogue', 'price_floor', 'open_offers', 'memories'] as const;
 export type FactBlock = (typeof FACT_BLOCKS)[number];
 
 export const FACT_INFO: Record<FactBlock, { label: string; description: string }> = {
@@ -33,6 +36,7 @@ export const FACT_INFO: Record<FactBlock, { label: string; description: string }
   catalogue: { label: 'What it sells', description: 'Item types with stat ranges and minimum making time; goods with their minimum price.' },
   price_floor: { label: 'Price floor', description: 'How the ledger sets the lowest price it accepts.' },
   open_offers: { label: 'Open offers', description: 'Its offers to this customer that are still open.' },
+  memories: { label: 'News it knows', description: 'What it saw or was told, with event ids and how sure it is. Only things within its perception radius, or passed on to it. What TELL, RETELL and ANNOUNCE need.' },
 };
 
 // Which model voices an NPC. The server maps each to a provider and model id from its env.
@@ -56,14 +60,20 @@ export const EFFORT_INFO: Record<EffortChoice, { label: string; description: str
 };
 
 // When an NPC takes a turn. Being spoken to uses its cue; a timer has a cue of its own (what to do when it comes round).
-export const TRIGGER_KINDS = ['on_spoken_to', 'every_hours'] as const;
+export const TRIGGER_KINDS = ['on_spoken_to', 'every_hours', 'on_meet', 'on_new_memory'] as const;
 export type TriggerKind = (typeof TRIGGER_KINDS)[number];
-export type Trigger = { kind: 'on_spoken_to' } | { kind: 'every_hours'; hours: number; cue: string };
+export type Trigger =
+  | { kind: 'on_spoken_to' }
+  | { kind: 'every_hours'; hours: number; cue: string }
+  | { kind: 'on_meet'; cue: string }
+  | { kind: 'on_new_memory'; cue: string };
 export const MAX_TRIGGER_HOURS = 48;
 
 export const TRIGGER_INFO: Record<TriggerKind, { label: string; description: string }> = {
   on_spoken_to: { label: 'When spoken to', description: 'Replies each time someone talks to it, with the cue below. Without it, it hears but never answers.' },
   every_hours: { label: 'On a timer', description: 'Acts on its own when the clock passes every N hours (a call to customers, a gift). A capped number of NPCs act per tick.' },
+  on_meet: { label: 'On meeting someone', description: "Acts when its day brings it to someone it wasn't with an hour before, and it knows news they haven't heard. Talks to them." },
+  on_new_memory: { label: 'On hearing news', description: 'Acts when it has learned something since it last acted on its own, once it is at its own place (the bard at the tavern). Speaks to everyone around.' },
 };
 
 // From `from` o'clock it is at `place`, until the next entry's hour (the last entry runs on past midnight to the first).

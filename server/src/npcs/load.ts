@@ -26,6 +26,9 @@ const LEDGER = {
   ACCEPT: verbs.ACCEPT,
   START_WORK: verbs.START_WORK,
   GIVE: verbs.GIVE,
+  TELL: verbs.TELL,
+  RETELL: verbs.RETELL,
+  ANNOUNCE: verbs.ANNOUNCE,
 };
 
 // The offer verbs' schemas are built from the NPC's own catalogue, GIVE's from what it may have in stock.
@@ -52,6 +55,9 @@ export function buildNpc(input: unknown, places: readonly string[] | null = PLAC
   const d = parsed.data;
   const missing = places ? offMap(d, places) : [];
   if (missing.length > 0) return { ok: false, errors: missing };
+  // Passing news on cites an event id, which only the memories block tells it.
+  const tells = d.verbs.filter((v) => v === 'TELL' || v === 'RETELL' || v === 'ANNOUNCE');
+  if (tells.length > 0 && !d.facts.includes('memories')) return { ok: false, errors: [`${tells.join(', ')} needs the "News it knows" facts, or it can't know an event id to pass on`] };
   try {
     const npc = defineNpc({
       id: d.id,

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MAX_EMOTE_LENGTH, MAX_SAY_LENGTH } from './limits';
+import { MAX_EMOTE_LENGTH, MAX_NEWS_LENGTH, MAX_SAY_LENGTH } from './limits';
 import { GiftSchema, TermsSchema } from './trade';
 
 // Shapes from the handoff. The model proposes these; the server validates them before anything changes.
@@ -15,13 +15,15 @@ export const VERBS = [
   'DELIVER',
   'GIVE',
   'TELL',
-  'REACT',
+  'RETELL',
   'ANNOUNCE',
 ] as const;
 export const VerbSchema = z.enum(VERBS);
 export type Verb = z.infer<typeof VerbSchema>;
 
-// One schema per verb, so an NPC definition can list exactly the verbs it may use. TELL / REACT / ANNOUNCE arrive with the villagers.
+// One schema per verb, so an NPC definition can list exactly the verbs it may use.
+const news = z.string().min(1).max(MAX_NEWS_LENGTH);
+
 export const ACTION_SCHEMAS = {
   SAY: z.object({ action: z.literal('SAY'), text: z.string().min(1).max(MAX_SAY_LENGTH) }),
   EMOTE: z.object({ action: z.literal('EMOTE'), text: z.string().min(1).max(MAX_EMOTE_LENGTH) }),
@@ -32,6 +34,10 @@ export const ACTION_SCHEMAS = {
   START_WORK: z.object({ action: z.literal('START_WORK'), contract_id: z.string() }),
   DELIVER: z.object({ action: z.literal('DELIVER'), contract_id: z.string() }),
   GIVE: z.object({ action: z.literal('GIVE'), to: z.string().nullable(), gift: GiftSchema }), // to: null = whoever it's talking to
+  // News: the event it cites must be one it knows; `summary` is its own wording, which may drift from what happened.
+  TELL: z.object({ action: z.literal('TELL'), to: z.string().nullable(), event_id: z.string(), summary: news }), // to: null = whoever it's talking to
+  RETELL: z.object({ action: z.literal('RETELL'), event_id: z.string(), summary: news }),
+  ANNOUNCE: z.object({ action: z.literal('ANNOUNCE'), event_id: z.string(), summary: news }),
 };
 
 export const ActionSchema = z.discriminatedUnion('action', [
@@ -44,6 +50,9 @@ export const ActionSchema = z.discriminatedUnion('action', [
   ACTION_SCHEMAS.START_WORK,
   ACTION_SCHEMAS.DELIVER,
   ACTION_SCHEMAS.GIVE,
+  ACTION_SCHEMAS.TELL,
+  ACTION_SCHEMAS.RETELL,
+  ACTION_SCHEMAS.ANNOUNCE,
 ]);
 export type Action = z.infer<typeof ActionSchema>;
 export type ActionOf<V extends Action['action']> = Extract<Action, { action: V }>;
@@ -60,15 +69,6 @@ export const EventSchema = z.object({
 });
 export type GameEvent = z.infer<typeof EventSchema>;
 
-export const MemorySchema = z.object({
-  npc: z.string(),
-  event_id: z.string(),
-  how_learned: z.enum(['witnessed', 'told_by']),
-  told_by: z.string().nullable(),
-  confidence: z.number().min(0).max(1),
-  summary: z.string(),
-});
-export type Memory = z.infer<typeof MemorySchema>;
 
 export * from './clock';
 export * from './events';

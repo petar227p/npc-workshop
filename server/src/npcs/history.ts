@@ -1,6 +1,7 @@
 import { clockText, type Gift } from '@blacksmith/shared';
 import type { World } from '../engine';
 import { describe } from './facts';
+import { nameOf } from './news';
 
 const gift = (g: Gift, itemName: string | null) =>
   g.kind === 'gold' ? `${g.amount} gold` : g.kind === 'good' ? `${g.qty} × ${g.good}` : `${JSON.stringify(itemName ?? g.item_id)} (${g.item_id})`;
@@ -12,6 +13,8 @@ export function historyFor(npcId: string, name: string): (world: World, customer
   return (world, customer) => {
     // Accepts, work and deliveries are about a contract; only this NPC's own sales belong in its history.
     const sold = (id: string) => world.contracts[id]?.seller === npcId;
+    // The player is "Customer"; another villager it has met goes by name.
+    const them = customer === 'player' ? 'Customer' : nameOf(customer);
     const lines: string[] = [];
     for (const e of world.events) {
       switch (e.type) {
@@ -22,7 +25,7 @@ export function historyFor(npcId: string, name: string): (world: World, customer
             e.actor === npcId && (e.target === customer || e.target === null)
               ? name
               : e.actor === customer && (e.target === npcId || e.target === null)
-                ? 'Customer'
+                ? them
                 : null;
           // JSON-quoted, so a customer's quotes and newlines can't forge ledger lines or the NPC's words.
           if (speaker) lines.push(`${speaker}: ${JSON.stringify(e.data.text)}`);
@@ -38,6 +41,15 @@ export function historyFor(npcId: string, name: string): (world: World, customer
         case 'GIFT_REFUSED':
           if (e.actor === npcId && e.target === customer) lines.push(`[Customer tried to give ${name} ${gift(e.data.gift, e.data.item_name)}; ${name} handed it back: not ${name}'s trade]`);
           if (e.actor === customer && e.target === npcId) lines.push(`[${name} tried to give the customer ${gift(e.data.gift, e.data.item_name)}; the customer handed it back]`);
+          break;
+        // So it doesn't tell the same thing twice, and knows what it was told.
+        case 'TOLD':
+          if (e.actor === npcId && e.target === customer) lines.push(`[${name} told ${them} about ${e.data.event_id}]`);
+          if (e.actor === customer && e.target === npcId) lines.push(`[${them} told ${name} about ${e.data.event_id}]`);
+          break;
+        case 'RETOLD':
+        case 'ANNOUNCED':
+          if (e.actor === npcId) lines.push(`[${name} ${e.type === 'RETOLD' ? 'retold' : 'announced'} ${e.data.event_id} to everyone around]`);
           break;
         case 'CONTRACT_PROPOSED':
           if (e.actor === npcId && e.data.customer === customer) {
