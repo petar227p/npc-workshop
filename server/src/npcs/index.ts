@@ -1,11 +1,13 @@
 import { createEngine, createWorld, senses, type World } from '../engine';
 import { PLACE_NAMES, placeDistance } from '../village';
 import { npcFiles, toNpc } from './load';
-import { registerNames } from './news';
+import { registerLabels, registerNames } from './news';
 import { player } from './player';
 
 // Every actor in the village: the player plus each npcs/<id>.json. Adding an NPC is one file (and its persona).
 export const NPC_FILES = npcFiles();
+// Labels first: an NPC's words for things another file labels are built with them.
+registerLabels(NPC_FILES.list());
 export const NPCS = NPC_FILES.list().map(toNpc);
 export const ACTORS = [player, ...NPCS];
 
@@ -26,5 +28,5 @@ export const smith = found;
 
 export { player };
 export { buildNpc, npcFiles, readDraft, type Built, type NpcDirs, type NpcFiles } from './load';
-export { memoriesText, nameOf, summarize } from './news';
+export { labelOf, memoriesText, nameOf, summarize } from './news';
 export { defineNpc, type NpcDefinition, type NpcSpec } from './types';

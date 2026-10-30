@@ -27,6 +27,11 @@ export type WorldReport = {
   hours_ago: number; // reported late: who saw it is worked out from where everyone was then
 };
 
+// What an actor holds now, as the game's own code says (see InventorySyncSchema): new totals, and why.
+export type InventorySync = { actor: string; gold?: number; stock?: Record<string, number>; reason: string };
+// One thing a sync changed, from what the ledger had to what the game says.
+export type Change = { what: string; from: number; to: number }; // what: 'gold' or a good's name
+
 type Base<T extends string, D> = {
   id: string;
   tick: number;
@@ -53,6 +58,7 @@ export type EngineEvent =
   | Base<'RETOLD', News> // to everyone around: its witnesses heard it
   | Base<'ANNOUNCED', News> // cried at the actor's own place: its witnesses heard it
   | Base<'HAPPENED', { text: string; involved: string[]; seen_by: Sighting['kind']; notable: boolean; reported_tick: number }> // actor: 'world'; narrative only. tick: when it happened; reported_tick: when it was logged (later, if reported late)
+  | Base<'SYNCED', { changes: Change[]; reason: string }> // actor: 'world'; target: whose inventory the game changed itself. Nobody sees it
   | Base<'TRIGGER_FIRED', { trigger: Trigger }> // an NPC acting on its own; its turn's events follow
   | Base<'ACTION_REJECTED', { verb: string | null; reason: string; proposed: unknown }>
   | Base<'CLOCK_ADVANCED', { from: number }>;
@@ -102,3 +108,34 @@ export type ActionResponse = {
   events: EngineEvent[];
   view: StateView;
 };
+
+// The dev API (/api/v1): a game's own world, made from the NPCs it picks and driven with a bearer token, not a cookie.
+// The game sends what the player did and renders the events it gets back; the ledger still decides everything.
+
+// An NPC a world can be made with. `sells`: what is in its catalogue, made to order or from stock.
+// `labels`: what it calls the things it deals in, by their names in the world (a game's own item ids).
+export type ApiNpc = { id: string; name: string; model: ModelChoice; place: string; verbs: string[]; sells: string[]; labels: Record<string, string>; answers: boolean };
+
+// The world as the game sees it: the player's side, who is where, and the news, without the log (that is /events).
+// `last_event_id` is where to read the log on from; `calls_left` is how many model calls this world may still make.
+export type ApiState = Omit<StateView, 'events' | 'busy'> & {
+  world_id: string;
+  last_event_id: string | null;
+  busy: string | null; // who is answering, while a model call runs
+  calls_left: number;
+};
+
+// A line an NPC said in reply, so a game can show it without reading the events.
+export type ApiLine = { by: string; name: string; text: string; to: string | null };
+
+export type ApiResult = {
+  ok: boolean;
+  reason: string | null; // why the ledger refused the player's own action
+  outcome: 'acted' | 'fallback' | 'unavailable' | null; // the NPC's turn, if one ran
+  events: EngineEvent[]; // what this call added to the log, in order
+  said: ApiLine[];
+  state: ApiState;
+};
+
+export type ApiWorldCreated = { world_id: string; token: string; npcs: string[]; state: ApiState };
+export type ApiEvents = { events: EngineEvent[]; last_event_id: string | null; more: boolean };

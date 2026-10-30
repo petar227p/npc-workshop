@@ -1,11 +1,12 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { NpcDraftSchema, NpcFileSchema, type Catalogue, type ModelVerb, type NpcArt, type NpcDraft, type Start } from '@blacksmith/shared';
+import { NpcDraftSchema, NpcFileSchema, type Catalogue, type ModelVerb, type NpcArt, type NpcDraft } from '@blacksmith/shared';
 import * as flat from '../agents/flat';
 import { verbs } from '../engine';
 import { PLACE_NAMES } from '../village';
 import { factsFor } from './facts';
 import { historyFor } from './history';
+import { labelsFor } from './news';
 import { defineNpc, type NpcDefinition } from './types';
 
 // NPCs as data: npcs/<id>.json holds the settings, prompts/<id>.md the persona, npcs/art/<id>-<n>.<ext> its reference
@@ -32,11 +33,19 @@ const LEDGER = {
   ANNOUNCE: verbs.ANNOUNCE,
 };
 
-// The offer verbs' schemas are built from the NPC's own catalogue, GIVE's from what it may have in stock.
-function modelVerb(v: ModelVerb, catalogue: Catalogue, start: Start): flat.FlatVerb {
-  if (v === 'OFFER') return flat.OFFER(catalogue);
-  if (v === 'COUNTER_OFFER') return flat.COUNTER_OFFER(catalogue);
-  if (v === 'GIVE') return flat.GIVE([...new Set([...Object.keys(start.stock), ...Object.keys(catalogue.in_stock ?? {}), ...Object.keys(catalogue.made_to_order?.materials ?? {})])]);
+// Everything it deals in, by name: what its catalogue lists, what it starts with, and what its labels name (a game may
+// sync those in later). Item types are only made, never held, so GIVE leaves them out.
+function goodsOf(d: Pick<NpcDraft, 'start' | 'catalogue' | 'labels'>): string[] {
+  const types = d.catalogue.made_to_order?.items ?? {};
+  const named = [...Object.keys(d.start.stock), ...Object.keys(d.catalogue.in_stock ?? {}), ...Object.keys(d.catalogue.made_to_order?.materials ?? {}), ...Object.keys(d.labels)];
+  return [...new Set(named)].filter((n) => !Object.hasOwn(types, n));
+}
+
+// The offer verbs' schemas are built from the NPC's own catalogue, GIVE's from what it may hold; all in its words.
+function modelVerb(v: ModelVerb, catalogue: Catalogue, goods: string[], words: flat.Words): flat.FlatVerb {
+  if (v === 'OFFER') return flat.OFFER(catalogue, words);
+  if (v === 'COUNTER_OFFER') return flat.COUNTER_OFFER(catalogue, words);
+  if (v === 'GIVE') return flat.GIVE(goods, words);
   return flat[v];
 }
 
@@ -60,6 +69,10 @@ export function buildNpc(input: unknown, places: readonly string[] | null = PLAC
   const tells = d.verbs.filter((v) => v === 'TELL' || v === 'RETELL' || v === 'ANNOUNCE');
   if (tells.length > 0 && !d.facts.includes('memories')) return { ok: false, errors: [`${tells.join(', ')} needs the "News it knows" facts, or it can't know an event id to pass on`] };
   try {
+    // What it calls each thing, the same in its schema, its facts and its history. Throws if two things share a word.
+    const label = labelsFor(d.labels);
+    const goods = goodsOf(d);
+    const words = flat.wordsFor([...goods, ...Object.keys(d.catalogue.made_to_order?.items ?? {})], label);
     const npc = defineNpc({
       id: d.id,
       name: d.name,
@@ -71,12 +84,13 @@ export function buildNpc(input: unknown, places: readonly string[] | null = PLAC
       art: d.art,
       catalogue: d.catalogue,
       start: d.start,
-      modelVerbs: d.model_verbs.map((v) => modelVerb(v, d.catalogue, d.start)),
+      labels: d.labels,
+      modelVerbs: d.model_verbs.map((v) => modelVerb(v, d.catalogue, goods, words)),
       perception_radius: d.perception_radius,
       model: d.model,
       effort: d.effort,
-      facts: factsFor(d.id, d.facts, d.catalogue),
-      history: historyFor(d.id, d.name),
+      facts: factsFor(d.id, d.facts, d.catalogue, label),
+      history: historyFor(d.id, d.name, label),
       triggers: d.triggers,
       cue: d.cue,
       fallbacks: d.fallbacks,

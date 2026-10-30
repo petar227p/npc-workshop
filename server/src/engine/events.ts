@@ -83,6 +83,15 @@ export function apply(world: World, event: EngineEvent): World {
       }
       break;
     }
+    // The game's own change (engine/sync.ts): the totals it says, for gold and for each good it names.
+    case 'SYNCED': {
+      const to = event.target as string;
+      for (const c of event.data.changes) {
+        if (c.what === 'gold') w.gold[to] = c.to;
+        else (w.stock[to] ??= {})[c.what] = c.to;
+      }
+      break;
+    }
     // News changes no state: who knows what is read from the log itself (memory.ts).
     case 'TOLD':
     case 'RETOLD':

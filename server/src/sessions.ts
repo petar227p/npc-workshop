@@ -66,40 +66,69 @@ export function guestSession(): Session {
   return newSession('', 0);
 }
 
-export function createSessionStore(limits: SessionLimits = {}) {
-  const { maxSessions = 500, maxNewPerMinute = 60, maxNewPerIpPerMinute = 10, minIdleMs = 30 * 60_000, now = Date.now } = limits;
-  const sessions = new Map<string, Session>();
-  let recent: { at: number; ip: string | null }[] = []; // sessions created in the last minute
+// Anything kept in memory per visitor (a browser's session, a game's world): capped in number and in how fast new
+// ones are made, overall and per address. A full store evicts only one idle long enough, never one in use.
+export type Caps = { max: number; perMinute: number; perIpPerMinute: number; minIdleMs: number; now: () => number };
+export type CapText = { fromIp: string; overall: string; full: string }; // what each refusal says
+type Kept = { id: string; lastSeen: number; busy: unknown };
+
+export function cappedStore<T extends Kept>(caps: Caps, text: CapText) {
+  const kept = new Map<string, T>();
+  let recent: { at: number; ip: string | null }[] = []; // made in the last minute
 
   return {
-    get(id: string | undefined): Session | undefined {
-      const s = id ? sessions.get(id) : undefined;
-      if (s) s.lastSeen = now();
-      return s;
+    get(id: string | undefined): T | undefined {
+      const e = id ? kept.get(id) : undefined;
+      if (e) e.lastSeen = caps.now();
+      return e;
     },
     // `ip` is the visitor's address when the host can tell us it reliably; null skips the per-address cap.
-    create(ip: string | null = null): Created {
-      const t = now();
+    add(ip: string | null, make: (id: string, now: number) => T): { ok: true; entry: T } | { ok: false; status: 429 | 503; error: string } {
+      const t = caps.now();
       recent = recent.filter((r) => t - r.at < 60_000);
-      if (ip !== null && recent.filter((r) => r.ip === ip).length >= maxNewPerIpPerMinute) {
-        return { ok: false, status: 429, error: 'Too many new games from your address. Try again in a minute.' };
-      }
-      if (recent.length >= maxNewPerMinute) return { ok: false, status: 429, error: 'Too many new visitors right now. Try again in a minute.' };
-      if (sessions.size >= maxSessions) {
-        // Evict the least recently seen session that has been idle long enough; never an active player.
-        const idle = [...sessions.values()]
-          .filter((s) => !s.busy && t - s.lastSeen >= minIdleMs)
+      if (ip !== null && recent.filter((r) => r.ip === ip).length >= caps.perIpPerMinute) return { ok: false, status: 429, error: text.fromIp };
+      if (recent.length >= caps.perMinute) return { ok: false, status: 429, error: text.overall };
+      if (kept.size >= caps.max) {
+        // Evict the least recently seen one that has been idle long enough; never one in use.
+        const idle = [...kept.values()]
+          .filter((e) => !e.busy && t - e.lastSeen >= caps.minIdleMs)
           .sort((a, b) => a.lastSeen - b.lastSeen)[0];
-        if (!idle) return { ok: false, status: 503, error: 'The forge is full. Try again later.' };
-        sessions.delete(idle.id);
+        if (!idle) return { ok: false, status: 503, error: text.full };
+        kept.delete(idle.id);
       }
       recent.push({ at: t, ip });
-      const s = newSession(randomUUID(), t);
-      sessions.set(s.id, s);
-      return { ok: true, session: s };
+      const e = make(randomUUID(), t);
+      kept.set(e.id, e);
+      return { ok: true, entry: e };
+    },
+    delete(id: string): boolean {
+      return kept.delete(id);
     },
     get size() {
-      return sessions.size;
+      return kept.size;
+    },
+  };
+}
+
+export function createSessionStore(limits: SessionLimits = {}) {
+  const { maxSessions = 500, maxNewPerMinute = 60, maxNewPerIpPerMinute = 10, minIdleMs = 30 * 60_000, now = Date.now } = limits;
+  const store = cappedStore<Session>(
+    { max: maxSessions, perMinute: maxNewPerMinute, perIpPerMinute: maxNewPerIpPerMinute, minIdleMs, now },
+    {
+      fromIp: 'Too many new games from your address. Try again in a minute.',
+      overall: 'Too many new visitors right now. Try again in a minute.',
+      full: 'The forge is full. Try again later.',
+    },
+  );
+
+  return {
+    get: store.get,
+    create(ip: string | null = null): Created {
+      const r = store.add(ip, newSession);
+      return r.ok ? { ok: true, session: r.entry } : r;
+    },
+    get size() {
+      return store.size;
     },
   };
 }

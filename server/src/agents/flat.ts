@@ -17,51 +17,74 @@ const str = { type: 'string' };
 const kind = (k: OfferKind) => ({ type: 'string', enum: [k] });
 const object = (properties: Record<string, unknown>) => ({ type: 'object', additionalProperties: false, required: Object.keys(properties), properties });
 
+// What the NPC calls each thing (its label, or the name itself) and back again: the model's enums and facts are in its
+// words, the action the ledger checks is in the world's names (a game's own item ids). A word it doesn't know passes
+// through as it is, for the ledger to refuse. Two things one word would make an answer ambiguous, so that is an error.
+export type Words = { word(name: string): string; name(word: string): string };
+export const PLAIN: Words = { word: (n) => n, name: (w) => w };
+export function wordsFor(names: readonly string[], label: (name: string) => string): Words {
+  const back = new Map<string, string>();
+  for (const n of new Set(names)) {
+    const w = label(n);
+    const taken = back.get(w);
+    if (taken !== undefined) throw new Error(`two things are called "${w}": '${taken}' and '${n}'`);
+    back.set(w, n);
+  }
+  return { word: label, name: (w) => back.get(w) ?? w };
+}
+const enumOf = (names: readonly string[], words: Words) => ({ type: 'string', enum: names.map(words.word) });
+
 // Enums come from the seller's catalogue, so the model can't name an item type, material or good it doesn't sell.
-const madeToOrder = (mto: MadeToOrder) =>
+const madeToOrder = (mto: MadeToOrder, words: Words) =>
   object({
     kind: kind('made_to_order'),
     item_name: str,
-    item_type: { type: 'string', enum: Object.keys(mto.items) },
+    item_type: enumOf(Object.keys(mto.items), words),
     description: str,
     stats: object({ damage: int, weight: int, durability: int }),
-    materials: { type: 'array', items: object({ material: { type: 'string', enum: Object.keys(mto.materials) }, qty: int }) },
+    materials: { type: 'array', items: object({ material: enumOf(Object.keys(mto.materials), words), qty: int }) },
     price: int,
     delivery_ticks: int,
     remarks: str,
   });
 
-const inStock = (goods: Record<string, unknown>) => object({ kind: kind('in_stock'), good: { type: 'string', enum: Object.keys(goods) }, qty: int, price: int, remarks: str });
+const inStock = (goods: Record<string, unknown>, words: Words) =>
+  object({ kind: kind('in_stock'), good: enumOf(Object.keys(goods), words), qty: int, price: int, remarks: str });
 
 function kindsOf(catalogue: Catalogue): OfferKind[] {
   return [...(catalogue.made_to_order ? ['made_to_order' as const] : []), ...(catalogue.in_stock ? ['in_stock' as const] : [])];
 }
 
 // One shape per kind the seller offers. Nested anyOf is fine in strict mode; only the root may not be one.
-function offerField(catalogue: Catalogue): Record<string, unknown> {
+function offerField(catalogue: Catalogue, words: Words): Record<string, unknown> {
   const shapes = [
-    ...(catalogue.made_to_order ? [madeToOrder(catalogue.made_to_order)] : []),
-    ...(catalogue.in_stock ? [inStock(catalogue.in_stock)] : []),
+    ...(catalogue.made_to_order ? [madeToOrder(catalogue.made_to_order, words)] : []),
+    ...(catalogue.in_stock ? [inStock(catalogue.in_stock, words)] : []),
   ];
   if (shapes.length === 0) throw new Error('OFFER and COUNTER_OFFER need a catalogue with something to sell');
   return shapes.length === 1 ? shapes[0] : { anyOf: shapes };
 }
 const contractId = () => ({ type: 'string' });
 
-// The flat offer becomes the action's `terms`. A made-to-order materials list becomes materials_used; fromEntries
-// makes own keys, so '__proto__' stays a plain (invalid) name. A seller with one kind may leave `kind` out.
-function terms(offer: unknown, kinds: OfferKind[]): Record<string, unknown> {
+// The flat offer becomes the action's `terms`, with the NPC's words turned back into names. A made-to-order materials
+// list becomes materials_used; fromEntries makes own keys, so '__proto__' stays a plain (invalid) name. A seller with
+// one kind may leave `kind` out.
+function terms(offer: unknown, kinds: OfferKind[], words: Words): Record<string, unknown> {
   if (!offer || typeof offer !== 'object') return {};
   const { materials, ...rest } = offer as Record<string, unknown>;
   const k = rest.kind ?? (kinds.length === 1 ? kinds[0] : undefined);
-  if (k !== 'made_to_order') return { ...rest, kind: k };
+  const named = (v: unknown) => (typeof v === 'string' ? words.name(v) : v);
+  if (k !== 'made_to_order') return { ...rest, kind: k, ...('good' in rest && { good: named(rest.good) }) };
   const totals = new Map<string, number>();
   if (Array.isArray(materials)) {
     for (const m of materials as { material?: unknown; qty?: unknown }[]) {
-      if (typeof m?.material === 'string' && typeof m.qty === 'number') totals.set(m.material, (totals.get(m.material) ?? 0) + m.qty);
+      if (typeof m?.material === 'string' && typeof m.qty === 'number') {
+        const name = words.name(m.material);
+        totals.set(name, (totals.get(name) ?? 0) + m.qty);
+      }
     }
   }
-  return { ...rest, kind: k, materials_used: Object.fromEntries(totals) };
+  return { ...rest, kind: k, ...('item_type' in rest && { item_type: named(rest.item_type) }), materials_used: Object.fromEntries(totals) };
 }
 
 export const SAY: FlatVerb = {
@@ -70,21 +93,21 @@ export const SAY: FlatVerb = {
   toAction: (out) => ({ action: 'SAY', text: out.say.slice(0, MAX_SAY_LENGTH) }),
 };
 
-export function OFFER(catalogue: Catalogue): FlatVerb {
+export function OFFER(catalogue: Catalogue, words: Words = PLAIN): FlatVerb {
   const kinds = kindsOf(catalogue);
   return {
     verb: 'OFFER',
-    fields: { offer: offerField(catalogue) },
-    toAction: (out) => ({ action: 'OFFER', terms: terms(out.offer, kinds) }),
+    fields: { offer: offerField(catalogue, words) },
+    toAction: (out) => ({ action: 'OFFER', terms: terms(out.offer, kinds, words) }),
   };
 }
 
-export function COUNTER_OFFER(catalogue: Catalogue): FlatVerb {
+export function COUNTER_OFFER(catalogue: Catalogue, words: Words = PLAIN): FlatVerb {
   const kinds = kindsOf(catalogue);
   return {
     verb: 'COUNTER_OFFER',
-    fields: { offer: offerField(catalogue), contract_id: contractId() },
-    toAction: (out) => ({ action: 'COUNTER_OFFER', replaces: out.contract_id, terms: terms(out.offer, kinds) }),
+    fields: { offer: offerField(catalogue, words), contract_id: contractId() },
+    toAction: (out) => ({ action: 'COUNTER_OFFER', replaces: out.contract_id, terms: terms(out.offer, kinds, words) }),
   };
 }
 
@@ -97,16 +120,20 @@ export const EMOTE: FlatVerb = {
 
 // One shape per kind of gift; goods are an enum of what it may hold. A gift goes to whoever it's talking to: the model
 // is never told anyone's id (the history says "Customer"), so a recipient field would only invite names the ledger refuses.
-export function GIVE(goods: readonly string[]): FlatVerb {
+export function GIVE(goods: readonly string[], words: Words = PLAIN): FlatVerb {
   const shapes = [
     object({ kind: { type: 'string', enum: ['gold'] }, amount: int }),
-    ...(goods.length ? [object({ kind: { type: 'string', enum: ['good'] }, good: { type: 'string', enum: [...goods] }, qty: int })] : []),
+    ...(goods.length ? [object({ kind: { type: 'string', enum: ['good'] }, good: enumOf(goods, words), qty: int })] : []),
     object({ kind: { type: 'string', enum: ['item'] }, item_id: str }),
   ];
+  const named = (gift: unknown) => {
+    const g = gift as { kind?: unknown; good?: unknown } | null;
+    return g && typeof g === 'object' && g.kind === 'good' && typeof g.good === 'string' ? { ...g, good: words.name(g.good) } : gift;
+  };
   return {
     verb: 'GIVE',
     fields: { gift: { anyOf: shapes } },
-    toAction: (out) => ({ action: 'GIVE', to: null, gift: out.gift }),
+    toAction: (out) => ({ action: 'GIVE', to: null, gift: named(out.gift) }),
   };
 }
 

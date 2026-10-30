@@ -4,36 +4,39 @@ import { act, NPCS, report, sense, smith, type NpcDefinition } from './npcs';
 import { runTriggers, type TownDeps, type TownResult } from './town';
 
 // What the player can do. Routes call these; each returns the new world plus the events it produced.
+// `act` is the engine the world's actors are registered with: the village's by default, a dev-API world's own otherwise.
+type Engine = { act?: Act };
 
 // An NPC without the on_spoken_to trigger hears the line (it's in the log) but never answers it.
 export const answers = (npc: NpcDefinition) => npc.triggers.some((t) => t.kind === 'on_spoken_to');
 
 // The line alone, with no reply: for an NPC that doesn't answer when spoken to.
-export function playerSpeaks(world: World, text: string, npc: NpcDefinition): ActResult {
-  return act(world, 'player', { action: 'SAY', text }, { to: npc.id });
+export function playerSpeaks(world: World, text: string, npc: NpcDefinition, opts: Engine = {}): ActResult {
+  return (opts.act ?? act)(world, 'player', { action: 'SAY', text }, { to: npc.id });
 }
 
-export async function playerSays(world: World, text: string, model: NpcModel, npc: NpcDefinition = smith): Promise<TurnResult | ActResult> {
-  const said = playerSpeaks(world, text, npc);
+export async function playerSays(world: World, text: string, model: NpcModel, npc: NpcDefinition = smith, opts: Engine = {}): Promise<TurnResult | ActResult> {
+  const said = playerSpeaks(world, text, npc, opts);
   if (!said.ok || !answers(npc)) return said;
-  const turn = await npcTurn(npc, said.world, model);
+  const turn = await npcTurn(npc, said.world, model, { act: opts.act });
   return { ...turn, events: [...said.events, ...turn.events] };
 }
 
 // Accepting a made-to-order offer starts the work at once: START_WORK is issued by code on the seller's behalf,
 // so the timer can't stall. An in-stock sale is already handed over by the accept itself.
-export function playerAccepts(world: World, contractId: string): ActResult {
-  const accepted = act(world, 'player', { action: 'ACCEPT', contract_id: contractId });
+export function playerAccepts(world: World, contractId: string, opts: Engine = {}): ActResult {
+  const run = opts.act ?? act;
+  const accepted = run(world, 'player', { action: 'ACCEPT', contract_id: contractId });
   if (!accepted.ok) return accepted;
   const c = accepted.world.contracts[contractId];
   if (c.kind !== 'made_to_order') return accepted;
-  const started = act(accepted.world, c.seller, { action: 'START_WORK', contract_id: contractId });
+  const started = run(accepted.world, c.seller, { action: 'START_WORK', contract_id: contractId });
   return { ...started, events: [...accepted.events, ...started.events] };
 }
 
 // `gift` is checked by the engine like any proposal, so a malformed one is logged as a rejection.
-export function playerGives(world: World, to: string, gift: unknown): ActResult {
-  return act(world, 'player', { action: 'GIVE', to, gift }, { to });
+export function playerGives(world: World, to: string, gift: unknown, opts: Engine = {}): ActResult {
+  return (opts.act ?? act)(world, 'player', { action: 'GIVE', to, gift }, { to });
 }
 
 export function skipTime(world: World, ticks: number): { world: World; events: EngineEvent[] } {

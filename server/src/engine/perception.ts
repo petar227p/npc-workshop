@@ -8,8 +8,9 @@ import type { Actor } from './validator';
 
 export type Distance = (a: string, b: string) => number; // between two named places, in tiles; Infinity if unknown
 
-// Bookkeeping, not something that happened in the village: nobody sees it.
-const UNSEEN = new Set<EventType>(['ACTION_REJECTED', 'TRIGGER_FIRED', 'CLOCK_ADVANCED']);
+// Bookkeeping, not something that happened in the village: nobody sees it. (A sync is the game's own record of what
+// it changed; if the change was a deed worth gossip, the game reports that too.)
+const UNSEEN = new Set<EventType>(['ACTION_REJECTED', 'TRIGGER_FIRED', 'CLOCK_ADVANCED', 'SYNCED']);
 
 export function senses(actors: readonly Actor[], distance: Distance): Sense {
   const lookers = actors.filter((a) => a.perception_radius !== undefined);

@@ -60,8 +60,12 @@ export async function sketch(client: ImageClient, subject: string, art: NpcArt |
   return { sprite: toSprite(png, { palette: KENNEY_PALETTE }), prompt, latency_ms };
 }
 
-export const artUrl = (e: ArtEntry) => `/api/art/${e.id}.png`;
+export type Studio = ReturnType<typeof createStudio>;
 
-export function artView(gallery: Gallery): Record<string, ItemArt> {
-  return Object.fromEntries([...gallery].map(([contractId, e]) => [contractId, { status: e.status, url: e.status === 'ready' ? artUrl(e) : null }]));
+export const artUrl = (e: ArtEntry) => `/api/art/${e.id}.png`;
+export const ART_FILE = /^([0-9a-f-]{36})\.png$/; // a picture's file name in its URL; the group is its id
+
+// `url` says where a ready picture is served: the village's route by default, a dev-API world's own otherwise.
+export function artView(gallery: Gallery, url: (e: ArtEntry) => string = artUrl): Record<string, ItemArt> {
+  return Object.fromEntries([...gallery].map(([contractId, e]) => [contractId, { status: e.status, url: e.status === 'ready' ? url(e) : null }]));
 }

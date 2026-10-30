@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { MAX_SAY_LENGTH } from './limits';
-import { CatalogueSchema, StartSchema } from './trade';
+import { MAX_LABEL_LENGTH, MAX_SAY_LENGTH } from './limits';
+import { CatalogueSchema, NameSchema, StartSchema } from './trade';
 import {
   DEFAULT_SPRITE,
   EFFORT_CHOICES,
@@ -57,6 +57,15 @@ const reference = z
   .refine((u) => ((u.length - u.indexOf(',') - 1) * 3) / 4 <= MAX_REFERENCE_BYTES, `a reference picture is at most ${MAX_REFERENCE_BYTES / 1024} KB`);
 const ArtDraftSchema = z.object({ style, references: z.array(reference).max(MAX_REFERENCES, `at most ${MAX_REFERENCES} reference pictures`) }).strict();
 
+// What players and the model call a good, material or item type, by its name in the world (a game's own item id, say).
+// One line, so a label can't open a new section of the prompt. The names may also be ones it doesn't stock yet: a
+// game can sync them in later, and GIVE can name them.
+const label = z
+  .string()
+  .transform((s) => s.replace(/\s+/g, ' ').trim())
+  .pipe(z.string().min(1).max(MAX_LABEL_LENGTH));
+const LabelsSchema = z.record(NameSchema, label).refine((r) => Object.keys(r).length <= 200, 'at most 200 labels');
+
 export const NpcFileSchema = z
   .object({
     id: z
@@ -76,6 +85,7 @@ export const NpcFileSchema = z
     art: ArtFileSchema.default(() => ({ ...NO_ART, references: [] })), // files from before the art box drew in the plain pixel-art style
     start: StartSchema,
     catalogue: CatalogueSchema,
+    labels: LabelsSchema.default({}), // files from before labels go by their names
     // Files from before triggers only ever answered when spoken to.
     triggers: z
       .array(TriggerSchema)

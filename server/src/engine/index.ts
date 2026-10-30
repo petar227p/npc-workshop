@@ -2,6 +2,7 @@ import type { Action } from '@blacksmith/shared';
 import type { ZodError, ZodType } from 'zod';
 import { commit, type EngineEvent, type Sense } from './events';
 import { reported } from './happen';
+import { synced } from './sync';
 import type { World } from './state';
 import { placeAt } from './schedule';
 import { own, reject, type ActOptions, type Actor, type ActorOf, type Verdict } from './validator';
@@ -40,6 +41,7 @@ function verbOf(raw: unknown): string | null {
 type Actors = Record<string, Actor>;
 export type Act = (world: World, actor: string, raw: unknown, opts?: ActOptions) => ActResult;
 export type Report = (world: World, raw: unknown) => ActResult;
+export type Sync = (world: World, raw: unknown) => ActResult;
 
 // Who may do what comes from the actors passed in (see npcs/), not from the engine.
 // A verb the actor doesn't list is rejected before its schema or rule ever runs.
@@ -65,7 +67,9 @@ function check(actors: Actors, world: World, actor: string, raw: unknown, opts: 
 // `report` is the other door: a world event the game reports (happen.ts). A bad report changes nothing and isn't
 // logged, since nobody in the world proposed it; the reason goes back to whoever sent it.
 // `places` are where a report may say something happened; without them, anywhere.
-export function createEngine(list: readonly Actor[], config: { sense?: Sense; places?: readonly string[] } = {}): { act: Act; report: Report } {
+// `sync` is the third: the game's own code saying what an actor holds now, after changing it itself (sync.ts). Like a
+// report, a bad one isn't logged; one that changes nothing logs nothing.
+export function createEngine(list: readonly Actor[], config: { sense?: Sense; places?: readonly string[] } = {}): { act: Act; report: Report; sync: Sync } {
   const actors: Actors = {};
   for (const a of list) {
     if (Object.hasOwn(actors, a.id)) throw new Error(`two actors have the id '${a.id}'`);
@@ -92,6 +96,12 @@ export function createEngine(list: readonly Actor[], config: { sense?: Sense; pl
     report(world, raw) {
       const r = reported(world, raw, list, config);
       if (!r.ok) return { world, events: [], ok: false, reason: r.reason };
+      return { ...commit(world, [r.draft]), ok: true, reason: null };
+    },
+    sync(world, raw) {
+      const r = synced(world, raw, list);
+      if (!r.ok) return { world, events: [], ok: false, reason: r.reason };
+      if (!r.draft) return { world, events: [], ok: true, reason: null };
       return { ...commit(world, [r.draft]), ok: true, reason: null };
     },
   };
