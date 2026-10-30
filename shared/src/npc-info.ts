@@ -4,11 +4,11 @@ import type { Catalogue, Start } from './trade';
 // What the NPC editor can build from, as plain constants (no zod), so the browser can import them.
 // Rules behind each verb and fact block live in server code; the editor only picks from these lists.
 
-export const LEDGER_VERBS = ['SAY', 'EMOTE', 'OFFER', 'COUNTER_OFFER', 'REFUSE', 'ACCEPT', 'START_WORK', 'GIVE', 'TELL', 'RETELL', 'ANNOUNCE'] as const;
+export const LEDGER_VERBS = ['SAY', 'EMOTE', 'OFFER', 'COUNTER_OFFER', 'REFUSE', 'ACCEPT', 'START_WORK', 'GIVE', 'TELL', 'RETELL', 'ANNOUNCE', 'SIGNAL'] as const;
 export type LedgerVerb = (typeof LEDGER_VERBS)[number];
 
 // The verbs a model can answer with (each has a flat-schema mapping on the server). ACCEPT and START_WORK are code-only.
-export const MODEL_VERBS = ['SAY', 'EMOTE', 'OFFER', 'COUNTER_OFFER', 'REFUSE', 'GIVE', 'TELL', 'RETELL', 'ANNOUNCE'] as const satisfies readonly LedgerVerb[];
+export const MODEL_VERBS = ['SAY', 'EMOTE', 'OFFER', 'COUNTER_OFFER', 'REFUSE', 'GIVE', 'TELL', 'RETELL', 'ANNOUNCE', 'SIGNAL'] as const satisfies readonly LedgerVerb[];
 export type ModelVerb = (typeof MODEL_VERBS)[number];
 
 export const VERB_INFO: Record<LedgerVerb, string> = {
@@ -23,9 +23,11 @@ export const VERB_INFO: Record<LedgerVerb, string> = {
   TELL: 'Pass news on to whoever it is talking to. It must cite an event it saw or was told about, and the listener must be with it. Each retelling is less sure. Needs the "News it knows" facts.',
   RETELL: 'Tell a piece of news to everyone around, the way a bard sings it. Same check: only an event it knows. The wording may drift; the event it cites can\'t.',
   ANNOUNCE: 'Cry a piece of news to everyone around, only at its own place (the crier at the notice board). Only events it knows.',
+  SIGNAL:
+    'Ask the game to do something the ledger doesn\'t (open a gate, follow the player, start a fight). Only a signal it declares below; it changes nothing here, and the game\'s own code decides whether it happens. Needs the "What it can ask the game for" facts.',
 };
 
-export const FACT_BLOCKS = ['clock', 'purse', 'stock', 'inventory', 'catalogue', 'price_floor', 'open_offers', 'memories'] as const;
+export const FACT_BLOCKS = ['clock', 'purse', 'stock', 'inventory', 'catalogue', 'price_floor', 'open_offers', 'memories', 'signals'] as const;
 export type FactBlock = (typeof FACT_BLOCKS)[number];
 
 export const FACT_INFO: Record<FactBlock, { label: string; description: string }> = {
@@ -37,6 +39,7 @@ export const FACT_INFO: Record<FactBlock, { label: string; description: string }
   price_floor: { label: 'Price floor', description: 'How the ledger sets the lowest price it accepts.' },
   open_offers: { label: 'Open offers', description: 'Its offers to this customer that are still open.' },
   memories: { label: 'News it knows', description: 'What it saw or was told, with event ids and how sure it is. Only things within its perception radius, or passed on to it. What TELL, RETELL and ANNOUNCE need.' },
+  signals: { label: 'What it can ask the game for', description: 'Its signals, each with what it means. What SIGNAL needs.' },
 };
 
 // Which model voices an NPC. The server maps each to a provider and model id from its env.
@@ -119,6 +122,7 @@ export type NpcDraft = {
   start: Start; // its purse and stock in a new world
   catalogue: Catalogue; // what it sells; empty for an NPC that only talks
   labels: Record<string, string>; // what players and the model call a thing, by its name in the world (a game's item id → "iron sword")
+  signals: Record<string, string>; // what it may ask the game to do (SIGNAL), by name, with what each means
   triggers: Trigger[];
   cue: string;
   fallbacks: { rejected: string; unavailable: string };

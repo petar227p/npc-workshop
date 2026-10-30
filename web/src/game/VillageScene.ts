@@ -177,6 +177,9 @@ export class VillageScene extends Phaser.Scene {
       case 'EMOTED':
         this.bubble(e.actor, `*${e.data.text}*`, 3500);
         break;
+      case 'SIGNALED':
+        this.bubble(e.actor, `[${e.data.signal.replace(/_/g, ' ')}]`, 3500);
+        break;
       case 'GOODS_DELIVERED':
         this.bubble(e.actor, `Here: ${e.data.qty} × ${e.data.good.replace(/_/g, ' ')}.`, 3500);
         break;

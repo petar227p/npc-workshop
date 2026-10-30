@@ -372,6 +372,44 @@ describe('dev api (/api/v1)', () => {
     });
   });
 
+  describe('what the ledger has no verb for', () => {
+    const guardSays = (v: object) => JSON.stringify({ action: 'SAY', say: '', offer: null, signal: null, contract_id: null, ...v });
+    const pass = guardSays({ action: 'OFFER', say: 'Here, a pass.', offer: { kind: 'in_stock', good: 'gate pass', qty: 1, price: 0, remarks: 'Good for today.' } });
+    const open = guardSays({ action: 'SIGNAL', say: 'Open the gate!', signal: 'open_gate' });
+
+    it("signals come back for the game's own code to act on; the ledger changed nothing for them", async () => {
+      const { newWorld } = setup(() => mockClient([pass, open]));
+      const w = await newWorld(['guard']);
+      const handed = await w.send('/say', { npc: 'guard', text: 'I have business with the farmer. A pass, please?' });
+      expect(handed.json.state.contracts[0]).toMatchObject({ kind: 'in_stock', good: 'gate_pass', price: 0 });
+      expect((await w.send('/accept', { contract_id: 'c_001' })).json.state.goods).toEqual({ gate_pass: 1 });
+
+      const asked = await w.send('/say', { npc: 'guard', text: 'I have my pass. Let me through.' });
+      expect(asked.json.signals).toEqual([{ by: 'guard', name: 'Garrick', signal: 'open_gate', to: 'player' }]);
+      expect(asked.json.said).toEqual([{ by: 'guard', name: 'Garrick', text: 'Open the gate!', to: 'player' }]);
+      expect(asked.json.state.goods).toEqual({ gate_pass: 1 }); // the game decides what opening the gate means
+    });
+
+    it("a grant the ledger counts: free passes run out, and the game's sync is the only way to more", async () => {
+      const { newWorld } = setup(() => mockClient([pass, pass, pass]));
+      const w = await newWorld(['guard']);
+      await w.send('/sync', { actor: 'guard', stock: { gate_pass: 0 }, reason: "today's passes are gone" });
+      const none = await w.send('/say', { npc: 'guard', text: 'A pass, please.' });
+      expect(none.json.outcome).toBe('fallback'); // two offers of a pass it doesn't have, both refused
+      expect(none.json.state.contracts).toEqual([]);
+
+      await w.send('/sync', { actor: 'guard', stock: { gate_pass: 3 }, reason: 'a new day: three passes' });
+      expect((await w.send('/say', { npc: 'guard', text: 'A pass, please.' })).json.state.contracts).toHaveLength(1);
+    });
+
+    it('the NPC list says what each NPC may signal', async () => {
+      const { call } = setup();
+      const r = await call<{ npcs: ApiNpc[] }>('GET', '/api/v1/npcs');
+      expect(r.json.npcs.find((n) => n.id === 'guard')).toMatchObject({ signals: { open_gate: expect.any(String), raise_alarm: expect.any(String) }, labels: { gate_pass: 'gate pass' } });
+      expect(r.json.npcs.find((n) => n.id === 'smith')?.signals).toEqual({});
+    });
+  });
+
   it('a game can end a world', async () => {
     const { newWorld, call } = setup();
     const w = await newWorld(['smith']);

@@ -37,6 +37,10 @@ export function historyFor(npcId: string, name: string, label: Label = (n) => n)
         case 'EMOTED':
           if (e.actor === npcId && (e.target === customer || e.target === null)) lines.push(`[${name} ${JSON.stringify(e.data.text)}]`);
           break;
+        // So it knows it already asked, and doesn't ask again every turn.
+        case 'SIGNALED':
+          if (e.actor === npcId && (e.target === customer || e.target === null)) lines.push(`[${name} signalled ${e.data.signal}]`);
+          break;
         case 'GIVEN':
           if (e.actor === npcId && e.target === customer) lines.push(`[${name} gave the customer ${gift(e.data.gift, e.data.item_name)}]`);
           if (e.actor === customer && e.target === npcId) lines.push(`[Customer gave ${name} ${gift(e.data.gift, e.data.item_name)}]`);

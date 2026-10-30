@@ -8,3 +8,5 @@ export const MAX_NOTE_LENGTH = 500; // a god-mode note in its own words, before 
 export const MAX_HOURS_AGO = 48; // how far back a world event may be reported: two days, like the longest skip
 export const MAX_LABEL_LENGTH = 40; // what players and the model call a good, material or item type ("iron sword")
 export const MAX_SYNC_REASON = 200; // why a game changed an inventory itself ("looted the mill chest")
+export const MAX_SIGNAL_TEXT = 200; // what one signal asks the game to do, as the model is told it
+export const MAX_SIGNALS = 20; // signals one NPC may declare

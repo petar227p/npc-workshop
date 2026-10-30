@@ -58,6 +58,7 @@ export type EngineEvent =
   | Base<'RETOLD', News> // to everyone around: its witnesses heard it
   | Base<'ANNOUNCED', News> // cried at the actor's own place: its witnesses heard it
   | Base<'HAPPENED', { text: string; involved: string[]; seen_by: Sighting['kind']; notable: boolean; reported_tick: number }> // actor: 'world'; narrative only. tick: when it happened; reported_tick: when it was logged (later, if reported late)
+  | Base<'SIGNALED', { signal: string }> // target: who it was talking to, if anyone. The game acts on it; the ledger changes nothing
   | Base<'SYNCED', { changes: Change[]; reason: string }> // actor: 'world'; target: whose inventory the game changed itself. Nobody sees it
   | Base<'TRIGGER_FIRED', { trigger: Trigger }> // an NPC acting on its own; its turn's events follow
   | Base<'ACTION_REJECTED', { verb: string | null; reason: string; proposed: unknown }>
@@ -114,7 +115,18 @@ export type ActionResponse = {
 
 // An NPC a world can be made with. `sells`: what is in its catalogue, made to order or from stock.
 // `labels`: what it calls the things it deals in, by their names in the world (a game's own item ids).
-export type ApiNpc = { id: string; name: string; model: ModelChoice; place: string; verbs: string[]; sells: string[]; labels: Record<string, string>; answers: boolean };
+// `signals`: what it may ask the game to do, by name, with what each means.
+export type ApiNpc = {
+  id: string;
+  name: string;
+  model: ModelChoice;
+  place: string;
+  verbs: string[];
+  sells: string[];
+  labels: Record<string, string>;
+  signals: Record<string, string>;
+  answers: boolean;
+};
 
 // The world as the game sees it: the player's side, who is where, and the news, without the log (that is /events).
 // `last_event_id` is where to read the log on from; `calls_left` is how many model calls this world may still make.
@@ -127,6 +139,8 @@ export type ApiState = Omit<StateView, 'events' | 'busy'> & {
 
 // A line an NPC said in reply, so a game can show it without reading the events.
 export type ApiLine = { by: string; name: string; text: string; to: string | null };
+// A signal an NPC sent: something it asks the game to do. The game's own code decides whether it happens.
+export type ApiSignal = { by: string; name: string; signal: string; to: string | null };
 
 export type ApiResult = {
   ok: boolean;
@@ -134,6 +148,7 @@ export type ApiResult = {
   outcome: 'acted' | 'fallback' | 'unavailable' | null; // the NPC's turn, if one ran
   events: EngineEvent[]; // what this call added to the log, in order
   said: ApiLine[];
+  signals: ApiSignal[];
   state: ApiState;
 };
 

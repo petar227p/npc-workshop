@@ -4,17 +4,18 @@ import { labelOf, memoriesText } from './news';
 
 // The facts an NPC can be told, one block each. Code-owned numbers, so the model can quote prices and limits that will pass.
 // A definition picks blocks by name; their text is joined in this order. Every block reads the NPC's own catalogue and stock.
-// `label` is what the NPC calls each good, material and item type (npcs/news.ts labelsFor): a game's own item id reads as
-// its label, the same word the model's schema takes.
+// `own` is the NPC's own: its catalogue, its signals, and `label`, what it calls each good, material and item type
+// (npcs/news.ts labelsFor): a game's own item id reads as its label, the same word the model's schema takes.
 
 type Label = (name: string) => string;
-type Block = (world: World, npcId: string, customer: string, catalogue: Catalogue, label: Label) => string | null;
+type Own = { catalogue: Catalogue; label: Label; signals: Record<string, string> };
+type Block = (world: World, npcId: string, customer: string, own: Own) => string | null;
 
 export const FACTS: Record<FactBlock, Block> = {
   // The same day and time the player sees, so a line about the morning comes in the morning.
   clock: (world, npcId) => `It is ${clockText(world.tick)}. Jobs in hand: ${activeJobs(world, npcId)}.`,
   purse: (world, _npc, customer) => `Customer's purse: ${world.gold[customer] ?? 0} gold.`,
-  stock: (world, npcId, _customer, catalogue, label) => {
+  stock: (world, npcId, _customer, { catalogue, label }) => {
     const available = availableStock(world, npcId);
     const count = (name: string) => Math.max(0, Object.hasOwn(available, name) ? available[name] : 0);
     const lines: string[] = [];
@@ -29,7 +30,7 @@ export const FACTS: Record<FactBlock, Block> = {
     return lines.join('\n') || null;
   },
   // Everything it owns, not only what it sells: GIVE can hand over any of it, and items go by id.
-  inventory: (world, npcId, _customer, _catalogue, label) => {
+  inventory: (world, npcId, _customer, { label }) => {
     const goods = Object.entries(availableStock(world, npcId))
       .filter(([, n]) => n > 0)
       .map(([g, n]) => `${label(g)} ${n}`)
@@ -39,7 +40,7 @@ export const FACTS: Record<FactBlock, Block> = {
     if (items.length) lines.push(`Items you own: ${items.join(', ')}.`);
     return lines.join('\n');
   },
-  catalogue: (world, npcId, _customer, catalogue, label) => {
+  catalogue: (world, npcId, _customer, { catalogue, label }) => {
     const parts: string[] = [];
     const mto = catalogue.made_to_order;
     if (mto) {
@@ -59,29 +60,42 @@ export const FACTS: Record<FactBlock, Block> = {
     }
     return parts.join('\n\n') || 'You have nothing to sell.';
   },
-  price_floor: (_world, _npc, _customer, catalogue) => {
+  price_floor: (_world, _npc, _customer, { catalogue }) => {
     const lines: string[] = [];
     if (catalogue.made_to_order) lines.push(`Price floor for made-to-order work: material cost + ${Math.round(catalogue.made_to_order.min_margin * 1000) / 10}%, rounded up.`);
     if (catalogue.in_stock) lines.push('Price floor for goods: the minimum price each, times the quantity.');
     return lines.join('\n') || null;
   },
   // Only this NPC's own offers: another seller's aren't its to quote, counter or withdraw.
-  open_offers: (world, npcId, customer, _catalogue, label) => {
+  open_offers: (world, npcId, customer, { label }) => {
     const open = Object.values(world.contracts).filter((c) => c.status === 'proposed' && c.customer === customer && c.seller === npcId);
     const offers = open.length ? open.map((c) => `- ${c.contract_id}: ${describe(c, label)}`).join('\n') : '- none';
     return `Your open offers to this customer:\n${offers}`;
   },
   // What it saw or was told, with the event ids TELL, RETELL and ANNOUNCE must cite.
   memories: (world, npcId) => memoriesText(world, npcId),
+  // What it may ask the game to do, and what each means. The game decides whether it happens, so it is a request.
+  signals: (_world, _npc, _customer, { signals }) => {
+    const lines = Object.entries(signals).map(([name, meaning]) => `- ${name}: ${meaning}`);
+    if (!lines.length) return null;
+    return `What you can ask the game to do (SIGNAL, with the name in signal). It only asks; the game decides whether it happens:\n${lines.join('\n')}`;
+  },
 };
 
 export const NO_FACTS = 'Nothing else is known right now.';
 
-export function factsFor(npcId: string, blocks: readonly FactBlock[], catalogue: Catalogue, label: Label = (n) => n): (world: World, customer: string) => string {
+export function factsFor(
+  npcId: string,
+  blocks: readonly FactBlock[],
+  catalogue: Catalogue,
+  label: Label = (n) => n,
+  signals: Record<string, string> = {},
+): (world: World, customer: string) => string {
   const chosen = Object.keys(FACTS).filter((b) => blocks.includes(b as FactBlock)) as FactBlock[];
+  const own = { catalogue, label, signals };
   return (world, customer) =>
     chosen
-      .map((b) => FACTS[b](world, npcId, customer, catalogue, label))
+      .map((b) => FACTS[b](world, npcId, customer, own))
       .filter((t): t is string => t !== null)
       .join('\n\n') || NO_FACTS;
 }

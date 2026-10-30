@@ -100,3 +100,43 @@ describe('labels', () => {
     expect(() => registerLabels([{ id: 'smith', labels: { itm_rope_7: 'rope' } }])).toThrow(/calls 'itm_rope_7' "rope", but another NPC calls it "hemp rope"/);
   });
 });
+
+// For a game that can't make custom items: each item type is one of its own items, with every stat fixed. The NPC can
+// then only promise exactly that item, in its words, at a price the ledger checks.
+describe('fixed items', () => {
+  const fixed = (n: number) => ({ min: n, max: n });
+  const armourer: NpcDraft = {
+    ...readDraft('smith'),
+    id: 'armourer',
+    name: 'Ulf',
+    catalogue: {
+      made_to_order: {
+        items: { itm_iron_sword_02: { damage: fixed(12), weight: fixed(6), durability: fixed(60), base_ticks: 4 } },
+        materials: { itm_iron_bar: 10 },
+        min_margin: 0.2,
+        workload_per_job: 0.5,
+      },
+    },
+    start: { gold: 0, stock: { itm_iron_bar: 6 } },
+    labels: { itm_iron_sword_02: 'iron longsword', itm_iron_bar: 'iron bar' },
+  };
+  const order = (stats: { damage: number; weight: number; durability: number }) =>
+    JSON.stringify({
+      action: 'OFFER',
+      say: 'An iron longsword, as always.',
+      offer: { kind: 'made_to_order', item_name: 'Iron Longsword', item_type: 'iron longsword', description: 'Standard issue', stats, materials: [{ material: 'iron bar', qty: 3 }], price: 40, delivery_ticks: 4, remarks: '' },
+      contract_id: null,
+    });
+
+  it('the exact item is offered under the game’s ids; any other stats are refused', async () => {
+    const npc = built(armourer);
+    const { act } = createEngine([player, npc]);
+    const ok = await npcTurn(npc, createWorld([player, npc]), { client: mockClient([order({ damage: 12, weight: 6, durability: 60 })]), model: 'test' }, { act });
+    expect(ok.world.contracts.c_001).toMatchObject({ item_type: 'itm_iron_sword_02', materials_used: { itm_iron_bar: 3 }, stats: { damage: 12, weight: 6, durability: 60 } });
+
+    const better = await npcTurn(npc, createWorld([player, npc]), { client: mockClient([order({ damage: 30, weight: 6, durability: 60 }), order({ damage: 13, weight: 6, durability: 60 })]), model: 'test' }, { act });
+    expect(better.outcome).toBe('fallback');
+    expect(better.world.contracts).toEqual({});
+    expect(npc.facts(createWorld([player, npc]), 'player')).toMatch(/- iron longsword: damage 12–12, weight 6–6, durability 60–60/);
+  });
+});

@@ -27,6 +27,7 @@ The world is rebuilt by replaying the event log, so every session is auditable a
 - **Generic agent turn** (`server/src/agents/`): builds a strict flat JSON schema from the NPC's model verbs, calls the model, maps the reply to an action, retries once with the rejection reason, then falls back to a safe line.
 - **Playable web app**: chat with inline contract cards, a forge panel with progress and a skip-time button, your gear, stock, and a live ledger showing every event including the rejections.
 - **Item pictures**: Muse Image renders the accepted item as a pixel sprite, snapped to a fixed palette.
+- **Signals**: an NPC can ask the game to do something the ledger has no verb for (open a gate, raise the alarm), only from a list it declares. The game's own code decides whether it happens. Garrick the guard at the gate uses them.
 - **NPC workshop** (`#/workshop`): edit persona, verbs, fact blocks, cue, fallbacks and radius. The server checks the draft on every edit and shows the generated schema and facts. A **test bench** runs the draft against the real model on a throwaway world, shows the ledger's verdict on each answer, and has cheat-line buttons for quick exploit tests.
 - **Dev API** (`/api/v1`): another game makes its own world from the NPCs it picks, then sends what its player says and does and gets back the events to show. No cookie, a bearer token per world, the same ledger. See [Use the NPCs from your own game](#use-the-npcs-from-your-own-game).
 - **Model layer**: plain `fetch` clients for the Meta Model API and Baseten, with retries, a JSONL recorder, replay and mock clients. Keys stay on the server.
@@ -130,7 +131,7 @@ curl -s -X POST $W/tick   -H "$AUTH" -H 'content-type: application/json' -d '{"h
 | `GET …/worlds/:id/art/<file>.png` | | The item picture Muse Image drew for an accepted order |
 | `DELETE …/worlds/:id` | | Ends the world |
 
-Every call on a world sends `Authorization: Bearer <token>`. Each action returns `{ ok, reason, outcome, events, said, state }`: `reason` is why the ledger refused the player's own action, `said` the NPCs' lines, `events` what the call added to the log, and `state` the world after it. The player is the actor `player`; one per world. Any site may call it (CORS is open, and the token is the only credential).
+Every call on a world sends `Authorization: Bearer <token>`. Each action returns `{ ok, reason, outcome, events, said, signals, state }`: `reason` is why the ledger refused the player's own action, `said` the NPCs' lines, `signals` what the NPCs asked your game to do (see below), `events` what the call added to the log, and `state` the world after it. The player is the actor `player`; one per world. Any site may call it (CORS is open, and the token is the only credential).
 
 ### Your game's items
 
@@ -146,7 +147,16 @@ Goods, materials and item types are plain names (lowercase letters, digits, `_`)
 - **Your save comes first.** `POST /worlds` takes `start` for the player and any NPC, so the world begins with what your game says they hold.
 - **Two-way, with one owner per change.** Changes the ledger makes (sales, deliveries, gifts) come to you as events: apply them on your side. Changes your game makes itself (loot, theft, crafting) go to the ledger as a `sync` of the new totals. A sync sent twice changes nothing; one that would take away what is promised to accepted work is refused. No verb leads to sync, so no model can ask for it.
 - **Made-to-order items** arrive in `ITEM_DELIVERED` with an `item_type`, stats and an id (`i_c_001`). If your game can make custom items, map the type to a base item and apply the stats, and keep `i_c_001` → your own instance id. If it can only hand out fixed items, key the item types by your item ids and give each stat range one value (min = max): the NPC can then only promise exactly that item, at a price the ledger checks against its floor.
-- **Things an NPC grants that aren't trade** (a gate pass, a room for the night, a quest) can be goods: a guard "sells" `gate_pass` for 0 gold from a stock your game syncs (3 a day, say), and your game opens the gate when the `GOODS_DELIVERED` event arrives. The ledger guarantees the NPC can't grant more than your game put in its stock.
+
+### Actions the ledger has no verb for
+
+The ledger only knows trade, gifts and news. Anything else (open a gate, follow the player, start a fight) stays in your game's own code. There are three ways to connect it to an NPC, from least to most involved:
+
+1. **Your code alone.** The NPC just talks; your game decides from its own rules and buttons ("Ask to follow", a quest flag). Fine whenever the NPC's opinion doesn't matter.
+2. **A grant the ledger counts.** Something an NPC hands out in limited numbers (a gate pass, a room for the night) can be a good, free or not. Garrick the guard (`npcs/guard.json`) has three `gate_pass` at 0 gold; when they're gone, no amount of talk gets a fourth until your game syncs more in. Your game does the rest when the `GOODS_DELIVERED` event arrives.
+3. **A signal.** When the NPC's own judgment should decide (the guard is persuaded to open the gate, or sees real trouble), give it the `SIGNAL` verb and declare its signals in its file with what each means: `"signals": { "open_gate": "…", "raise_alarm": "…" }`. The model can only name a declared one (the ledger refuses anything else, and the exploit suite checks it); the event changes nothing in the ledger and comes back in `signals`. Your code carries it out, or doesn't: it can check what the model can't, such as whether the player really holds a pass. Parsing the NPC's words instead would be fragile, and a player could talk it into saying the magic phrase.
+
+The guard does both: it hands out passes (counted) and signals `open_gate` once you hold one (your call). In the village there is no game code behind a signal, so the chat shows what a game would be asked.
 
 Limits, so a public server can't be run up: 150 model calls per world (a world out of calls still keeps time, its NPCs just stop acting on their own), 60 calls a minute across all worlds, 5,000 events per world, 200 worlds in memory (only ones idle for 30 minutes are dropped), 5 new worlds a minute per address and 20 overall, request bodies up to 16 KB.
 

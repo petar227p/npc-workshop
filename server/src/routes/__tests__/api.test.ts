@@ -417,7 +417,7 @@ describe('api', () => {
       expect(r.events[0]).toMatchObject({ type: 'HAPPENED', actor: 'world', location: 'gate', data: { text: dragon.text, seen_by: 'everyone' } });
       const story = r.view.news[0];
       expect(story.text).toContain(dragon.text);
-      expect(story.knowers.map((k) => k.id).sort()).toEqual(['bard', 'cottager', 'crier', 'farmer', 'keeper', 'merchant', 'smith']);
+      expect(story.knowers.map((k) => k.id).sort()).toEqual(['bard', 'cottager', 'crier', 'farmer', 'guard', 'keeper', 'merchant', 'smith']);
       expect(r.events.slice(1).map((e) => [e.type, e.actor])).toContainEqual(['TRIGGER_FIRED', 'crier']); // 08:00: it is at the notice board
       expect(r.view.gold).toBe(200);
     });

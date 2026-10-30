@@ -148,6 +148,15 @@ export const TELL = news('TELL');
 export const RETELL = news('RETELL');
 export const ANNOUNCE = news('ANNOUNCE');
 
+// The signal is one of the NPC's own names; its spoken line, if any, goes in `say`.
+export function SIGNAL(signals: readonly string[]): FlatVerb {
+  return {
+    verb: 'SIGNAL',
+    fields: { signal: { type: 'string', enum: [...signals] } },
+    toAction: (out) => ({ action: 'SIGNAL', signal: out.signal }),
+  };
+}
+
 export const REFUSE: FlatVerb = {
   verb: 'REFUSE',
   fields: { contract_id: contractId() },
