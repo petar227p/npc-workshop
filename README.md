@@ -68,6 +68,7 @@ npm test              # Vitest
 npm run typecheck     # shared, server, web, scripts
 npm run smith-demo    # live order -> accept -> skip -> delivery, then an absurd request and an injection attempt
 npm run latency-test  # times each model setup, checks each answer against the ledger
+npm run ledger-proof  # controlled inputs (no model): a valid offer, then invalid ones the ledger must refuse unchanged
 ```
 
 Every model call is recorded to `logs/<session>.jsonl` (no keys). Play one back offline with `REPLAY=logs/<file> npm run smith-demo`.

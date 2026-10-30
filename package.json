@@ -15,7 +15,8 @@
     "smith-demo": "tsx scripts/smith-demo.ts",
     "latency-test": "tsx scripts/latency-test.ts",
     "make-map": "tsx scripts/make-map.ts",
-    "exploit-suite": "tsx scripts/exploit-suite.ts"
+    "exploit-suite": "tsx scripts/exploit-suite.ts",
+    "ledger-proof": "tsx scripts/ledger-proof.ts"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

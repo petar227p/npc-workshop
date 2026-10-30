@@ -205,10 +205,41 @@ export function Ledger({ view }: { view: StateView }) {
           <li key={e.id} className={kind(e)}>
             <time>{clockText(e.tick).split(' · ')[1]}</time>
             <span>{describe(e, view)}</span>
+            {e.type === 'ACTION_REJECTED' && <RejectedProposal e={e} view={view} />}
           </li>
         ))}
       </ol>
     </section>
+  );
+}
+
+// A reason can quote whatever was proposed, so a rejection's ledger line keeps to a few lines; the whole reason, as
+// stored, is under "View rejected proposal".
+// The verb is whatever "action" the proposal named, so it is capped too.
+const REASON_CHARS = 180;
+const VERB_CHARS = 40;
+const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
+const reasonText = (r: string) => (r.length > REASON_CHARS ? `${cut(r, REASON_CHARS)} (${r.length} characters; the full reason is below)` : r);
+
+// What was proposed, exactly as the ledger stored it, beside why it was refused. Plain text, never markup; a proposal
+// too long to keep whole is stored as a clipped string and shown as it is.
+function RejectedProposal({ e, view }: { e: Extract<EngineEvent, { type: 'ACTION_REJECTED' }>; view: StateView }) {
+  const proposed = e.data.proposed;
+  const text = typeof proposed === 'string' ? proposed : (JSON.stringify(proposed, null, 2) ?? String(proposed));
+  const who = e.actor === 'player' ? 'you (player)' : `${nameOf(view, e.actor)} (${e.actor})`;
+  return (
+    <details className="rejected">
+      <summary>View rejected proposal</summary>
+      <dl>
+        <dt>Event</dt>
+        <dd>{e.id}</dd>
+        <dt>Actor</dt>
+        <dd>{who}</dd>
+        <dt>Reason</dt>
+        <dd className="full-reason">{e.data.reason}</dd>
+      </dl>
+      <pre className="code">{text}</pre>
+    </details>
   );
 }
 
@@ -254,7 +285,7 @@ function describe(e: EngineEvent, view: StateView): string {
     case 'ITEM_DELIVERED':
       return `${e.data.contract_id} delivered by the clock: ${e.data.item.item_name}`;
     case 'ACTION_REJECTED':
-      return `Rejected ${e.actor} ${e.data.verb ?? 'output'}: ${e.data.reason}`;
+      return `Rejected ${e.actor} ${cut(e.data.verb ?? 'output', VERB_CHARS)}: ${reasonText(e.data.reason)}`;
     case 'CLOCK_ADVANCED':
       return `Time passes (${e.tick - e.data.from} h)`;
     case 'GIVEN':
