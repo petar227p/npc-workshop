@@ -28,6 +28,7 @@ export type Session = {
   art: Gallery;
   artRenders: number;
   artist: ImageClient | null;
+  voiceClips: number; // lines transcribed, for the per-session cap
   lastSeen: number;
 };
 
@@ -48,6 +49,7 @@ const newSession = (id: string, lastSeen: number): Session => ({
   art: new Map(),
   artRenders: 0,
   artist: null,
+  voiceClips: 0,
   lastSeen,
 });
 

@@ -102,6 +102,9 @@ export type ArtResponse = { art: StateView['art'] };
 // God mode's reading of a note in plain words: a report to check and send, not yet in the log.
 export type ReadNoteResponse = { report: WorldReport };
 
+// A spoken line as text, for the player to read over and send. Nothing is logged.
+export type TranscribeResponse = { text: string };
+
 export type ActionResponse = {
   ok: boolean;
   reason: string | null;

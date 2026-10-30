@@ -123,7 +123,7 @@ function VillagePage() {
         <Suspense fallback={<div className="game" />}>
           <Village view={view} onTalk={talk} />
         </Suspense>
-        <Chat view={view} talkTo={talkTo} onTalkTo={setTalkTo} pending={pending} onSay={say} onAccept={(id) => run(api.accept(id))} inputRef={chatInput} />
+        <Chat view={view} talkTo={talkTo} onTalkTo={setTalkTo} pending={pending} onSay={say} onAccept={(id) => run(api.accept(id))} inputRef={chatInput} onError={setError} />
         {error && (
           <div className="error" role="alert">
             {error}

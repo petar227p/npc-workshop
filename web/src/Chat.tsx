@@ -3,7 +3,8 @@ import type { ContractView, EngineEvent, StateView } from '@blacksmith/shared';
 import { MAX_SAY_LENGTH } from '@blacksmith/shared/src/limits';
 import { MODEL_INFO } from '@blacksmith/shared/src/npc-info';
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
-import { clockText } from './api';
+import { api, clockText } from './api';
+import { canRecord, record, type Recording } from './voice';
 
 export type Pending = { text: string; npc: string }; // the player's line while that NPC is thinking
 
@@ -15,6 +16,7 @@ type Props = {
   onSay: (text: string) => void;
   onAccept: (contractId: string) => void;
   inputRef?: RefObject<HTMLInputElement>; // the village focuses it when the player walks up to someone
+  onError?: (message: string | null) => void; // where the mic's trouble is shown
 };
 
 // A Tiny Dungeon character frame at 3x, as the portrait's background.
@@ -23,7 +25,7 @@ const portraitStyle = (frame: number) => ({ backgroundPosition: `-${(frame % 12)
 // Display names come with the people in the view (and each seller's stock).
 export const nameOf = (view: StateView, id: string) => view.people.find((p) => p.id === id)?.name ?? view.shops.find((s) => s.id === id)?.name ?? id;
 
-export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRef }: Props) {
+export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRef, onError }: Props) {
   const [text, setText] = useState('');
   const box = useRef<HTMLDivElement>(null);
   // One NPC thinks at a time and the server is locked until it's done, so nobody can be spoken to meanwhile.
@@ -92,9 +94,80 @@ export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRe
           // Esc hands the keys back to walking.
           onKeyDown={(e) => e.key === 'Escape' && e.currentTarget.blur()}
         />
+        {canRecord() && (
+          <Mic
+            disabled={thinking}
+            onError={onError ?? (() => {})}
+            // What was heard goes in the box, after anything typed, for the player to read over and send.
+            onText={(heard) => {
+              setText((t) => (t.trim() ? `${t.trim()} ${heard}` : heard).slice(0, MAX_SAY_LENGTH));
+              inputRef?.current?.focus();
+            }}
+          />
+        )}
         <button disabled={thinking || !text.trim()}>Send</button>
       </form>
     </section>
+  );
+}
+
+// Click to speak, click again to stop: the clip goes to Muse Voice Transcribe and the words come back into the box.
+// It stops itself at the server's limit. Nothing is said to anyone until Send.
+function Mic({ disabled, onText, onError }: { disabled: boolean; onText: (text: string) => void; onError: (message: string | null) => void }) {
+  const [state, setState] = useState<'idle' | 'listening' | 'hearing'>('idle');
+  const [seconds, setSeconds] = useState(0);
+  const rec = useRef<Recording | null>(null);
+
+  useEffect(() => () => rec.current?.cancel(), []);
+  useEffect(() => {
+    if (state !== 'listening') return;
+    const began = Date.now();
+    setSeconds(0);
+    const timer = setInterval(() => setSeconds(Math.floor((Date.now() - began) / 1000)), 250);
+    return () => clearInterval(timer);
+  }, [state]);
+
+  const finish = async () => {
+    const r = rec.current;
+    if (!r) return;
+    rec.current = null;
+    setState('hearing');
+    try {
+      const wav = await r.stop();
+      if (wav.length < 44 + 16_000 * 2 * 0.4) return onError('Hold the mic a little longer, then click again to stop.');
+      const { text } = await api.transcribe(wav);
+      if (text) onText(text);
+      else onError("Nobody caught any words. Try again, or type it.");
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setState('idle');
+    }
+  };
+
+  const start = async () => {
+    onError(null);
+    try {
+      rec.current = await record(() => void finish());
+      setState('listening');
+    } catch {
+      onError('No microphone to listen with. Allow it in the browser, or type instead.');
+    }
+  };
+
+  const listening = state === 'listening';
+  return (
+    <button
+      type="button"
+      className={`secondary mic ${listening ? 'on' : ''}`}
+      disabled={state === 'hearing' || (disabled && !listening)}
+      onClick={() => void (listening ? finish() : start())}
+      aria-label={listening ? 'Stop and use what you said' : 'Speak instead of typing'}
+      aria-pressed={listening}
+      title={listening ? 'Click to stop' : 'Speak (Muse Voice Transcribe)'}
+    >
+      {state === 'hearing' ? '…' : listening ? `■ ${seconds}s` : '🎙'}
+    </button>
   );
 }
 

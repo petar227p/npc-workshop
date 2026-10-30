@@ -1,4 +1,4 @@
-import type { ActionResponse, ArtResponse, BenchResponse, EditorLibrary, Gift, NpcDraft, PreviewResponse, ReadNoteResponse, SaveResponse, SketchResponse, StateView, WorldReport } from '@blacksmith/shared';
+import type { ActionResponse, ArtResponse, BenchResponse, EditorLibrary, Gift, NpcDraft, PreviewResponse, ReadNoteResponse, SaveResponse, SketchResponse, StateView, TranscribeResponse, WorldReport } from '@blacksmith/shared';
 
 export class ApiError extends Error {}
 
@@ -25,6 +25,14 @@ export const api = {
   reset: () => call<ActionResponse>('reset', {}),
   report: (r: WorldReport) => call<ActionResponse>('god', r),
   readNote: (note: string) => call<ReadNoteResponse>('god/read', { note }),
+  transcribe: async (wav: Uint8Array<ArrayBuffer>): Promise<TranscribeResponse> => {
+    const res = await fetch('/api/transcribe', { method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: wav });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new ApiError(err?.error ?? `Nobody heard that (${res.status}).`);
+    }
+    return (await res.json()) as TranscribeResponse;
+  },
 };
 
 // Reference pictures are up to a megabyte, and only pictures and saves use them: the checks on every edit and the

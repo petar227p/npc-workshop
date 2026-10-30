@@ -10,3 +10,4 @@ export const MAX_LABEL_LENGTH = 40; // what players and the model call a good, m
 export const MAX_SYNC_REASON = 200; // why a game changed an inventory itself ("looted the mill chest")
 export const MAX_SIGNAL_TEXT = 200; // what one signal asks the game to do, as the model is told it
 export const MAX_SIGNALS = 20; // signals one NPC may declare
+export const MAX_VOICE_SECONDS = 30; // one spoken line for the chat box; the browser stops recording there, the server refuses longer
