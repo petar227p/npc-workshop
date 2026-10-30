@@ -9,7 +9,24 @@ export const registerNames = (list: readonly { id: string; name: string }[]) => 
 export const nameOf = (id: string) => NAMES.get(id) ?? id;
 
 const show = (name: string) => name.replace(/_/g, ' ');
-const gift = (g: Gift, itemName: string | null) => (g.kind === 'gold' ? `${g.amount} gold` : g.kind === 'good' ? `${g.qty} × ${show(g.good)}` : (itemName ?? 'an item'));
+
+// What a good, material or item type is called, from the NPC files' labels: a game's own item id reads as "iron sword".
+// Any NPC can hear of a thing another sells, so the labels are the whole world's. Two files can't call one thing two names.
+const LABELS = new Map<string, string>();
+export function registerLabels(list: readonly { id: string; labels?: Record<string, string> }[]) {
+  for (const n of list) {
+    for (const [name, label] of Object.entries(n.labels ?? {})) {
+      const seen = LABELS.get(name);
+      if (seen !== undefined && seen !== label) throw new Error(`npcs/${n.id}.json calls '${name}' "${label}", but another NPC calls it "${seen}"`);
+      LABELS.set(name, label);
+    }
+  }
+}
+export const labelOf = (name: string) => LABELS.get(name) ?? show(name);
+// For one NPC: its own labels first (a draft on the bench isn't registered), then the world's, then the name as it is.
+export const labelsFor = (own: Record<string, string> = {}) => (name: string) => (Object.hasOwn(own, name) ? own[name] : (LABELS.get(name) ?? name));
+
+const gift = (g: Gift, itemName: string | null) => (g.kind === 'gold' ? `${g.amount} gold` : g.kind === 'good' ? `${g.qty} × ${labelOf(g.good)}` : (itemName ?? 'an item'));
 
 // What happened, by whom, where and when. Null for events that aren't news (see engine/memory.ts MEMORABLE).
 export function summarize(world: World, e: EngineEvent): string | null {
@@ -18,7 +35,7 @@ export function summarize(world: World, e: EngineEvent): string | null {
   const what = (id: string) => {
     const c = contract(id);
     if (!c) return id;
-    return c.kind === 'made_to_order' ? `a ${c.item_name} (${c.item_type})` : `${c.qty} × ${show(c.good)}`;
+    return c.kind === 'made_to_order' ? `a ${c.item_name} (${labelOf(c.item_type)})` : `${c.qty} × ${labelOf(c.good)}`;
   };
   switch (e.type) {
     case 'CONTRACT_ACCEPTED':

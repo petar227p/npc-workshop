@@ -13,6 +13,7 @@ export type NpcSpec = Actor & {
   perception_radius: number; // in tiles: how far from its place it sees what happens (engine/perception.ts)
   sprite?: number; // its look in the village (a Tiny Dungeon frame); the default villager if not given
   art?: NpcArt; // how pictures of what it makes look; the plain pixel-art style if not given
+  labels?: Record<string, string>; // what it calls the things it deals in, by their names in the world (a game's item ids)
   facts(world: World, customer: string): string; // code-owned numbers it may quote
   history(world: World, customer: string): string; // the conversation with this customer, rebuilt from the event log
   triggers?: readonly Trigger[]; // when it takes a turn; being spoken to if not given

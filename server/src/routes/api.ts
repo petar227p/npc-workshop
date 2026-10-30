@@ -6,7 +6,7 @@ import { getCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
 import { readNote } from '../agents/note';
 import type { NpcModel } from '../agents/npc';
-import { artView, createStudio, type StudioLimits } from '../art';
+import { ART_FILE, artView, createStudio, type StudioLimits } from '../art';
 import { placeAt } from '../engine';
 import { answers, passTime, playerAccepts, playerGives, playerSays, playerSpeaks, worldReports } from '../game';
 import type { ImageClient } from '../models/image';
@@ -14,6 +14,7 @@ import { NPC_FILES, NPCS, nameOf, newVillage, player, smith as brann, type NpcFi
 import { PLACE_NAMES } from '../village';
 import { busyMessage, createSessionStore, guestSession, toView, type Session, type SessionLimits } from '../sessions';
 import { mountEditor, type BenchLimits } from './editor';
+import { createV1, type V1Limits } from './v1';
 
 const COOKIE = 'bs_session';
 const MAX_SKIP = 48;
@@ -23,7 +24,6 @@ const MAX_EDITOR_BODY_BYTES = 64 * 1024;
 // Saving and trial pictures carry the draft's reference pictures too: up to three, each at most 300 KB as base64.
 const MAX_ART_BODY_BYTES = MAX_EDITOR_BODY_BYTES + MAX_REFERENCES * Math.ceil((MAX_REFERENCE_BYTES * 4) / 3 + 64);
 const ART_ROUTES = ['/api/editor/save', '/api/editor/sketch'];
-const ART_FILE = /^([0-9a-f-]{36})\.png$/;
 
 const SayBody = z.object({ text: z.string().max(MAX_SAY_LENGTH), npc: z.string().optional() }); // npc: who the player talks to; Brann by default
 const AcceptBody = z.object({ contract_id: z.string() });
@@ -43,6 +43,7 @@ export type ApiDeps = {
   canSaveNpcs?: boolean; // dev only: the NPC editor may write npcs/ and prompts/
   npcFiles?: NpcFiles; // where the editor's library comes from and saves go; the repo's npcs/ and prompts/ by default
   bench?: BenchLimits;
+  v1?: V1Limits; // the dev API's worlds and model calls
 };
 
 // Behind a proxy every request comes from the proxy, so the host's header names the visitor instead.
@@ -68,7 +69,9 @@ export function createApi(deps: ApiDeps) {
   app.use('/api/*', (c, next) => limitFor(c.req.path)(c, next));
 
   // Sessions are made on the first action, not the first look: a crawler or a curl loop of GETs stores nothing.
+  // The dev API has none: a game's world comes with its own token (routes/v1.ts).
   app.use('/api/*', async (c, next) => {
+    if (c.req.path.startsWith('/api/v1/')) return next();
     let s = store.get(getCookie(c, COOKIE));
     if (!s && c.req.method === 'GET') {
       c.set('session', guestSession());
@@ -243,6 +246,7 @@ export function createApi(deps: ApiDeps) {
   });
 
   mountEditor(app, { modelFor, artistFor, canSave: deps.canSaveNpcs ?? false, files: deps.npcFiles ?? NPC_FILES, limits: deps.bench });
+  app.route('/api/v1', createV1({ makeModel: deps.makeModel, makeArtist: deps.makeArtist, studio, clientIp: deps.clientIp, limits: deps.v1 }));
 
   return app;
 }

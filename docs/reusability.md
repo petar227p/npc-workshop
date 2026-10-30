@@ -39,6 +39,8 @@ The hard part is **who owns the state**. In a mod the host game owns gold and in
 
 Made-to-order items with free stats also need a game that can spawn custom items; many can't. Shopkeepers, haggling and quest givers fit best, which is what the toolkit already does.
 
+**Built since (2026-10-30, branch `dev-api`):** steps 1 and 4 exist as the dev API's `start` (a world begins from the game's save) and `sync` (the game's own changes, as totals, logged as `SYNCED`; refused if it would take what is promised to accepted work). Step 3 is the game applying the events it gets back. Item ids can be the game's own, with `labels` so the model reads words. Games that can't spawn custom items can key item types by their ids with fixed stats (min = max). Non-trade grants (a gate pass, a room) can be goods the game syncs into the NPC's stock. Still open: a game action that is neither trade nor a grant needs a new verb in code.
+
 ## As the base of a new game
 
 A good fit: here the ledger *is* the authority, so the sync problem disappears. A JS/TS game (Phaser, as in the demo village) uses it directly. Godot, Unity or Unreal use it as a backend; the engine is about 600 lines of pure logic and could be ported, but model calls belong on a server anyway to keep keys private. The server is already authoritative, so multiplayer gets cheat-proof NPCs without extra work.

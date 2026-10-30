@@ -118,6 +118,7 @@ export type NpcDraft = {
   art: NpcArt; // how the pictures of what it makes look
   start: Start; // its purse and stock in a new world
   catalogue: Catalogue; // what it sells; empty for an NPC that only talks
+  labels: Record<string, string>; // what players and the model call a thing, by its name in the world (a game's item id → "iron sword")
   triggers: Trigger[];
   cue: string;
   fallbacks: { rejected: string; unavailable: string };

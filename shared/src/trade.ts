@@ -52,6 +52,7 @@ export type Gift = z.infer<typeof GiftSchema>;
 const NAME = /^[a-z][a-z0-9_]{0,40}$/;
 const name = z.string().regex(NAME, 'names are lowercase letters, digits and _, starting with a letter');
 const count = z.number().int().min(0).max(1_000_000);
+export { count as CountSchema, name as NameSchema };
 const notEmpty = (r: Record<string, unknown>) => Object.keys(r).length > 0;
 
 const RangeSchema = z

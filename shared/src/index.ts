@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import type { WorldReport } from './events';
-import { MAX_EMOTE_LENGTH, MAX_HAPPENED_LENGTH, MAX_HOURS_AGO, MAX_NEWS_LENGTH, MAX_SAY_LENGTH } from './limits';
-import { GiftSchema, TermsSchema } from './trade';
+import type { InventorySync, WorldReport } from './events';
+import { MAX_EMOTE_LENGTH, MAX_HAPPENED_LENGTH, MAX_HOURS_AGO, MAX_NEWS_LENGTH, MAX_SAY_LENGTH, MAX_SYNC_REASON } from './limits';
+import { CountSchema, GiftSchema, NameSchema, TermsSchema } from './trade';
 
 // Shapes from the handoff. The model proposes these; the server validates them before anything changes.
 
@@ -75,6 +75,22 @@ export const WorldReportSchema: z.ZodType<WorldReport, z.ZodTypeDef, unknown> = 
   notable: z.boolean().default(false),
   hours_ago: z.number().int().min(0).max(MAX_HOURS_AGO).default(0),
 });
+
+// What an actor holds now, as the game's own code says after changing it itself (loot, theft, crafting). Counts are the
+// new totals, not changes, so sending the same sync twice changes nothing. Whether the actor exists and what is promised
+// to a job is the engine's check.
+export const InventorySyncSchema: z.ZodType<InventorySync, z.ZodTypeDef, unknown> = z
+  .object({
+    actor: z.string(),
+    gold: CountSchema.optional(),
+    stock: z.record(NameSchema, CountSchema).refine((s) => Object.keys(s).length <= 200, 'at most 200 goods at once').optional(),
+    reason: z
+      .string()
+      .transform((s) => s.replace(/\s+/g, ' ').trim())
+      .pipe(z.string().min(1).max(MAX_SYNC_REASON)),
+  })
+  .strict()
+  .refine((s) => s.gold !== undefined || s.stock !== undefined, 'give gold, stock or both');
 
 export const EventSchema = z.object({
   id: z.string(),

@@ -1,6 +1,6 @@
 import type { BenchAttempt, BenchResponse, EngineEvent, NpcDraft, PreviewResponse, StateView } from '@blacksmith/shared';
 // The zod-free modules, so the schemas stay out of the bundle.
-import { MAX_SAY_LENGTH } from '@blacksmith/shared/src/limits';
+import { MAX_LABEL_LENGTH, MAX_SAY_LENGTH } from '@blacksmith/shared/src/limits';
 import {
   DEFAULT_SPRITE,
   EFFORT_CHOICES,
@@ -49,6 +49,7 @@ const BLANK: NpcDraft = {
   art: { style: '', references: [] },
   start: { gold: 0, stock: {} },
   catalogue: {},
+  labels: {},
   triggers: [{ kind: 'on_spoken_to' }],
   cue: "Reply to the customer's last words.",
   fallbacks: { rejected: 'Hm. Ask me again.', unavailable: "I'm busy. Come back in a moment." },
@@ -136,6 +137,8 @@ function loadStored(): NpcDraft | null {
     effort: (EFFORT_CHOICES as readonly unknown[]).includes(v.effort) ? (v.effort as NpcDraft['effort']) : 'low',
     start: object('start'),
     catalogue: object('catalogue'),
+    // Drafts from before labels went by their names.
+    labels: everyValue(v.labels, (l) => typeof l === 'string') ? (v.labels as Record<string, string>) : BLANK.labels,
     triggers: readTriggers(v.triggers),
     cue: text('cue'),
     fallbacks: {
@@ -322,6 +325,7 @@ export function Editor() {
         </div>
         <Schedule places={places} home={draft.location} value={draft.schedule} onChange={(s) => set('schedule', s)} />
         <CatalogueForm value={draft} onChange={({ catalogue, start }) => setDraft((d) => ({ ...d, catalogue, start }))} />
+        <Labels draft={draft} onChange={(labels) => set('labels', labels)} />
 
         <h3>How its pictures look</h3>
         <p className="muted small">
@@ -487,6 +491,47 @@ function Schedule({ places, home, value, onChange }: { places: string[]; home: s
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// What the model and players call each thing it deals in. Only needed when a name isn't a word, such as a game's own
+// item id: the NPC then says "iron sword" while the ledger, the log and the dev API keep the id. A name with no label
+// left in the box is dropped.
+function Labels({ draft, onChange }: { draft: NpcDraft; onChange: (labels: Record<string, string>) => void }) {
+  const { start, catalogue, labels } = draft;
+  const names = [
+    ...new Set([
+      ...Object.keys(catalogue.made_to_order?.items ?? {}),
+      ...Object.keys(catalogue.made_to_order?.materials ?? {}),
+      ...Object.keys(catalogue.in_stock ?? {}),
+      ...Object.keys(start.stock),
+      ...Object.keys(labels),
+    ]),
+  ];
+  const [extra, setExtra] = useState('');
+  const put = (name: string, label: string) => {
+    const { [name]: _old, ...rest } = labels;
+    onChange(label.trim() ? { ...rest, [name]: label } : rest);
+  };
+  return (
+    <div className="field">
+      <span className="field-label">
+        What it calls things <span className="muted">· only for names that aren't words, like a game's item ids; the ledger keeps the name</span>
+      </span>
+      {names.length === 0 && <span className="muted small">It deals in nothing yet.</span>}
+      {names.map((n) => (
+        <div key={n} className="inline">
+          <code className="small">{n}</code>
+          <input value={labels[n] ?? ''} placeholder={n} maxLength={MAX_LABEL_LENGTH} onChange={(e) => put(n, e.target.value)} aria-label={`What it calls ${n}`} />
+        </div>
+      ))}
+      <div className="inline">
+        <input value={extra} placeholder="another name it may get (itm_wolf_pelt)" onChange={(e) => setExtra(e.target.value.trim())} aria-label="Another name" />
+        <button type="button" className="secondary small" disabled={!/^[a-z][a-z0-9_]{0,40}$/.test(extra) || names.includes(extra)} onClick={() => (put(extra, extra.replace(/_/g, ' ')), setExtra(''))}>
+          Add
+        </button>
+      </div>
     </div>
   );
 }
