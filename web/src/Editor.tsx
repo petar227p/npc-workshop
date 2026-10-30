@@ -1,6 +1,6 @@
 import type { BenchAttempt, BenchResponse, EngineEvent, NpcDraft, PreviewResponse, StateView } from '@blacksmith/shared';
 // The zod-free modules, so the schemas stay out of the bundle.
-import { MAX_LABEL_LENGTH, MAX_SAY_LENGTH } from '@blacksmith/shared/src/limits';
+import { MAX_LABEL_LENGTH, MAX_SAY_LENGTH, MAX_SIGNAL_TEXT, MAX_SIGNALS } from '@blacksmith/shared/src/limits';
 import {
   DEFAULT_SPRITE,
   EFFORT_CHOICES,
@@ -50,6 +50,7 @@ const BLANK: NpcDraft = {
   start: { gold: 0, stock: {} },
   catalogue: {},
   labels: {},
+  signals: {},
   triggers: [{ kind: 'on_spoken_to' }],
   cue: "Reply to the customer's last words.",
   fallbacks: { rejected: 'Hm. Ask me again.', unavailable: "I'm busy. Come back in a moment." },
@@ -139,6 +140,8 @@ function loadStored(): NpcDraft | null {
     catalogue: object('catalogue'),
     // Drafts from before labels went by their names.
     labels: everyValue(v.labels, (l) => typeof l === 'string') ? (v.labels as Record<string, string>) : BLANK.labels,
+    // Drafts from before signals asked the game for nothing.
+    signals: everyValue(v.signals, (m) => typeof m === 'string') ? (v.signals as Record<string, string>) : BLANK.signals,
     triggers: readTriggers(v.triggers),
     cue: text('cue'),
     fallbacks: {
@@ -309,6 +312,7 @@ export function Editor() {
           issued by code. What each verb checks is fixed in code.
         </p>
         <VerbTable draft={draft} onChange={(verbs, model_verbs) => setDraft((d) => ({ ...d, verbs, model_verbs }))} />
+        {draft.verbs.includes('SIGNAL') && <Signals value={draft.signals} onChange={(signals) => set('signals', signals)} />}
 
         <h3>Where it is and what it sells</h3>
         <p className="muted small">
@@ -530,6 +534,43 @@ function Labels({ draft, onChange }: { draft: NpcDraft; onChange: (labels: Recor
         <input value={extra} placeholder="another name it may get (itm_wolf_pelt)" onChange={(e) => setExtra(e.target.value.trim())} aria-label="Another name" />
         <button type="button" className="secondary small" disabled={!/^[a-z][a-z0-9_]{0,40}$/.test(extra) || names.includes(extra)} onClick={() => (put(extra, extra.replace(/_/g, ' ')), setExtra(''))}>
           Add
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// What it may ask the game to do (SIGNAL): a name the game's code listens for, and what it means, which is what the
+// model is told. The ledger only checks it is one of these; the game decides whether it happens.
+function Signals({ value, onChange }: { value: Record<string, string>; onChange: (signals: Record<string, string>) => void }) {
+  const rows = Object.entries(value);
+  const [name, setName] = useState('');
+  const valid = /^[a-z][a-z0-9_]{0,40}$/.test(name) && !Object.hasOwn(value, name) && rows.length < MAX_SIGNALS;
+  return (
+    <div className="field">
+      <span className="field-label">
+        What it can ask the game for <span className="muted">· your game's code listens for these names and decides whether they happen</span>
+      </span>
+      {rows.length === 0 && <span className="muted small">No signals yet. Add one, such as open_gate or follow_player.</span>}
+      {rows.map(([n, meaning]) => (
+        <div key={n} className="inline">
+          <code className="small">{n}</code>
+          <input
+            value={meaning}
+            placeholder="what it means, as the NPC is told"
+            maxLength={MAX_SIGNAL_TEXT}
+            onChange={(e) => onChange({ ...value, [n]: e.target.value })}
+            aria-label={`What ${n} means`}
+          />
+          <button type="button" className="secondary small" onClick={() => onChange(Object.fromEntries(rows.filter(([x]) => x !== n)))}>
+            Remove
+          </button>
+        </div>
+      ))}
+      <div className="inline">
+        <input value={name} placeholder="a name (open_gate)" onChange={(e) => setName(e.target.value.trim())} aria-label="New signal name" />
+        <button type="button" className="secondary small" disabled={!valid} onClick={() => (onChange({ ...value, [name]: '' }), setName(''))}>
+          Add a signal
         </button>
       </div>
     </div>
@@ -864,6 +905,12 @@ function BenchEntry({ event: e, view, npcName }: { event: EngineEvent; view: Sta
       return <div className="note ok">{gaveText(e, view)}</div>;
     case 'TRIGGER_FIRED':
       return <div className="note">{clockText(e.tick)}: {npcName} acts on their own.</div>;
+    case 'SIGNALED':
+      return (
+        <div className="note ok">
+          {npcName} signals <code>{e.data.signal}</code>: your game&apos;s code would act on it.
+        </div>
+      );
     case 'CONTRACT_REFUSED':
       return <div className="note">{e.data.contract_id ? `${npcName} withdrew offer ${e.data.contract_id}.` : `${npcName} refused.`}</div>;
     case 'ACTION_REJECTED':

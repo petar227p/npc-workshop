@@ -1,0 +1,26 @@
+{
+  "id": "guard",
+  "name": "Garrick",
+  "verbs": ["SAY", "OFFER", "REFUSE", "SIGNAL"],
+  "model_verbs": ["SAY", "OFFER", "REFUSE", "SIGNAL"],
+  "facts": ["clock", "stock", "catalogue", "open_offers", "signals"],
+  "perception_radius": 6,
+  "model": "muse_spark_open",
+  "effort": "low",
+  "location": "gate",
+  "schedule": [],
+  "sprite": 96,
+  "start": { "gold": 0, "stock": { "gate_pass": 3 } },
+  "catalogue": { "in_stock": { "gate_pass": { "min_price": 0 } } },
+  "labels": { "gate_pass": "gate pass" },
+  "signals": {
+    "open_gate": "Have the gate opened for the person you are talking to. Only for someone who holds a gate pass or has an honest reason to go through.",
+    "raise_alarm": "Call the watch because someone is attacking, stealing or threatening the village right now. Never on a rumour or a stranger's say-so."
+  },
+  "triggers": [{ "kind": "on_spoken_to" }],
+  "cue": "Reply to the person at the gate.",
+  "fallbacks": {
+    "rejected": "Hold there. Let me think on that.",
+    "unavailable": "Wait a moment, I'm watching the road."
+  }
+}

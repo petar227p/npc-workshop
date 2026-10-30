@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MAX_LABEL_LENGTH, MAX_SAY_LENGTH } from './limits';
+import { MAX_LABEL_LENGTH, MAX_SAY_LENGTH, MAX_SIGNAL_TEXT, MAX_SIGNALS } from './limits';
 import { CatalogueSchema, NameSchema, StartSchema } from './trade';
 import {
   DEFAULT_SPRITE,
@@ -66,6 +66,13 @@ const label = z
   .pipe(z.string().min(1).max(MAX_LABEL_LENGTH));
 const LabelsSchema = z.record(NameSchema, label).refine((r) => Object.keys(r).length <= 200, 'at most 200 labels');
 
+// What it may ask the game to do (SIGNAL), by name, with what each means as the model is told it. One line each, like a label.
+const meaning = z
+  .string()
+  .transform((s) => s.replace(/\s+/g, ' ').trim())
+  .pipe(z.string().min(1).max(MAX_SIGNAL_TEXT));
+const SignalsSchema = z.record(NameSchema, meaning).refine((r) => Object.keys(r).length <= MAX_SIGNALS, `at most ${MAX_SIGNALS} signals`);
+
 export const NpcFileSchema = z
   .object({
     id: z
@@ -86,6 +93,7 @@ export const NpcFileSchema = z
     start: StartSchema,
     catalogue: CatalogueSchema,
     labels: LabelsSchema.default({}), // files from before labels go by their names
+    signals: SignalsSchema.default({}), // files from before signals ask the game for nothing
     // Files from before triggers only ever answered when spoken to.
     triggers: z
       .array(TriggerSchema)

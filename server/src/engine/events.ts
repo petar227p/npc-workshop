@@ -99,6 +99,7 @@ export function apply(world: World, event: EngineEvent): World {
     case 'HAPPENED': // narrative only: what it changes is who knows it
     case 'SAID':
     case 'EMOTED':
+    case 'SIGNALED': // the game acts on it, in its own code
     case 'GIFT_REFUSED':
     case 'TRIGGER_FIRED':
     case 'ACTION_REJECTED':

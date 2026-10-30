@@ -18,6 +18,7 @@ export const VERBS = [
   'TELL',
   'RETELL',
   'ANNOUNCE',
+  'SIGNAL',
 ] as const;
 export const VerbSchema = z.enum(VERBS);
 export type Verb = z.infer<typeof VerbSchema>;
@@ -39,6 +40,9 @@ export const ACTION_SCHEMAS = {
   TELL: z.object({ action: z.literal('TELL'), to: z.string().nullable(), event_id: z.string(), summary: news }), // to: null = whoever it's talking to
   RETELL: z.object({ action: z.literal('RETELL'), event_id: z.string(), summary: news }),
   ANNOUNCE: z.object({ action: z.literal('ANNOUNCE'), event_id: z.string(), summary: news }),
+  // A request to the game for something the ledger doesn't do itself (open the gate, follow the player, start a fight).
+  // The NPC may only name a signal it declares; whether and how it happens is the game's own code.
+  SIGNAL: z.object({ action: z.literal('SIGNAL'), signal: z.string() }),
 };
 
 export const ActionSchema = z.discriminatedUnion('action', [
@@ -54,6 +58,7 @@ export const ActionSchema = z.discriminatedUnion('action', [
   ACTION_SCHEMAS.TELL,
   ACTION_SCHEMAS.RETELL,
   ACTION_SCHEMAS.ANNOUNCE,
+  ACTION_SCHEMAS.SIGNAL,
 ]);
 export type Action = z.infer<typeof ActionSchema>;
 export type ActionOf<V extends Action['action']> = Extract<Action, { action: V }>;

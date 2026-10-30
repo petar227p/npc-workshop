@@ -275,6 +275,8 @@ function describe(e: EngineEvent, view: StateView): string {
       const late = e.data.reported_tick > e.tick ? `, reported ${e.data.reported_tick - e.tick} h later` : '';
       return `${e.data.notable ? 'Big news' : 'Happened'} at the ${e.location.replace(/_/g, ' ')}: ${e.data.text} (${seenBy(e, view)}${late})`;
     }
+    case 'SIGNALED':
+      return `${who} asks the game to ${e.data.signal.replace(/_/g, ' ')}${e.target ? ` (for ${e.target === 'player' ? 'you' : nameOf(view, e.target)})` : ''}; the game's own code decides`;
     case 'SYNCED':
       return `The game changed ${nameOf(view, e.target ?? '')}'s things: ${e.data.changes.map((c) => `${c.what === 'gold' ? 'gold' : goodName(c.what)} ${c.from} → ${c.to}`).join(', ')} (${e.data.reason})`;
     case 'SAID':

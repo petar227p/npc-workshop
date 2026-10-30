@@ -44,6 +44,7 @@ const miller: NpcDraft = {
   start: { gold: 5, stock: {} },
   catalogue: {},
   labels: {},
+  signals: {},
   triggers: [{ kind: 'on_spoken_to' }],
   cue: 'Reply to the customer.',
   fallbacks: { rejected: 'Eh?', unavailable: 'The wheel is loud. Later.' },

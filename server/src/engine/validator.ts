@@ -31,6 +31,7 @@ export type Actor = {
   catalogue?: Catalogue; // what it sells; OFFER checks terms against it
   start?: Start; // its purse and stock in a new world
   perception_radius?: number; // in tiles: how far from its place it sees what happens; without one it witnesses nothing
+  signals?: Record<string, string>; // what it may ask the game to do (SIGNAL), by name; the game decides whether it happens
 };
 
 export type ActorOf = (id: string) => Actor | undefined;
@@ -151,6 +152,18 @@ export const EMOTE: VerbDef<'EMOTE'> = {
     ok: true,
     events: [{ ...at(world, self, talkingTo(opts, actorOf)), type: 'EMOTED', target: opts.to ?? null, data: { text: action.text } }],
   }),
+};
+
+// A request to the game, for something the ledger doesn't do itself. Only a signal the NPC declares; it changes nothing
+// here, so the game's own code can still say no. Its line, if any, is the SAID after it.
+export const SIGNAL: VerbDef<'SIGNAL'> = {
+  verb: 'SIGNAL',
+  schema: ACTION_SCHEMAS.SIGNAL,
+  rule(world, self, action, opts, actorOf) {
+    const signals = self.signals ?? {};
+    if (own(signals, action.signal) === undefined) return reject(`'${action.signal}' isn't a signal ${self.id} has; it has: ${list(signals)}`);
+    return { ok: true, events: [{ ...at(world, self, talkingTo(opts, actorOf)), type: 'SIGNALED', target: opts.to ?? null, data: { signal: action.signal } }] };
+  },
 };
 
 export const OFFER: VerbDef<'OFFER'> = {

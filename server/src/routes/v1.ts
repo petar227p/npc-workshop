@@ -5,6 +5,7 @@ import {
   type ApiLine,
   type ApiNpc,
   type ApiResult,
+  type ApiSignal,
   type ApiState,
   type ApiWorldCreated,
   type EngineEvent,
@@ -60,6 +61,7 @@ const npcInfo = (n: NpcDefinition): ApiNpc => ({
   verbs: n.verbs.map((v) => v.verb),
   sells: sells(n),
   labels: { ...n.labels },
+  signals: { ...n.signals },
   answers: answers(n),
 });
 
@@ -72,6 +74,7 @@ const parseJson = (text: string): unknown => {
 };
 const bearer = (c: Context) => /^Bearer\s+(\S+)$/i.exec(c.req.header('authorization') ?? '')?.[1] ?? null;
 const isLine = (e: EngineEvent): e is Extract<EngineEvent, { type: 'SAID' }> => e.type === 'SAID' && e.actor !== 'player';
+const isSignal = (e: EngineEvent): e is Extract<EngineEvent, { type: 'SIGNALED' }> => e.type === 'SIGNALED';
 
 export function createV1(deps: V1Deps) {
   const { callsPerWorld = 150, callsPerMinute = 60, maxEvents = 5000, now = Date.now } = deps.limits ?? {};
@@ -145,8 +148,11 @@ export function createV1(deps: V1Deps) {
   };
   const said = (events: EngineEvent[]): ApiLine[] =>
     events.filter(isLine).map((e) => ({ by: e.actor, name: nameOf(e.actor), text: e.data.text, to: e.target }));
+  // What the NPCs asked the game to do: the game's own code carries it out, or doesn't.
+  const signalled = (events: EngineEvent[]): ApiSignal[] =>
+    events.filter(isSignal).map((e) => ({ by: e.actor, name: nameOf(e.actor), signal: e.data.signal, to: e.target }));
   const result = (c: Context, w: GameWorld, r: { ok: boolean; reason: string | null; events: EngineEvent[] }, outcome: ApiResult['outcome'] = null) =>
-    c.json({ ok: r.ok, reason: r.reason, outcome, events: r.events, said: said(r.events), state: stateOf(w) } satisfies ApiResult);
+    c.json({ ok: r.ok, reason: r.reason, outcome, events: r.events, said: said(r.events), signals: signalled(r.events), state: stateOf(w) } satisfies ApiResult);
 
   app.get('/npcs', (c) => c.json({ npcs: NPCS.map(npcInfo) }));
 

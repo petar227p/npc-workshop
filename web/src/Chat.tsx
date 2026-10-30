@@ -106,6 +106,7 @@ export function between(e: EngineEvent, npc: string, view: StateView): boolean {
   switch (e.type) {
     case 'SAID':
     case 'EMOTED':
+    case 'SIGNALED':
       return (e.actor === npc && e.target === null) || toPlayer || (e.actor === 'player' && e.target === npc);
     case 'GIVEN':
     case 'GIFT_REFUSED':
@@ -157,6 +158,13 @@ function Entry({ event: e, view, disabled, onAccept }: { event: EngineEvent; vie
       );
     case 'GIVEN':
       return <div className="note ok">{gaveText(e, view)}</div>;
+    // A request to the game. The village has no code behind it, so it only shows what a game would be asked.
+    case 'SIGNALED':
+      return (
+        <div className="note">
+          {nameOf(view, e.actor)} signals <code>{e.data.signal}</code>. A game would act on it here.
+        </div>
+      );
     // The line itself is the SAID after it; this is the ledger's side: which event, how sure.
     case 'TOLD':
       return (

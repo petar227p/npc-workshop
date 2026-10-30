@@ -41,6 +41,7 @@ export function defineNpc(spec: NpcSpec): NpcDefinition {
   // Giving is for quest givers and gift-givers. A seller who could give would let a customer talk its stock out of it
   // for free, around every price floor in its catalogue.
   if (allowed.has('GIVE') && sells) throw new Error(`${spec.id}: GIVE is for NPCs who give (quest givers, gifts), not sellers: a seller could be talked into giving its stock away`);
+  if (allowed.has('SIGNAL') && Object.keys(spec.signals ?? {}).length === 0) throw new Error(`${spec.id}: SIGNAL needs at least one signal to send`);
   if (spec.catalogue?.made_to_order && !allowed.has('START_WORK')) {
     throw new Error(`${spec.id}: a made-to-order catalogue needs START_WORK, or accepted work never starts`);
   }

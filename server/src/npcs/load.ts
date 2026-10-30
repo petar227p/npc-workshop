@@ -31,6 +31,7 @@ const LEDGER = {
   TELL: verbs.TELL,
   RETELL: verbs.RETELL,
   ANNOUNCE: verbs.ANNOUNCE,
+  SIGNAL: verbs.SIGNAL,
 };
 
 // Everything it deals in, by name: what its catalogue lists, what it starts with, and what its labels name (a game may
@@ -41,11 +42,13 @@ function goodsOf(d: Pick<NpcDraft, 'start' | 'catalogue' | 'labels'>): string[] 
   return [...new Set(named)].filter((n) => !Object.hasOwn(types, n));
 }
 
-// The offer verbs' schemas are built from the NPC's own catalogue, GIVE's from what it may hold; all in its words.
-function modelVerb(v: ModelVerb, catalogue: Catalogue, goods: string[], words: flat.Words): flat.FlatVerb {
-  if (v === 'OFFER') return flat.OFFER(catalogue, words);
-  if (v === 'COUNTER_OFFER') return flat.COUNTER_OFFER(catalogue, words);
+// The offer verbs' schemas are built from the NPC's own catalogue, GIVE's from what it may hold, all in its words;
+// SIGNAL's from the signals it declares.
+function modelVerb(v: ModelVerb, d: Pick<NpcDraft, 'catalogue' | 'signals'>, goods: string[], words: flat.Words): flat.FlatVerb {
+  if (v === 'OFFER') return flat.OFFER(d.catalogue, words);
+  if (v === 'COUNTER_OFFER') return flat.COUNTER_OFFER(d.catalogue, words);
   if (v === 'GIVE') return flat.GIVE(goods, words);
+  if (v === 'SIGNAL') return flat.SIGNAL(Object.keys(d.signals));
   return flat[v];
 }
 
@@ -68,6 +71,8 @@ export function buildNpc(input: unknown, places: readonly string[] | null = PLAC
   // Passing news on cites an event id, which only the memories block tells it.
   const tells = d.verbs.filter((v) => v === 'TELL' || v === 'RETELL' || v === 'ANNOUNCE');
   if (tells.length > 0 && !d.facts.includes('memories')) return { ok: false, errors: [`${tells.join(', ')} needs the "News it knows" facts, or it can't know an event id to pass on`] };
+  // A signal's name alone doesn't say what it does; the model learns that from its facts.
+  if (d.model_verbs.includes('SIGNAL') && !d.facts.includes('signals')) return { ok: false, errors: ['SIGNAL needs the "What it can ask the game for" facts, or it can\'t know what its signals mean'] };
   try {
     // What it calls each thing, the same in its schema, its facts and its history. Throws if two things share a word.
     const label = labelsFor(d.labels);
@@ -85,11 +90,12 @@ export function buildNpc(input: unknown, places: readonly string[] | null = PLAC
       catalogue: d.catalogue,
       start: d.start,
       labels: d.labels,
-      modelVerbs: d.model_verbs.map((v) => modelVerb(v, d.catalogue, goods, words)),
+      signals: d.signals,
+      modelVerbs: d.model_verbs.map((v) => modelVerb(v, d, goods, words)),
       perception_radius: d.perception_radius,
       model: d.model,
       effort: d.effort,
-      facts: factsFor(d.id, d.facts, d.catalogue, label),
+      facts: factsFor(d.id, d.facts, d.catalogue, label, d.signals),
       history: historyFor(d.id, d.name, label),
       triggers: d.triggers,
       cue: d.cue,
