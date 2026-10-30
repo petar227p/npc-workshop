@@ -3,11 +3,13 @@ import { loadEnv, REPO_ROOT } from '../config/env';
 import { createClient } from './client';
 import { createImageClient, type ImageClient } from './image';
 import { readLog, replayClient, withRecorder } from './recorder';
+import { createTranscriber, type Transcriber } from './voice';
 import type { ChatClient } from './types';
 
 export * from './types';
 export { createClient } from './client';
 export { createImageClient, mockImageClient, type ImageClient, type ImageRequest, type ImageResult, type ImageStrength } from './image';
+export { createTranscriber, mockTranscriber, readWav, type Transcriber, type Transcript, type WavInfo } from './voice';
 export { mockClient, readLog, replayClient, withRecorder, type LogEntry } from './recorder';
 
 export type ModelClient = { client: ChatClient; model: string };
@@ -49,4 +51,13 @@ export function createArtist(): ImageClient {
   const apiKey = env.MODEL_API_KEY;
   if (!apiKey) throw new Error('MODEL_API_KEY is not set (see .env.example)');
   return createImageClient({ baseURL: env.META_BASE_URL ?? 'https://api.meta.ai/v1', apiKey, model: env.IMAGE_MODEL ?? 'muse-image-1.0' });
+}
+
+// Muse Voice Transcribe for the chat box's mic. Replays have no voice (the player types).
+export function createVoice(): Transcriber {
+  const env = loadEnv();
+  if (env.REPLAY) throw new Error('no voice in REPLAY mode');
+  const apiKey = env.MODEL_API_KEY;
+  if (!apiKey) throw new Error('MODEL_API_KEY is not set (see .env.example)');
+  return createTranscriber({ baseURL: env.META_BASE_URL ?? 'https://api.meta.ai/v1', apiKey, model: env.TRANSCRIBE_MODEL ?? 'muse-voice-transcribe-1.0' });
 }

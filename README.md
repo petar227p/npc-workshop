@@ -27,6 +27,7 @@ The world is rebuilt by replaying the event log, so every session is auditable a
 - **Generic agent turn** (`server/src/agents/`): builds a strict flat JSON schema from the NPC's model verbs, calls the model, maps the reply to an action, retries once with the rejection reason, then falls back to a safe line.
 - **Playable web app**: chat with inline contract cards, a forge panel with progress and a skip-time button, your gear, stock, and a live ledger showing every event including the rejections.
 - **Item pictures**: Muse Image renders the accepted item as a pixel sprite, snapped to a fixed palette.
+- **Speak instead of typing**: the mic beside the chat box records a line (up to 30 s), the browser encodes it as 16 kHz WAV itself, and Muse Voice Transcribe turns it into text in the box. You read it over and press Send; typing always works.
 - **Signals**: an NPC can ask the game to do something the ledger has no verb for (open a gate, raise the alarm), only from a list it declares. The game's own code decides whether it happens. Garrick the guard at the gate uses them.
 - **NPC workshop** (`#/workshop`): edit persona, verbs, fact blocks, cue, fallbacks and radius. The server checks the draft on every edit and shows the generated schema and facts. A **test bench** runs the draft against the real model on a throwaway world, shows the ledger's verdict on each answer, and has cheat-line buttons for quick exploit tests.
 - **Dev API** (`/api/v1`): another game makes its own world from the NPCs it picks, then sends what its player says and does and gets back the events to show. No cookie, a bearer token per world, the same ledger. See [Use the NPCs from your own game](#use-the-npcs-from-your-own-game).
@@ -42,6 +43,7 @@ Not built yet: the walkable village, villagers that gossip, and the live-site bu
 | Brann, the blacksmith (haggling over made-to-order work) | Muse Spark 1.3 | Meta Model API |
 | Mira, the merchant, and later villagers, gossip and attackers | Muse Spark Open (`meta-models/muse-spark-open-1026`) | Baseten |
 | Item picture | Muse Image | Meta Model API |
+| Spoken lines to text (the chat box's mic) | Muse Voice Transcribe | Meta Model API |
 
 Muse Spark and Muse Spark Open always reason, so the clients send a low `reasoning_effort` and a generous token limit. Baseten does not enforce `json_schema` for Muse Spark Open, so every reply is Zod-validated with one repair retry. Latency and cost numbers from real calls are in [`docs/api-notes.md`](docs/api-notes.md); `npm run latency-test` reproduces them (about 50 calls, six minutes, roughly $0.20).
 
@@ -168,7 +170,7 @@ server/src/
   engine/      world state, events, verbs, validator, clock. Pure, fully tested
   agents/      the generic NPC turn and the flat-schema builder
   npcs/        loads npcs/*.json, fact blocks, conversation history
-  models/      Meta + Baseten clients, recorder, replay, mock
+  models/      Meta + Baseten clients (chat, image, voice), recorder, replay, mock
   art/         Muse Image prompt, background removal, palette snapping
   routes/      the village's HTTP API, the dev API (/api/v1) and the workshop's preview / bench / save endpoints
 web/src/       React app: chat, side panels, workshop editor

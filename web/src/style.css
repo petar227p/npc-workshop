@@ -52,6 +52,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .note.ok { color: var(--ok); }
 .chat-form { display: flex; gap: 8px; margin-top: 10px; }
 .chat-form input { flex: 1; min-width: 0; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font: inherit; }
+.chat-form .mic { min-width: 44px; font-variant-numeric: tabular-nums; }
+.chat-form .mic.on { background: #3a2220; border-color: var(--bad); color: #f3c4bc; }
 .error { background: #3a2220; border: 1px solid var(--bad); color: #f3c4bc; border-radius: 8px; padding: 8px 12px; font-size: 13px; }
 
 /* Contract card */

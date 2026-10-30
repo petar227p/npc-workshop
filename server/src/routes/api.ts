@@ -1,4 +1,4 @@
-import { MAX_NOTE_LENGTH, MAX_REFERENCE_BYTES, MAX_REFERENCES, MAX_SAY_LENGTH, type ActionResponse, type ArtResponse, type ModelChoice, type ReadNoteResponse } from '@blacksmith/shared';
+import { MAX_NOTE_LENGTH, MAX_REFERENCE_BYTES, MAX_REFERENCES, MAX_SAY_LENGTH, MAX_VOICE_SECONDS, type ActionResponse, type ArtResponse, type ModelChoice, type ReadNoteResponse, type TranscribeResponse } from '@blacksmith/shared';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
@@ -10,6 +10,7 @@ import { ART_FILE, artView, createStudio, type StudioLimits } from '../art';
 import { placeAt } from '../engine';
 import { answers, passTime, playerAccepts, playerGives, playerSays, playerSpeaks, worldReports } from '../game';
 import type { ImageClient } from '../models/image';
+import { readWav, type Transcriber } from '../models/voice';
 import { NPC_FILES, NPCS, nameOf, newVillage, player, smith as brann, type NpcFiles } from '../npcs';
 import { PLACE_NAMES } from '../village';
 import { busyMessage, createSessionStore, guestSession, toView, type Session, type SessionLimits } from '../sessions';
@@ -24,6 +25,8 @@ const MAX_EDITOR_BODY_BYTES = 64 * 1024;
 // Saving and trial pictures carry the draft's reference pictures too: up to three, each at most 300 KB as base64.
 const MAX_ART_BODY_BYTES = MAX_EDITOR_BODY_BYTES + MAX_REFERENCES * Math.ceil((MAX_REFERENCE_BYTES * 4) / 3 + 64);
 const ART_ROUTES = ['/api/editor/save', '/api/editor/sketch'];
+// A spoken line as WAV: at most 30 s of 24 kHz 16-bit mono, plus room for the header.
+const MAX_VOICE_BYTES = MAX_VOICE_SECONDS * 24_000 * 2 + 4096;
 
 const SayBody = z.object({ text: z.string().max(MAX_SAY_LENGTH), npc: z.string().optional() }); // npc: who the player talks to; Brann by default
 const AcceptBody = z.object({ contract_id: z.string() });
@@ -36,6 +39,8 @@ export type Env = { Variables: { session: Session } };
 export type ApiDeps = {
   makeModel: (sessionId: string, choice: ModelChoice) => NpcModel; // the client for an NPC's model choice
   makeArtist?: (sessionId: string) => ImageClient; // Muse Image; without it items keep the placeholder picture
+  makeVoice?: () => Transcriber; // Muse Voice Transcribe for the mic; without it the player types
+  voice?: VoiceLimits;
   art?: StudioLimits;
   sessions?: SessionLimits;
   clientIp?: (c: Context) => string | null; // the visitor's address, for the per-address session cap
@@ -45,6 +50,8 @@ export type ApiDeps = {
   bench?: BenchLimits;
   v1?: V1Limits; // the dev API's worlds and model calls
 };
+
+export type VoiceLimits = { perSession?: number; perMinute?: number; now?: () => number };
 
 // Behind a proxy every request comes from the proxy, so the host's header names the visitor instead.
 // The proxy appends the address it saw, so the last entry is the one it vouches for; earlier ones can be forged.
@@ -65,7 +72,9 @@ export function createApi(deps: ApiDeps) {
   const limit = bodyLimit({ maxSize: MAX_BODY_BYTES, onError: tooLarge });
   const editorLimit = bodyLimit({ maxSize: MAX_EDITOR_BODY_BYTES, onError: tooLarge });
   const artLimit = bodyLimit({ maxSize: MAX_ART_BODY_BYTES, onError: tooLarge });
-  const limitFor = (path: string) => (ART_ROUTES.includes(path) ? artLimit : path.startsWith('/api/editor/') ? editorLimit : limit);
+  const voiceLimit = bodyLimit({ maxSize: MAX_VOICE_BYTES, onError: tooLarge });
+  const limitFor = (path: string) =>
+    path === '/api/transcribe' ? voiceLimit : ART_ROUTES.includes(path) ? artLimit : path.startsWith('/api/editor/') ? editorLimit : limit;
   app.use('/api/*', (c, next) => limitFor(c.req.path)(c, next));
 
   // Sessions are made on the first action, not the first look: a crawler or a curl loop of GETs stores nothing.
@@ -114,6 +123,21 @@ export function createApi(deps: ApiDeps) {
     }
     return s.artist;
   };
+  // One client for everyone: it holds no state, and the caps below are what keep the bill down.
+  let voice: Transcriber | null | undefined;
+  const voiceClient = (): Transcriber | null => {
+    if (voice === undefined) {
+      try {
+        voice = deps.makeVoice?.() ?? null;
+      } catch (err) {
+        console.error(`voice unavailable: ${(err as Error).message}`);
+        voice = null;
+      }
+    }
+    return voice;
+  };
+  const { perSession: clipsPerSession = 60, perMinute: clipsPerMinute = 120, now = Date.now } = deps.voice ?? {};
+  let recentClips: number[] = []; // across all visitors, like the picture cap
   const busy = (c: Context<Env>) => c.json({ error: busyMessage(c.get('session')) }, 409);
   const body = async <T>(c: Context<Env>, schema: z.ZodType<T>) => schema.safeParse(await c.req.json().catch(() => null));
 
@@ -234,6 +258,31 @@ export function createApi(deps: ApiDeps) {
       return c.json({ report } satisfies ReadNoteResponse);
     } finally {
       s.busy = null;
+    }
+  });
+
+  // The mic: a WAV line to text for the chat box. Only text comes back, and it goes in the box for the player to read
+  // over: nothing is said or logged until they press Send. It never touches the world, so it doesn't take the lock.
+  app.post('/api/transcribe', async (c) => {
+    const s = c.get('session');
+    const wav = new Uint8Array(await c.req.arrayBuffer());
+    const info = readWav(wav);
+    if (typeof info === 'string') return c.json({ error: `${info}.` }, 400);
+    if (info.ms > MAX_VOICE_SECONDS * 1000 + 500) return c.json({ error: `Speak for at most ${MAX_VOICE_SECONDS} seconds.` }, 400);
+    const t = now();
+    recentClips = recentClips.filter((at) => t - at < 60_000);
+    if (s.voiceClips >= clipsPerSession) return c.json({ error: "You've used up this visit's voice lines. Type instead." }, 429);
+    if (recentClips.length >= clipsPerMinute) return c.json({ error: 'The village is hard of hearing just now. Type, or try again in a minute.' }, 429);
+    const client = voiceClient();
+    if (!client) return c.json({ error: "Nobody's listening right now. Type instead." }, 503);
+    s.voiceClips += 1;
+    recentClips.push(t);
+    try {
+      const { text } = await client.transcribe(wav);
+      return c.json({ text: text.slice(0, MAX_SAY_LENGTH) } satisfies TranscribeResponse);
+    } catch (err) {
+      console.error(`transcribe failed: ${(err as Error).message}`);
+      return c.json({ error: "That didn't come through. Try again, or type it." }, 502);
     }
   });
 

@@ -1,6 +1,6 @@
 import { serve } from '@hono/node-server';
 import { loadEnv } from './config/env';
-import { createArtist, createModel } from './models';
+import { createArtist, createModel, createVoice } from './models';
 import { clientIpReader, createApi } from './routes/api';
 
 const env = loadEnv();
@@ -8,6 +8,7 @@ const env = loadEnv();
 const app = createApi({
   makeModel: (sessionId, choice) => createModel(sessionId, choice),
   makeArtist: () => createArtist(),
+  makeVoice: () => createVoice(),
   clientIp: clientIpReader(env.TRUST_PROXY_HEADER),
   secureCookie: env.NODE_ENV === 'production',
   // Only `npm run dev` sets this, so a deployed server never writes NPC files.
