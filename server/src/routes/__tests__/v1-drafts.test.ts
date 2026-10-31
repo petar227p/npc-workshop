@@ -39,6 +39,23 @@ function setup(client: ChatClient = mockClient([say]), overrides: Partial<ApiDep
 }
 
 describe('API worlds made directly from Workshop drafts', () => {
+  it('stops reading an oversized streamed world request at the API body limit', async () => {
+    const { app } = setup();
+    let chunksRead = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        chunksRead++;
+        controller.enqueue(new Uint8Array(1024 * 1024));
+        if (chunksRead === 10) controller.close();
+      },
+    }, { highWaterMark: 0 });
+    const request = new Request('http://localhost/api/v1/worlds', {
+      method: 'POST', body: stream, duplex: 'half', headers: { 'content-type': 'application/json' },
+    } as RequestInit);
+    const response = await app.fetch(request);
+    expect(response.status).toBe(413);
+    expect(chunksRead).toBeLessThan(10);
+  });
   it('voices an unregistered NPC, checks its signals and selects its configured model', async () => {
     const { create, makeModel, call } = setup(mockClient([signal('open_gate')]));
     const before = (await call<{ npcs: ApiNpc[] }>('GET', '/api/v1/npcs')).json;

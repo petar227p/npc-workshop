@@ -24,7 +24,7 @@ export function ConnectionVerification({ server, npc }: { server: string; npc: N
   return <div>
     <span className="pill">{LABELS[result.state]}</span>
     <p role="status" aria-live="polite">{result.message}</p>
-    <p>In the interactive example, type <code>/verify</code>. Open its temporary local page and copy the world ID and token here. The token can control that world; keep it private.</p>
+    <p>In the interactive example, type <code>/verify</code>. Open its temporary local page and copy the world ID and token here. If the example runs on a remote backend, forward its loopback port over SSH first (see the example README). The token can control that world; keep it private.</p>
     <form onSubmit={(e) => { e.preventDefault(); setSession({ id: id.trim(), token: token.trim() }); }} autoComplete="off">
       <div className="connection-fields">
         <label>World ID<input value={id} onChange={(e) => { reset(); setId(e.target.value); }} required maxLength={128} spellCheck={false} autoCapitalize="none" /></label>

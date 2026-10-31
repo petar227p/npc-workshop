@@ -69,6 +69,8 @@ Consume `result.events` once, in order, and identify effects by event ID. `resul
 
 Keep this process and its bearer token on a trusted local machine or your game's backend. Do not bundle it into a distributed browser/mobile/engine client. API requests send the token only in `Authorization` headers. Tokens are never printed, written to files or placed in URLs. `/verify` starts a temporary page on `127.0.0.1` with an ephemeral port. Click **Show verification credentials**, then copy the values into Workshop’s step 3. The page exposes credentials only to a same-origin POST with a UI header, refuses cross-site requests and unexpected Host headers, disables caching/framing, and stops after five minutes or when the example exits. Close the page after copying. Do not deploy this loopback UI as a public credential endpoint.
 
+If the example runs on a remote backend, forward the printed port over SSH from your own computer before opening the URL. For example, if `/verify` prints `http://127.0.0.1:45678`, run `ssh -N -L 127.0.0.1:45678:127.0.0.1:45678 user@backend` in a local terminal, replacing the port and SSH destination with your own. Keep that tunnel open while using the page, then close it. Use the same port on both sides because the page checks the Host header. If the local port is occupied, run `/verify` again for a new port. Each `/verify` creates a new temporary page and may require a new tunnel.
+
 ## Recovery and limits
 
 | What you see | What to do |

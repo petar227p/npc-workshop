@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { draftKey, parseNpcBundle, type ApiConnection } from '@blacksmith/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { connectionState, pollConnection, readConnection, snapshotHash, VerificationError, verificationFailure } from '../connectionStatus';
+import { connectionState, pollConnection, readConnection, SecureContextError, snapshotHash, VerificationError, verificationFailure } from '../connectionStatus';
 
 const parsed = parseNpcBundle(readFileSync(new URL('../../../docs/workshop-game-integration-task-2/browser-export.npc.json', import.meta.url), 'utf8'));
 if (!parsed.ok) throw new Error('Invalid fixture');
@@ -15,6 +15,17 @@ describe('connection verification and bounded polling', () => {
     expect(await snapshotHash(npc)).toBe(`sha256:${createHash('sha256').update(draftKey(npc)).digest('hex')}`);
     const changed = structuredClone(npc); changed.persona += 'Changed';
     expect(await snapshotHash(changed)).not.toBe(await snapshotHash(npc));
+  });
+  it('explains the secure-context requirement and stops polling when hashing is unavailable', async () => {
+    vi.stubGlobal('crypto', {});
+    await expect(snapshotHash(npc)).rejects.toBeInstanceOf(SecureContextError);
+    expect(verificationFailure(new SecureContextError()).message).toContain('localhost or over HTTPS');
+    vi.useFakeTimers();
+    const read = vi.fn(() => snapshotHash(npc).then(() => connectionState(data(), npc.id, 'hash')));
+    const stop = pollConnection(read, vi.fn());
+    await vi.runAllTimersAsync();
+    expect(read).toHaveBeenCalledTimes(1);
+    stop();
   });
   it('requires both matching NPC identity and matching snapshot before awarding a real reply', () => {
     const d = data();

@@ -5,6 +5,7 @@ export type Verification = { state: 'not_connected' | 'created' | 'reply' | 'una
 export const NOT_CONNECTED: Verification = { state: 'not_connected', message: 'Enter the world ID and token from the example’s local verification page.' };
 
 export async function snapshotHash(npc: NpcDraft): Promise<string> {
+  if (!globalThis.crypto?.subtle) throw new SecureContextError();
   const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(draftKey(npc)));
   return `sha256:${Array.from(new Uint8Array(bytes), (b) => b.toString(16).padStart(2, '0')).join('')}`;
 }
@@ -23,7 +24,9 @@ export function connectionState(data: ApiConnection, npc: string, expected: stri
 export class VerificationError extends Error {
   constructor(public status: number) { super('Connection check failed'); }
 }
+export class SecureContextError extends Error {}
 export function verificationFailure(error: unknown): Verification {
+  if (error instanceof SecureContextError) return { state: 'unavailable', message: 'This browser needs a secure context to verify the character. Open Workshop on localhost or over HTTPS, then retry.' };
   const status = error instanceof VerificationError ? error.status : 0;
   return { state: 'unavailable', message: status === 401
     ? 'The world ID or token was refused. Copy both from the same example’s local verification page and retry.'
@@ -55,7 +58,7 @@ export function pollConnection(read: (signal: AbortSignal) => Promise<Verificati
     try { result = await read(controller.signal); terminal = result.state === 'mismatch'; }
     catch (error) {
       result = verificationFailure(error);
-      terminal = error instanceof VerificationError && [401, 404].includes(error.status);
+      terminal = error instanceof SecureContextError || (error instanceof VerificationError && [401, 404].includes(error.status));
     }
     if (controller.signal.aborted) return;
     const done = terminal || ++attempts >= 6;

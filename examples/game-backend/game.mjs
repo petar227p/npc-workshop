@@ -226,7 +226,7 @@ export async function main(argv, log = console.log) {
           else if (text === '/verify') {
             verification?.close();
             verification = await game.openVerification();
-            log(`Open ${verification.url} in your browser, then use its local form to copy credentials into Workshop. This page expires in five minutes; /verify opens a fresh page.`);
+            log(`Open ${verification.url} in a browser on this machine, then use its local form to copy credentials into Workshop. For a remote backend, forward this port over SSH first; see examples/game-backend/README.md. This page expires in five minutes; /verify opens a fresh page.`);
           }
           else if (text.startsWith('/accept ')) await game.accept(text.slice(8).trim());
           else if (text.startsWith('/tick ')) await game.tick(Number(text.slice(6)));
