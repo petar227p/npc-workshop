@@ -34,7 +34,9 @@ function useArrivals(view: StateView | null) {
     const more = view.items.some((i) => !items.has(i.item_id)) || Object.entries(view.goods).some(([g, n]) => n > (before.goods[g] ?? 0));
     if (more) setGear((n) => n + 1);
     const known = heardKeys(before);
-    if ([...heardKeys(view)].some((k) => !known.has(k))) setHeard(true);
+    const newHeard = [...heardKeys(view)].some((k) => !known.has(k));
+    if (prev.world_id !== view.world_id) setHeard(newHeard);
+    else if (newHeard) setHeard(true);
   }, [view]);
   return { gear, heard, seenHeard: useCallback(() => setHeard(false), []) };
 }
@@ -78,7 +80,8 @@ export function VillagePage() {
   const chatInput = useRef<HTMLInputElement>(null);
   const arrivals = useArrivals(view);
   // Whether the player has opened a conversation this visit (E, the picker, the message box): the first hint is how to.
-  const [engaged, setEngaged] = useState(false);
+  const [engagedWorld, setEngagedWorld] = useState<string | null>(null);
+  const engaged = !!view?.world_id && engagedWorld === view.world_id;
   const [prefill, setPrefill] = useState<{ text: string; n: number } | null>(null);
   const hints = useHints({ view, talkTo, engaged, canClick: true });
   // E next to someone: talk to them, with the keys in the chat box until Esc. Not to someone else while an NPC is
@@ -87,15 +90,15 @@ export function VillagePage() {
     (npc: string) => {
       if (pending !== null && npc !== talkTo) return;
       setTalkTo(npc);
-      setEngaged(true);
+      setEngagedWorld(view?.world_id ?? null);
       chatInput.current?.focus();
     },
-    [pending, talkTo],
+    [pending, talkTo, view?.world_id],
   );
   const pickNpc = useCallback((npc: string) => {
     setTalkTo(npc);
-    setEngaged(true);
-  }, []);
+    setEngagedWorld(view?.world_id ?? null);
+  }, [view?.world_id]);
 
   useEffect(() => {
     api.state().then(setView, (e: Error) => setError(e.message));
@@ -110,14 +113,21 @@ export function VillagePage() {
   const drawing = Object.values(view?.art ?? {}).some((a) => a.status === 'rendering');
   useEffect(() => {
     if (!drawing) return;
+    let active = true;
+    const world = view?.world_id;
     const timer = setInterval(() => {
       api.art().then(
-        ({ art }) => setView((v) => (v ? { ...v, art } : v)),
+        ({ art }) => {
+          if (active) setView((v) => (v && v.world_id === world ? { ...v, art } : v));
+        },
         () => {},
       );
     }, 2000);
-    return () => clearInterval(timer);
-  }, [drawing]);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [drawing, view?.world_id]);
 
   // Passing time can wait on NPCs acting on their own, so every action locks the buttons until it's back.
   // True when the action went through, so a form can keep what was typed when it didn't.
@@ -231,7 +241,7 @@ export function VillagePage() {
           view={view}
           talkTo={talkTo}
           onTalkTo={pickNpc}
-          onInputFocus={() => setEngaged(true)}
+          onInputFocus={() => setEngagedWorld(view.world_id ?? null)}
           prefill={prefill}
           pending={pending}
           onSay={say}
