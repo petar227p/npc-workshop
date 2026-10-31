@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { buildSetup, ROLE_CARDS, SETUP_ROLES, TELLERS, TELLER_INFO, MAX_SETUP_NAME, MAX_PERSONALITY, type SetupRole, type Teller, type SetupResult } from '@blacksmith/shared/src/setup';
 import { benchIdeas } from '@blacksmith/shared/src/handoff';
+import { MAX_PERSONA_LENGTH } from '@blacksmith/shared/src/npc-info';
+import { markSetupPersonality } from './personality';
 
 const ROLE_HINTS: Record<SetupRole, string> = { merchant: 'Sells goods and bargains.', craftsperson: 'Makes items to order.', villager: 'Chats and can share news.', storyteller: 'Shares stories or news with a crowd.', guard: 'Offers passes and can request actions from your game.' };
 
@@ -13,6 +15,10 @@ export function GuidedSetup({ taken, locked, onUse, onCancel }: { taken: string[
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus(); }, [step]);
   const result = role ? buildSetup({ role, ...(role === 'storyteller' ? { teller } : {}), name, personality }, taken) : null;
+  if (result && personality.trim()) {
+    const marked = markSetupPersonality(result.draft.persona, personality.replace(/\s+/g, ' ').trim().slice(0, MAX_PERSONALITY).trim());
+    if (marked.length <= MAX_PERSONA_LENGTH) result.draft.persona = marked;
+  }
   const idea = result ? benchIdeas(result.draft) : null;
   return <section className="panel starters guided" id="starters" aria-labelledby="guide-heading">
     <p className="muted small">Step {step + 1} of 3 · {['Choose a role', 'Make it yours', 'Review and test'][step]}</p>

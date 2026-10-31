@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { readPersonality, writePersonality } from '../personality';
+import { markSetupPersonality, readPersonality, writePersonality } from '../personality';
+import { buildSetup } from '@blacksmith/shared/src/setup';
 
 describe('personality notes', () => {
   it('preserves existing instructions when adding, changing and clearing notes', () => {
@@ -14,5 +15,13 @@ describe('personality notes', () => {
   it('leaves an unmarked or incomplete persona untouched when reading', () => {
     expect(readPersonality('An existing custom prompt')).toBe('');
     expect(readPersonality('<!-- workshop:personality --> unfinished')).toBe('');
+  });
+  it('lets a guided personality be edited without leaving the old instruction behind', () => {
+    const draft = buildSetup({ role: 'merchant', name: 'Mira', personality: 'Friendly and curious' }, []).draft;
+    const marked = markSetupPersonality(draft.persona, 'Friendly and curious');
+    expect(readPersonality(marked)).toBe('Friendly and curious');
+    const edited = writePersonality(marked, 'Stern');
+    expect(edited).not.toContain('Friendly and curious');
+    expect(readPersonality(edited)).toBe('Stern');
   });
 });

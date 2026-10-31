@@ -238,7 +238,7 @@ export function Editor() {
   // Every new starting point (a template, a blank NPC, a file from the library) comes through here. The old
   // conversation belongs to another NPC, so the bench is cleared first and the draft switches only once it's gone; if
   // it can't be cleared, the draft and the conversation stay as they were.
-  const applyDraft = async (next: NpcDraft, what: string, done: string, fromSetup = false) => {
+  const applyDraft = async (next: NpcDraft, what: string, done: string, fromSetup = false, openTest = false) => {
     if (locked) return;
     if (draft && JSON.stringify(draft) !== baseline.current) {
       if (!confirm(`${what}? It replaces “${draft.name}” in this browser, and your changes to it are lost. Saved files aren't touched.`)) return;
@@ -260,6 +260,10 @@ export function Editor() {
     setStarting(false);
     setOverview(fromSetup);
     setNotice(done);
+    if (openTest) {
+      setSection('test');
+      requestAnimationFrame(() => document.getElementById('test-heading')?.focus());
+    }
   };
 
   const ids = library.map((n) => n.id);
@@ -272,12 +276,13 @@ export function Editor() {
       true,
     );
   };
-  const fromAnswers = (r: SetupResult) =>
+  const fromAnswers = (r: SetupResult, openTest = false) =>
     void applyDraft(
       r.draft,
       'Use this setup',
       `Started ${r.draft.name} (${r.summary.role.toLowerCase()}) from your answers: a new draft in this browser, with example settings. It isn't saved and isn't in the village.`,
       true,
+      openTest,
     );
   const blank = () => void applyDraft({ ...BLANK, id: freshNpcId(BLANK.id, BLANK.id, ids) }, 'Start a blank NPC', 'Started a blank NPC in this browser.');
   const load = (n: NpcDraft) =>
@@ -609,7 +614,7 @@ function Starters({
   library: NpcDraft[];
   locked: boolean;
   onTemplate: (role: SetupRole, teller?: Teller) => void;
-  onAnswers: (r: SetupResult) => void;
+  onAnswers: (r: SetupResult, openTest?: boolean) => void;
   onBlank: () => void;
   onLoad: (n: NpcDraft) => void;
 }) {
@@ -617,7 +622,7 @@ function Starters({
   const [asking, setAsking] = useState(false);
   const [guiding, setGuiding] = useState(false);
   const chosen = library.find((n) => n.id === pick);
-  if (guiding) return <GuidedSetup taken={library.map((n) => n.id)} locked={locked} onUse={onAnswers} onCancel={() => setGuiding(false)} />;
+  if (guiding) return <GuidedSetup taken={library.map((n) => n.id)} locked={locked} onUse={(result) => onAnswers(result, true)} onCancel={() => setGuiding(false)} />;
   if (asking) return <Questionnaire taken={library.map((n) => n.id)} locked={locked} onUse={onAnswers} onCancel={() => setAsking(false)} />;
   return (
     <section className="panel starters" id="starters" aria-labelledby="starters-h">
