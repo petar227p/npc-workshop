@@ -307,9 +307,13 @@ describe('api', () => {
   it('reset starts a fresh world', async () => {
     const { app } = setup();
     const b = browser(app);
-    await b.send('/api/say', { text: 'A hammerhead sword, please.' });
+    const before = ((await b.send('/api/say', { text: 'A hammerhead sword, please.' })).json as ActionResponse).view.world_id;
+    expect((await b.send('/api/state')).json).toMatchObject({ world_id: before });
     const r = (await b.send('/api/reset', {})).json as ActionResponse;
     expect(r.view).toMatchObject({ tick: 0, gold: 200, contracts: [], events: [] });
+    // A new game is a new world to the page, though its event ids start again from the same numbers.
+    expect(before).toEqual(expect.any(String));
+    expect(r.view.world_id).not.toBe(before);
   });
 
   describe('item pictures', () => {

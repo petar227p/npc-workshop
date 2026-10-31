@@ -5,7 +5,8 @@ import { findPath, placeNamed, readVillage, spotsIn } from '@blacksmith/shared/s
 import Phaser from 'phaser';
 
 // The village, drawn from the server's view. Where each NPC is comes from the server (its schedule at this tick);
-// the scene only walks it there. The player walks freely; E next to someone opens the chat with them.
+// the scene only walks it there. The player walks freely; E next to someone, or clicking them, opens the chat with them.
+// Hovering someone names them; it never opens anything.
 
 const TILE = 16;
 const NPC_SPEED = 40; // px per second
@@ -13,7 +14,7 @@ const PLAYER_SPEED = 70;
 const TALK_RANGE = 26; // px
 const ITEM_FALLBACK = 104; // a Tiny Dungeon weapon tile, until Muse Image has drawn the real item
 
-export type SceneHooks = { onTalk: (npcId: string) => void };
+export type SceneHooks = { onTalk: (npcId: string) => void; label: (npcId: string) => string };
 
 const px = (t: number) => t * TILE + TILE / 2;
 const tileOf = (x: number, y: number): Tile => ({ x: Math.floor(x / TILE), y: Math.floor(y / TILE) });
@@ -29,11 +30,11 @@ type Person = {
   bubble?: Bubble;
 };
 
-// Something beside the canvas is being typed into: the keys belong to the page. A picker isn't: after choosing from
-// one, the keys go straight back to walking (Space or Alt+↓ still open it).
+// Something beside the canvas is being typed into, or a panel over the page has focus: the keys belong to the page.
+// A picker isn't: after choosing from one, the keys go straight back to walking (Space or Alt+↓ still open it).
 const typing = () => {
   const el = document.activeElement as HTMLElement | null;
-  return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+  return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable || !!el.closest('[data-overlay]'));
 };
 const WALK_KEYS = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
 
@@ -49,6 +50,8 @@ export class VillageScene extends Phaser.Scene {
   private seen = new Set<string>(); // event ids already shown
   private started = false; // the first view only places people; what was already in the log isn't replayed
   private nextClang = 0;
+  private hovered: { id: string; text: Phaser.GameObjects.Text; until: number } | null = null;
+  private pressed: string | null = null; // the villager a click started on: it talks only if it ends there too
 
   constructor(private hooks: SceneHooks) {
     super('village');
@@ -105,8 +108,14 @@ export class VillageScene extends Phaser.Scene {
       if (typing() || event.ctrlKey || event.metaKey || event.altKey) return;
       if (WALK_KEYS.includes(event.key.toLowerCase())) event.preventDefault();
     });
-    // Clicking the village hands the keys back to walking.
-    this.input.on('pointerdown', () => (document.activeElement as HTMLElement | null)?.blur());
+    // Clicking the village hands the keys back to walking. Not a click on a villager: that opens their chat.
+    this.input.on('pointerdown', (_p: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
+      if (!over.length) (document.activeElement as HTMLElement | null)?.blur();
+    });
+    // A click released anywhere else is no click on anyone.
+    this.input.on('pointerup', (_p: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
+      if (!over.length) this.pressed = null;
+    });
 
     this.ready = true;
     if (this.view) this.setView(this.view);
@@ -145,6 +154,7 @@ export class VillageScene extends Phaser.Scene {
       let person = this.people.get(p.id);
       if (!person) {
         const sprite = this.add.sprite(px(goal.x), px(goal.y), 'dungeon', p.sprite);
+        this.makeClickable(sprite, p.id);
         person = { id: p.id, sprite, x: px(goal.x), y: px(goal.y), goal, path: [] };
         this.people.set(p.id, person);
         continue;
@@ -166,7 +176,43 @@ export class VillageScene extends Phaser.Scene {
       if (view.people.some((p) => p.id === id)) continue;
       this.people.get(id)!.sprite.destroy();
       this.people.delete(id);
+      if (this.hovered?.id === id) this.unhover(id);
     }
+  }
+
+  // Hover: their name and what they do, under their feet (speech goes over their head). Click: talk to them, the same
+  // as E next to them, from anywhere, as the chat's picker allows. Opened on release, not press: pressing on the canvas
+  // takes focus away from the page, so focus put in the chat box on press would be lost at once.
+  private makeClickable(sprite: Phaser.GameObjects.Sprite, id: string) {
+    // A little bigger than the 16 px figure, so it's easy to hit.
+    sprite.setInteractive({
+      hitArea: new Phaser.Geom.Rectangle(-3, -3, TILE + 6, TILE + 6),
+      hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+      useHandCursor: true,
+    });
+    sprite.on('pointerover', (p: Phaser.Input.Pointer) => this.hover(id, p.wasTouch ? 1500 : Infinity));
+    sprite.on('pointerout', () => this.unhover(id));
+    sprite.on('pointerdown', () => (this.pressed = id));
+    sprite.on('pointerup', (p: Phaser.Input.Pointer) => {
+      if (this.pressed !== id) return;
+      this.pressed = null;
+      if (p.wasTouch) this.hover(id, 1500);
+      this.hooks.onTalk(id);
+    });
+  }
+
+  private hover(id: string, ms: number) {
+    if (this.hovered?.id !== id) {
+      this.hovered?.text.destroy();
+      this.hovered = { id, text: this.makeText(this.hooks.label(id), '#f6ecd8', '#2a1a05').setOrigin(0.5, 0), until: 0 };
+    }
+    this.hovered.until = this.time.now + ms;
+  }
+
+  private unhover(id: string) {
+    if (this.hovered?.id !== id) return;
+    this.hovered.text.destroy();
+    this.hovered = null;
   }
 
   private play(e: EngineEvent, view: StateView) {
@@ -346,6 +392,12 @@ export class VillageScene extends Phaser.Scene {
     };
     for (const p of this.people.values()) p.bubble = place(p.bubble, p.x, p.y);
     this.playerBubble = place(this.playerBubble, this.player.x, this.player.y);
+
+    if (this.hovered) {
+      const p = this.people.get(this.hovered.id);
+      if (!p || time > this.hovered.until) this.unhover(this.hovered.id);
+      else this.hovered.text.setPosition(Math.round(p.x), Math.round(p.y + TILE / 2 + 1));
+    }
 
     const near = this.nearest();
     this.prompt.setVisible(!!near && !typing() && !near.bubble);

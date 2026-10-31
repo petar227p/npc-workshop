@@ -2,8 +2,9 @@ import type { ContractView, EngineEvent, StateView } from '@blacksmith/shared';
 // The zod-free module, so the schemas stay out of the bundle.
 import { MAX_SAY_LENGTH } from '@blacksmith/shared/src/limits';
 import { MODEL_INFO } from '@blacksmith/shared/src/npc-info';
-import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
 import { api, clockText } from './api';
+import { withRole } from './roles';
 import { canRecord, record, type Recording } from './voice';
 
 export type Pending = { text: string; npc: string }; // the player's line while that NPC is thinking
@@ -17,6 +18,9 @@ type Props = {
   onAccept: (contractId: string) => void;
   inputRef?: RefObject<HTMLInputElement>; // the village focuses it when the player walks up to someone
   onError?: (message: string | null) => void; // where the mic's trouble is shown
+  headExtra?: ReactNode; // beside the name: the village's way to this NPC's stock
+  prefill?: { text: string; n: number } | null; // a suggested line put in the box (each new n), for the player to edit or send
+  onInputFocus?: () => void;
 };
 
 // A Tiny Dungeon character frame at 3x, as the portrait's background.
@@ -25,8 +29,13 @@ const portraitStyle = (frame: number) => ({ backgroundPosition: `-${(frame % 12)
 // Display names come with the people in the view (and each seller's stock).
 export const nameOf = (view: StateView, id: string) => view.people.find((p) => p.id === id)?.name ?? view.shops.find((s) => s.id === id)?.name ?? id;
 
-export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRef, onError }: Props) {
+export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRef, onError, headExtra, prefill, onInputFocus }: Props) {
   const [text, setText] = useState('');
+  useEffect(() => {
+    if (!prefill) return;
+    setText(prefill.text.slice(0, MAX_SAY_LENGTH));
+    inputRef?.current?.focus();
+  }, [prefill?.n]);
   const box = useRef<HTMLDivElement>(null);
   // One NPC thinks at a time and the server is locked until it's done, so nobody can be spoken to meanwhile.
   const thinking = pending !== null;
@@ -61,13 +70,14 @@ export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRe
             <select value={talkTo} onChange={(e) => onTalkTo(e.target.value)} disabled={thinking} aria-label="Who you talk to">
               {view.people.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name}
+                  {withRole(p.id, p.name)}
                 </option>
               ))}
             </select>
           </label>
           <div className="tag">{(person && MODEL_INFO[person.model]?.label) ?? 'The model'} · proposes; the ledger decides</div>
         </div>
+        {headExtra && <div className="chat-head-extra">{headExtra}</div>}
       </div>
       <div className="messages" ref={box}>
         <div className="msg npc">{talkTo === 'smith' ? 'Brann looks up from the anvil.' : `${name} looks up.`} "What'll it be?"</div>
@@ -91,6 +101,7 @@ export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRe
           placeholder={talkTo === 'smith' ? 'Describe what you want forged…' : `Ask ${name} for something…`}
           aria-label={`Message to ${name}`}
           ref={inputRef}
+          onFocus={onInputFocus}
           // Esc hands the keys back to walking.
           onKeyDown={(e) => e.key === 'Escape' && e.currentTarget.blur()}
         />
@@ -238,11 +249,11 @@ function Entry({ event: e, view, disabled, onAccept }: { event: EngineEvent; vie
           {nameOf(view, e.actor)} signals <code>{e.data.signal}</code>. A game would act on it here.
         </div>
       );
-    // The line itself is the SAID after it; this is the ledger's side: which event, how sure.
+    // The line itself is the SAID after it; this is the ledger's side: which event.
     case 'TOLD':
       return (
         <div className="note">
-          {nameOf(view, e.actor)} passes on news ({e.data.event_id}, {Math.round(e.data.confidence * 100)}% sure).
+          {nameOf(view, e.actor)} passes on news ({e.data.event_id}). Who knows what shows how it spread.
         </div>
       );
     case 'GIFT_REFUSED':

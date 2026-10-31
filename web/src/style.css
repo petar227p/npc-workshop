@@ -99,7 +99,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .ledger li.reject { border-color: var(--bad); color: #f3c4bc; }
 .ledger li.clock { color: var(--muted); }
 .ledger li.happened { border-color: var(--god); }
-.ledger time { color: var(--muted); margin-right: 6px; font-family: 'Pixelify Sans', monospace; }
+.ledger time { color: var(--muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
 .ledger details.rejected { margin-top: 3px; color: var(--text); }
 .ledger details.rejected summary { font-size: 11.5px; color: var(--muted); }
 .ledger details.rejected dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1px 8px; margin: 4px 0 0; }
@@ -108,11 +108,19 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .ledger details.rejected dd.full-reason { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 9em; overflow-y: auto; }
 .story + .story { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .story-head { font-size: 13px; overflow-wrap: anywhere; }
-.story ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
-.story li { display: grid; grid-template-columns: 4.5em 3.5em 1fr; gap: 8px; align-items: center; }
-.story .who { color: var(--accent); }
-.story .confidence { margin-top: 0; }
+.story ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.story .who { color: var(--accent); font-weight: 600; }
 .story .muted { overflow-wrap: anywhere; }
+.news-intro { margin: 0 0 12px; }
+.witnessed { margin-top: 6px; font-size: 13px; }
+.know-label { color: var(--muted); }
+.witnessed .know-label { display: inline-block; min-width: 6.5em; font-weight: 600; color: var(--ok); }
+.heard summary { font-size: 13px; font-weight: 400; padding: 2px 0; border-radius: 4px; }
+.heard summary .know-label { font-weight: 600; color: var(--text); }
+.heard details[open] { background: var(--bg); border-radius: 6px; padding: 4px 8px 8px; }
+.chain ol { margin: 6px 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
+.chain-confidence { display: flex; align-items: center; gap: 6px; }
+.story-id { margin-top: 6px; }
 
 /* Page tabs */
 .tabs { display: flex; gap: 4px; margin-left: auto; }
@@ -120,6 +128,113 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .tabs a:hover { color: var(--text); }
 .tabs a[aria-current='page'] { color: var(--text); background: var(--panel); border-color: var(--line); }
 .tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Village shell: time and gold, folded gear, tools, drawers */
+.hud .hud-row { margin-bottom: 8px; }
+.hud .help-menu { margin-left: auto; }
+.hud-menu { margin-left: auto; }
+.hud .help-menu + .hud-menu { margin-left: 0; }
+.hud-time { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.popover-wrap { position: relative; }
+.popover { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: max-content; max-width: min(280px, calc(100vw - 32px)); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px; box-shadow: 0 8px 24px #0008; }
+.popover p { margin: 0; font-size: 13px; }
+.popover .actions { margin-top: 10px; }
+.menu-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.menu-list a { color: var(--text); font-size: 13px; }
+.menu-list a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.danger { background: var(--bad); color: #2a0d08; }
+.panel-toggle { all: unset; box-sizing: border-box; display: flex; width: 100%; align-items: baseline; justify-content: space-between; gap: 8px; cursor: pointer; border-radius: 4px; }
+.panel-toggle::after { content: '▸'; color: var(--muted); font-size: 12px; }
+.panel-toggle[aria-expanded='true']::after { content: '▾'; }
+.panel-toggle .title { font-size: 15px; font-weight: 600; flex: 1; }
+.panel-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.inventory-body { margin-top: 10px; }
+.tools { display: flex; flex-direction: column; gap: 6px; }
+.tools button { text-align: left; display: flex; align-items: center; gap: 8px; }
+.cue { margin-left: auto; font-size: 11px; font-weight: 600; background: var(--accent); color: #2a1a05; border-radius: 999px; padding: 0 7px; }
+.chat-head-extra { margin-left: auto; }
+/* Names now carry roles, so a narrow chat head wraps rather than push past the screen. */
+.chat-head { flex-wrap: wrap; }
+.chat-head > div:not(.portrait):not(.chat-head-extra) { min-width: 0; flex: 1 1 160px; }
+.chat-name select { max-width: 100%; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 20; width: min(420px, 100vw); display: flex; flex-direction: column; background: var(--panel); border-left: 1px solid var(--line); box-shadow: -12px 0 32px #0009; }
+.drawer:focus { outline: none; }
+.drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.drawer-head h2 { margin: 0; font-size: 17px; }
+.drawer-body { flex: 1; overflow-y: auto; padding: 12px 16px 24px; }
+.drawer-body > p { margin: 0 0 10px; }
+.drawer .panel { background: none; border: 0; padding: 0; border-radius: 0; }
+.drawer .news > h2, .drawer .ledger > h2, .drawer .stock-panel > h2 { display: none; }
+.drawer .ledger ol { max-height: none; }
+
+/* Tips and help */
+.tip-wrap { display: inline-flex; align-items: center; gap: 4px; }
+.tip { position: fixed; z-index: 50; max-width: min(260px, calc(100vw - 16px)); padding: 6px 9px; background: #f1e7d6; color: #2a1a05; border-radius: 6px; font-size: 12.5px; font-weight: 500; line-height: 1.4; text-align: left; white-space: normal; box-shadow: 0 6px 18px #0009; pointer-events: none; }
+.tip[hidden] { display: none; }
+.help, .tip-help { all: unset; box-sizing: border-box; display: inline-grid; place-items: center; width: 18px; height: 18px; flex-shrink: 0; border-radius: 50%; border: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 700; cursor: pointer; vertical-align: middle; }
+.help:hover, .tip-help:hover { color: var(--text); border-color: var(--muted); }
+.help:focus-visible, .tip-help:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* With a mouse, hovering the control is enough; the ? is for touch screens, which can't hover. */
+.tip-wrap > .tip-help { display: none; }
+@media (hover: none) { .tip-wrap > .tip-help { display: inline-grid; width: 24px; height: 24px; } .tip-wrap > .help { width: 24px; height: 24px; } }
+.tools .tip-wrap { display: flex; }
+.tools .tip-wrap > button:first-child { flex: 1; }
+.tools .tip-wrap > .tip-help, .tools .tip-wrap > .help { padding: 0; }
+
+/* Time and gold: one copy beside the village on wide screens, one above the chat on narrow ones. */
+.hud-top { display: none; }
+@media (max-width: 860px) { .hud-top { display: block; } .hud-side { display: none; } }
+
+/* Hints and help */
+.hint-slot:empty { display: none; }
+.hint { display: flex; flex-direction: column; gap: 6px; background: #3b3226; border: 1px solid #6a5434; border-left: 3px solid var(--accent); border-radius: 8px; padding: 6px 8px 6px 10px; }
+.hint-main { display: flex; align-items: center; gap: 4px 10px; flex-wrap: wrap; }
+.hint-text { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
+.hint-x { all: unset; cursor: pointer; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 4px; color: var(--muted); font-size: 18px; line-height: 1; }
+.hint-x:hover { color: var(--text); background: var(--panel-2); }
+.hint-x:focus-visible, .hint-off:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hint-examples { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.hint-examples button { font-weight: 500; text-align: left; }
+.hint-off { all: unset; cursor: pointer; white-space: nowrap; font-size: 11.5px; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; border-radius: 3px; }
+.hint-off:hover { color: var(--text); }
+.help-menu .popover { width: min(300px, calc(100vw - 32px)); }
+.help-title { margin: 0 0 6px; font-size: 13px; }
+.help-list { margin: 0 0 10px; padding-left: 18px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.flash { animation: flash 1.6s ease-out; border-radius: 6px; }
+@keyframes flash { 0%, 30% { box-shadow: 0 0 0 2px var(--accent); background: #4a3a22; } 100% { box-shadow: 0 0 0 2px transparent; } }
+@media (prefers-reduced-motion: reduce) { .flash { animation: none; box-shadow: 0 0 0 2px var(--accent); } }
+.item:focus, .story:focus { outline: none; }
+.item:focus-visible, .story:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Header and entrance */
+.brand { font-family: 'Pixelify Sans', monospace; font-size: 22px; font-weight: 600; color: var(--accent); text-decoration: none; border-radius: 4px; }
+.brand:hover { text-decoration: underline; text-underline-offset: 3px; }
+.brand:focus-visible, .entry:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.page:focus { outline: none; }
+.entrance { max-width: 880px; margin: 0 auto; padding: 8vh 0 32px; display: flex; flex-direction: column; gap: 28px; }
+.entrance-intro { text-align: center; }
+.entrance-intro h1 { font-size: 36px; }
+.entrance-intro p { margin: 8px auto 0; max-width: 46ch; font-size: 17px; color: var(--muted); }
+.entrance-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.entry { display: flex; flex-direction: column; gap: 6px; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; color: var(--text); text-decoration: none; transition: border-color .15s, transform .15s; }
+.entry:hover { border-color: var(--accent); transform: translateY(-2px); }
+.entry h2 { margin: 6px 0 0; font-size: 20px; color: var(--accent); }
+.entry p { margin: 0; color: var(--muted); flex: 1; }
+.entry-go { align-self: flex-start; margin-top: 8px; background: var(--accent); color: #2a1a05; font-weight: 600; border-radius: 6px; padding: 7px 14px; }
+.entry-go::after { content: ' →'; }
+.entry-preview { height: 112px; border-radius: 8px; border: 1px solid var(--line); overflow: hidden; }
+.village-preview { display: flex; align-items: flex-end; justify-content: center; gap: 6px; padding-bottom: 14px; background: linear-gradient(#7fb6d6 0 38%, #5a9e4b 38%); }
+.village-preview .portrait { background-color: transparent; }
+.workshop-preview { display: flex; align-items: center; gap: 12px; padding: 0 14px; background: var(--panel-2); }
+.workshop-preview ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); min-width: 0; }
+.workshop-preview li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.workshop-preview b { display: inline-block; width: 6.5em; color: var(--text); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .entry { transition: none; } .entry:hover { transform: none; } }
+@media (max-width: 640px) {
+  .entrance { padding-top: 24px; }
+  .entrance-intro h1 { font-size: 28px; }
+  .entrance-choices { grid-template-columns: 1fr; }
+}
 
 /* NPC workshop */
 .workshop { display: flex; flex-direction: column; gap: 12px; }
@@ -244,12 +359,12 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 
 /* The village canvas above the chat */
 .village-col { height: calc(100vh - 80px); min-height: 640px; }
-.game { height: 55%; min-height: 300px; flex-shrink: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #5a9e4b; }
+.game { height: 50%; min-height: 280px; flex-shrink: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #5a9e4b; }
 .game canvas { display: block; }
-.village-col .chat-panel { flex: 1; height: auto; min-height: 240px; }
+.village-col .chat-panel { flex: 1; height: auto; min-height: 300px; }
 @media (max-width: 860px) {
   .village-col { height: auto; min-height: 0; }
-  .game { height: 50vh; }
+  .game { height: 50vh; min-height: 200px; }
   .village-col .chat-panel { height: 60vh; }
 }
 

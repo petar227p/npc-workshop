@@ -95,6 +95,7 @@ export type StateView = {
   events: EngineEvent[];
   busy: boolean; // the smith is mid-turn
   art: Record<string, ItemArt>; // by contract id
+  world_id?: string; // the village's: new with every new game, so the page can tell a reset world from the one it knew
 };
 
 export type ArtResponse = { art: StateView['art'] };
