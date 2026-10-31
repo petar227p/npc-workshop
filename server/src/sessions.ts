@@ -18,6 +18,7 @@ export type Busy = { by: 'npc'; name: string } | { by: 'bench' } | null;
 export type Session = {
   id: string;
   world: World;
+  worldId: string; // new with each new game; the page keys what it remembers about a world (hints seen) by it
   bench: World | null;
   benchKey: string | null; // which draft's id and starting stock `bench` was made for
   busy: Busy;
@@ -39,6 +40,7 @@ export const busyMessage = (s: Session) =>
 const newSession = (id: string, lastSeen: number): Session => ({
   id,
   world: newVillage(),
+  worldId: randomUUID(),
   bench: null,
   benchKey: null,
   busy: null,

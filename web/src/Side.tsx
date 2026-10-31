@@ -1,24 +1,92 @@
-import type { ContractView, EngineEvent, Gift, ItemArt, MadeToOrderView, StateView, Trigger } from '@blacksmith/shared';
-import { useState } from 'react';
+import type { ContractView, EngineEvent, Gift, ItemArt, KnowerView, MadeToOrderView, StateView, Trigger } from '@blacksmith/shared';
+import { useCallback, useId, useState, type ReactNode } from 'react';
+import { Popover } from './Drawer';
+import { sourceChain } from './knowledge';
+import { Help, Tip } from './Tip';
 import { clockText } from './api';
 import { gaveText, giftText, goodName, nameOf } from './Chat';
 
-type ForgeProps = { view: StateView; disabled: boolean; onSkip: (ticks: number) => void; onReset: () => void };
-
-export function Forge({ view, disabled, onSkip, onReset }: ForgeProps) {
-  const jobs = view.contracts.filter((c): c is MadeToOrderView => c.kind === 'made_to_order' && c.status === 'in_progress');
-  const nextDue = Math.min(...jobs.map((j) => j.due_tick ?? Infinity));
+// Time and the purse, always in view. Village time moves only when the player says so; New game is in the menu,
+// behind a confirmation, because it throws the whole world away.
+export function Hud({
+  view,
+  disabled,
+  onSkip,
+  onReset,
+  help,
+  className = '',
+}: {
+  view: StateView;
+  disabled: boolean;
+  onSkip: (ticks: number) => void;
+  onReset: () => void;
+  help?: ReactNode;
+  className?: string; // where it sits: beside the village on wide screens, above the chat on narrow ones
+}) {
+  const [menu, setMenu] = useState<'closed' | 'open' | 'confirm'>('closed');
+  const close = useCallback(() => setMenu('closed'), []);
   return (
-    <section className="panel">
+    <section className={`panel hud ${className}`} aria-label="Time and gold">
       <div className="hud-row">
         <span className="clock">{clockText(view.tick)}</span>
-        <span className="gold">🪙 {view.gold}</span>
-        <button className="secondary small" onClick={onReset} disabled={disabled} title="Start a fresh world">
-          New game
-        </button>
+        <span className="gold" aria-label={`${view.gold} gold`}>
+          🪙 {view.gold}
+        </span>
+        {help}
+        <Popover label="Menu" open={menu !== 'closed'} onOpen={() => setMenu('open')} onClose={close} className="hud-menu">
+          {menu === 'confirm' ? (
+            <div className="confirm">
+              <p>Start over? Time, gold, items, offers and everything the villagers remember go back to the beginning.</p>
+              <div className="actions">
+                <button
+                  className="danger small"
+                  disabled={disabled}
+                  onClick={() => {
+                    close();
+                    onReset();
+                  }}
+                >
+                  Start a new game
+                </button>
+                <button className="secondary small" onClick={() => setMenu('open')} autoFocus>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <ul className="menu-list">
+              <li>
+                <button className="secondary small" onClick={() => setMenu('confirm')} disabled={disabled}>
+                  New game…
+                </button>
+              </li>
+              <li>
+                <a href="#/">Back to the entrance</a>
+              </li>
+            </ul>
+          )}
+        </Popover>
       </div>
+      <div className="hud-time">
+        <Tip text="Village time advances when you choose. Use +1 hour to see what happens next.">
+          <button className="secondary small" onClick={() => onSkip(1)} disabled={disabled} data-focus-home>
+            +1 hour
+          </button>
+        </Tip>
+        <span className="muted small">Village time moves only when you choose.</span>
+      </div>
+    </section>
+  );
+}
+
+// Work under way, only while there is some.
+export function Forge({ view, disabled, onSkip }: { view: StateView; disabled: boolean; onSkip: (ticks: number) => void }) {
+  const jobs = view.contracts.filter((c): c is MadeToOrderView => c.kind === 'made_to_order' && c.status === 'in_progress');
+  if (jobs.length === 0) return null;
+  const nextDue = Math.min(...jobs.map((j) => j.due_tick ?? Infinity));
+  return (
+    <section className="panel forge">
       <h2>Forge</h2>
-      {jobs.length === 0 && <div className="muted">The anvil is free.</div>}
       {jobs.map((j) => {
         const start = (j.due_tick ?? 0) - j.delivery_ticks;
         const pct = Math.min(100, ((view.tick - start) / j.delivery_ticks) * 100);
@@ -39,68 +107,85 @@ export function Forge({ view, disabled, onSkip, onReset }: ForgeProps) {
         );
       })}
       <div className="actions">
-        <button className="secondary" onClick={() => onSkip(1)} disabled={disabled}>
-          +1 hour
-        </button>
-        {jobs.length > 0 && (
+        <Tip text="Advance village time until the next order is ready.">
           <button onClick={() => onSkip(Math.max(1, Math.min(48, nextDue - view.tick)))} disabled={disabled}>
-            Skip until ready ⏩
+            Wait until ready
           </button>
-        )}
+        </Tip>
       </div>
     </section>
   );
 }
 
-// Each seller's unreserved stock, from the ledger.
-export function Stock({ view }: { view: StateView }) {
+// One seller's unreserved stock, from the ledger.
+export function Stock({ view, shop: id }: { view: StateView; shop: string }) {
+  const shop = view.shops.find((s) => s.id === id);
+  if (!shop) return null;
   return (
-    <>
-      {view.shops.map((shop) => (
-        <section key={shop.id} className="panel">
-          <h2>{shop.name}'s stock</h2>
-          <ul className="stock">
-            {Object.entries(shop.stock).map(([m, n]) => (
-              <li key={m} className={n <= 0 ? 'muted' : ''}>
-                <span>{goodName(m)}</span>
-                <b>{n}</b>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-    </>
+    <section className="panel stock-panel">
+      <h2>{shop.name}'s stock</h2>
+      <ul className="stock">
+        {Object.entries(shop.stock).map(([m, n]) => (
+          <li key={m} className={n <= 0 ? 'muted' : ''}>
+            <span>{goodName(m)}</span>
+            <b>{n}</b>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
-export function Inventory({ view, disabled, onGive }: { view: StateView; disabled: boolean; onGive: (to: string, gift: Gift) => void }) {
+// Folded to a one-line summary until opened; the village opens it when something arrives.
+export function Inventory({
+  view,
+  disabled,
+  onGive,
+  open,
+  onToggle,
+}: {
+  view: StateView;
+  disabled: boolean;
+  onGive: (to: string, gift: Gift) => void;
+  open: boolean;
+  onToggle: () => void;
+}) {
   const goods = Object.entries(view.goods).filter(([, n]) => n > 0);
+  const count = view.items.length + goods.reduce((sum, [, n]) => sum + n, 0);
+  const body = useId();
   return (
-    <section className="panel">
-      <h2>Your gear</h2>
-      {view.items.length === 0 && goods.length === 0 && <div className="muted">Nothing yet but your purse.</div>}
-      {goods.length > 0 && (
-        <ul className="stock">
-          {goods.map(([g, n]) => (
-            <li key={g}>
-              <span>{goodName(g)}</span>
-              <b>{n}</b>
-            </li>
-          ))}
-        </ul>
-      )}
-      {view.items.map((i) => (
-        <div key={i.item_id} className="item">
-          <ItemPicture name={i.item_name} art={view.art[i.contract_id]} />
-          <div>
-            <div className="title">{i.item_name}</div>
-            <div className="muted">
-              dmg {i.stats.damage} · wt {i.stats.weight} · dur {i.stats.durability}
+    <section className="panel inventory">
+      <button id="gear" className="panel-toggle" aria-expanded={open} aria-controls={body} onClick={onToggle}>
+        <span className="title">Your gear</span>
+        <span className="muted small">{count === 0 ? 'empty' : count === 1 ? '1 thing' : `${count} things`}</span>
+      </button>
+      {open && (
+        <div id={body} className="inventory-body">
+          {view.items.length === 0 && goods.length === 0 && <div className="muted">Nothing yet but your purse.</div>}
+          {goods.length > 0 && (
+            <ul className="stock">
+              {goods.map(([g, n]) => (
+                <li key={g}>
+                  <span>{goodName(g)}</span>
+                  <b>{n}</b>
+                </li>
+              ))}
+            </ul>
+          )}
+          {view.items.map((i) => (
+            <div key={i.item_id} id={`item-${i.item_id}`} tabIndex={-1} className="item">
+              <ItemPicture name={i.item_name} art={view.art[i.contract_id]} />
+              <div>
+                <div className="title">{i.item_name}</div>
+                <div className="muted">
+                  dmg {i.stats.damage} · wt {i.stats.weight} · dur {i.stats.durability}
+                </div>
+              </div>
             </div>
-          </div>
+          ))}
+          <GiveForm view={view} goods={goods.map(([g]) => g)} disabled={disabled} onGive={onGive} />
         </div>
-      ))}
-      <GiveForm view={view} goods={goods.map(([g]) => g)} disabled={disabled} onGive={onGive} />
+      )}
     </section>
   );
 }
@@ -164,32 +249,87 @@ function ItemPicture({ name, art }: { name: string; art: ItemArt | undefined }) 
   return <div className={`portrait item-art${drawing ? ' drawing' : ''}`} title={drawing ? 'Being drawn…' : name} />;
 }
 
-// Gossip: for the latest events anyone knows about, who knows and how. Seen with their own eyes, or told (by whom, in
-// what words, how sure). The words drift as news passes on; the event each telling cites can't.
+// Gossip: for the latest events anyone knows about, who knows and how. Seen with their own eyes, or heard from
+// someone, in that person's words. The words drift as news passes on; the event each telling cites can't. How sure
+// they are, and the ids, are in each telling's details.
 export function News({ view }: { view: StateView }) {
+  const example = view.news.flatMap((n) => n.knowers.filter((k) => k.how !== 'witnessed').map((k) => ({ n, k })))[0];
   return (
     <section className="panel news">
       <h2>Who knows what</h2>
       {view.news.length === 0 && <div className="muted">Nobody has seen anything worth talking about yet.</div>}
-      {view.news.map((n) => (
-        <div key={n.event_id} className="story">
-          <div className="story-head">
-            <span className="tag">{n.event_id}</span> {n.text}
+      {view.news.length > 0 && (
+        <p className="muted small news-intro">
+          Villagers remember what they see, and may pass it on in their own words when they meet.
+          {example && ` Here, ${example.k.name} didn't see it happen: ${example.k.told_by ?? 'someone'} told them.`}
+        </p>
+      )}
+      {view.news.map((n) => {
+        const saw = n.knowers.filter((k) => k.how === 'witnessed');
+        const heard = n.knowers.filter((k) => k.how !== 'witnessed');
+        return (
+          <div key={n.event_id} id={`news-${n.event_id}`} tabIndex={-1} className="story">
+            <div className="story-head">{n.text}</div>
+            {saw.length > 0 && (
+              <div className="witnessed">
+                <span className="know-label">Witnessed</span> {saw.map((k) => k.name).join(', ')}
+              </div>
+            )}
+            {heard.length > 0 && (
+              <ul className="heard">
+                {heard.map((k) => (
+                  <li key={k.id}>
+                    <details id={`know-${n.event_id}-${k.id}`}>
+                      <summary>
+                        <span className="who">{k.name}</span> <span className="know-label">Heard from {k.told_by ?? 'someone'}</span>
+                      </summary>
+                      <HowTheyKnow view={view} eventId={n.event_id} knower={k} />
+                    </details>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="tag story-id">Event {n.event_id}</div>
           </div>
-          <ul>
-            {n.knowers.map((k) => (
-              <li key={k.id}>
-                <span className="who">{k.name}</span>
-                <span className="bar confidence" title={`${pct(k.confidence)} sure`}>
-                  <div style={{ width: pct(k.confidence) }} />
-                </span>
-                <span className="muted small">{k.how === 'witnessed' ? 'saw it' : `${pct(k.confidence)}, from ${k.told_by}: "${k.claim}"`}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+        );
+      })}
     </section>
+  );
+}
+
+export const CONFIDENCE_TEXT = 'A simulation value that decreases with each retelling. It is not a measured probability that the story is true.';
+
+// The way the news reached them, oldest step first, as far as the log the view carries records it.
+function HowTheyKnow({ view, eventId, knower }: { view: StateView; eventId: string; knower: KnowerView }) {
+  const chain = sourceChain(view, eventId, knower);
+  const steps = [...chain.steps].reverse();
+  const first = steps[0];
+  return (
+    <div className="chain">
+      <ol>
+        {!chain.whole && first.kind === 'told' && <li className="muted">How {first.by} knew isn't in the record shown here.</li>}
+        {steps.map((s, i) =>
+          s.kind === 'saw' ? (
+            <li key={i}>{s.who} saw it happen.</li>
+          ) : (
+            <li key={i}>
+              {s.by} told {s.who}
+              {s.tick === null ? '' : ` at ${clockText(s.tick)}`}
+              {s.words ? `: “${s.words}”` : '.'}
+              {s.others.length > 0 && (
+                <span className="muted">
+                  {' '}
+                  {s.who} had also heard it from {s.others.join(', ')}.
+                </span>
+              )}
+            </li>
+          ),
+        )}
+      </ol>
+      <div className="muted small chain-confidence">
+        Confidence {knower.confidence.toFixed(2)} <Help about="confidence" text={CONFIDENCE_TEXT} />
+      </div>
+    </div>
   );
 }
 
@@ -253,8 +393,6 @@ function kind(e: EngineEvent) {
 const offered = (c: ContractView | Extract<EngineEvent, { type: 'CONTRACT_PROPOSED' }>['data']['contract']) =>
   c.kind === 'made_to_order' ? `${c.item_name}, ${c.price} gold, ${c.delivery_ticks} h` : `${c.qty} × ${goodName(c.good)}, ${c.price} gold`;
 
-const pct = (c: number) => `${Math.round(c * 100)}%`;
-
 function why(t: Trigger): string {
   if (t.kind === 'every_hours') return `every ${t.hours} h`;
   if (t.kind === 'on_meet') return 'met someone with news';
@@ -295,11 +433,11 @@ function describe(e: EngineEvent, view: StateView): string {
     case 'TRIGGER_FIRED':
       return `${who} acts on their own (${why(e.data.trigger)})`;
     case 'TOLD':
-      return `${who} told ${nameOf(view, e.target ?? '')} about ${e.data.event_id} (${pct(e.data.confidence)} sure): "${e.data.summary}"`;
+      return `${who} told ${nameOf(view, e.target ?? '')} about ${e.data.event_id} (confidence ${e.data.confidence.toFixed(2)}): "${e.data.summary}"`;
     case 'RETOLD':
-      return `${who} retold ${e.data.event_id} to everyone around (${pct(e.data.confidence)} sure): "${e.data.summary}"`;
+      return `${who} retold ${e.data.event_id} to everyone around (confidence ${e.data.confidence.toFixed(2)}): "${e.data.summary}"`;
     case 'ANNOUNCED':
-      return `${who} announced ${e.data.event_id} (${pct(e.data.confidence)} sure): "${e.data.summary}"`;
+      return `${who} announced ${e.data.event_id} (confidence ${e.data.confidence.toFixed(2)}): "${e.data.summary}"`;
     case 'EMOTED':
       return `${who} ${e.data.text}`;
     case 'HAPPENED': {

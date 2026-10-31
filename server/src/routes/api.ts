@@ -1,4 +1,5 @@
-import { MAX_NOTE_LENGTH, MAX_REFERENCE_BYTES, MAX_REFERENCES, MAX_SAY_LENGTH, MAX_VOICE_SECONDS, type ActionResponse, type ArtResponse, type ModelChoice, type ReadNoteResponse, type TranscribeResponse } from '@blacksmith/shared';
+import { randomUUID } from 'node:crypto';
+import { MAX_NOTE_LENGTH, MAX_REFERENCE_BYTES, MAX_REFERENCES, MAX_SAY_LENGTH, MAX_VOICE_SECONDS, type ActionResponse, type ArtResponse, type ModelChoice, type ReadNoteResponse, type StateView, type TranscribeResponse } from '@blacksmith/shared';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
@@ -98,7 +99,7 @@ export function createApi(deps: ApiDeps) {
 
   const respond = (c: Context<Env>, r: Omit<ActionResponse, 'view'>) => {
     const s = c.get('session');
-    return c.json({ ...r, view: toView(s.world, s.busy !== null, s.art, NPCS) } satisfies ActionResponse);
+    return c.json({ ...r, view: { ...toView(s.world, s.busy !== null, s.art, NPCS), world_id: s.worldId } } satisfies ActionResponse);
   };
   // A missing key or bad config is the server's problem: say so plainly, log the cause, change nothing.
   const modelFor = (s: Session, choice: ModelChoice): NpcModel | null => {
@@ -143,7 +144,7 @@ export function createApi(deps: ApiDeps) {
 
   app.get('/api/state', (c) => {
     const s = c.get('session');
-    return c.json(toView(s.world, s.busy !== null, s.art, NPCS));
+    return c.json({ ...toView(s.world, s.busy !== null, s.art, NPCS), world_id: s.worldId } satisfies StateView);
   });
 
   // Polled by the page while a picture renders; only the pictures, so a poll can't overwrite a newer world.
@@ -290,6 +291,7 @@ export function createApi(deps: ApiDeps) {
     const s = c.get('session');
     if (s.busy) return busy(c);
     s.world = newVillage();
+    s.worldId = randomUUID();
     s.art = new Map();
     return respond(c, { ok: true, reason: null, outcome: null, events: [] });
   });
