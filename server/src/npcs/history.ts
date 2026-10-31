@@ -1,7 +1,7 @@
 import { clockText, type Gift } from '@blacksmith/shared';
 import type { World } from '../engine';
 import { describe } from './facts';
-import { nameOf } from './news';
+import { nameOf, type Vocabulary } from './news';
 
 type Label = (name: string) => string;
 const giftWith = (label: Label) => (g: Gift, itemName: string | null) =>
@@ -11,13 +11,13 @@ const HISTORY_EVENTS = 24;
 
 // The conversation between one NPC and one customer, rebuilt from the event log rather than kept as chat state.
 // Goods go by what this NPC calls them (`label`), as in its facts.
-export function historyFor(npcId: string, name: string, label: Label = (n) => n): (world: World, customer: string) => string {
+export function historyFor(npcId: string, name: string, label: Label = (n) => n, resolveName: Vocabulary['nameOf'] = nameOf): (world: World, customer: string) => string {
   const gift = giftWith(label);
   return (world, customer) => {
     // Accepts, work and deliveries are about a contract; only this NPC's own sales belong in its history.
     const sold = (id: string) => world.contracts[id]?.seller === npcId;
     // The player is "Customer"; another villager it has met goes by name.
-    const them = customer === 'player' ? 'Customer' : nameOf(customer);
+    const them = customer === 'player' ? 'Customer' : resolveName(customer);
     const lines: string[] = [];
     for (const e of world.events) {
       switch (e.type) {

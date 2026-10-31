@@ -1,7 +1,9 @@
 import {
   MAX_SAY_LENGTH,
-  StartSchema,
+  MAX_WORLD_CREATE_BYTES,
+  worldCreationSchema,
   type ApiEvents,
+  type ApiConnection,
   type ApiLine,
   type ApiNpc,
   type ApiResult,
@@ -19,7 +21,7 @@ import { ART_FILE, artView, type Studio } from '../art';
 import { placeAt } from '../engine';
 import { answers, passTime, playerAccepts, playerGives, playerSays, playerSpeaks, worldReports } from '../game';
 import type { ImageClient } from '../models/image';
-import { nameOf, NPCS, type NpcDefinition } from '../npcs';
+import { NPC_DRAFTS, NPCS, type NpcDefinition } from '../npcs';
 import { toView } from '../sessions';
 import { createWorldStore, sameToken, type GameWorld, type WorldLimits } from '../worlds';
 
@@ -33,7 +35,7 @@ const MAX_HOURS = 48; // one call moves the clock at most two days, like the vil
 const MAX_PAGE = 500; // events per read of the log
 
 // `start`: by actor id ('player' or an NPC in the world), what it holds when the world begins, from the game's own save.
-const NewWorldBody = z.object({ npcs: z.array(z.string()).min(1).max(NPCS.length).optional(), start: z.record(z.string(), StartSchema).optional() }).strict();
+const NewWorldBody = worldCreationSchema(NPCS.length);
 const SayBody = z.object({ npc: z.string(), text: z.string().trim().min(1).max(MAX_SAY_LENGTH) });
 const AcceptBody = z.object({ contract_id: z.string() });
 const GiveBody = z.object({ to: z.string(), gift: z.unknown() }); // the engine checks the gift itself
@@ -114,7 +116,18 @@ export function createV1(deps: V1Deps) {
   const modelFor = (w: GameWorld, choice: ModelChoice): NpcModel | null => {
     if (!w.models[choice]) {
       try {
-        w.models[choice] = deps.makeModel(w.id, choice);
+        const model = deps.makeModel(w.id, choice);
+        w.models[choice] = {
+          ...model,
+          client: {
+            provider: model.client.provider,
+            async chat(request) {
+              if (!canCall(w)) throw new Error('API model-call quota exhausted');
+              spent(w, 1); // includes provider failures; reserves quota across concurrent worlds
+              return model.client.chat(request);
+            },
+          },
+        };
       } catch (err) {
         console.error(`${choice} unavailable: ${(err as Error).message}`);
         return null;
@@ -146,26 +159,36 @@ export function createV1(deps: V1Deps) {
       calls_left: Math.max(0, callsPerWorld - w.calls),
     };
   };
-  const said = (events: EngineEvent[]): ApiLine[] =>
-    events.filter(isLine).map((e) => ({ by: e.actor, name: nameOf(e.actor), text: e.data.text, to: e.target }));
+  const said = (w: GameWorld, events: EngineEvent[]): ApiLine[] =>
+    events.filter(isLine).map((e) => ({ by: e.actor, name: w.cast.find((n) => n.id === e.actor)?.name ?? e.actor, text: e.data.text, to: e.target }));
   // What the NPCs asked the game to do: the game's own code carries it out, or doesn't.
-  const signalled = (events: EngineEvent[]): ApiSignal[] =>
-    events.filter(isSignal).map((e) => ({ by: e.actor, name: nameOf(e.actor), signal: e.data.signal, to: e.target }));
+  const signalled = (w: GameWorld, events: EngineEvent[]): ApiSignal[] =>
+    events.filter(isSignal).map((e) => ({ by: e.actor, name: w.cast.find((n) => n.id === e.actor)?.name ?? e.actor, signal: e.data.signal, to: e.target }));
   const result = (c: Context, w: GameWorld, r: { ok: boolean; reason: string | null; events: EngineEvent[] }, outcome: ApiResult['outcome'] = null) =>
-    c.json({ ok: r.ok, reason: r.reason, outcome, events: r.events, said: said(r.events), signals: signalled(r.events), state: stateOf(w) } satisfies ApiResult);
+    c.json({ ok: r.ok, reason: r.reason, outcome, events: r.events, said: said(w, r.events), signals: signalled(w, r.events), state: stateOf(w) } satisfies ApiResult);
 
   app.get('/npcs', (c) => c.json({ npcs: NPCS.map(npcInfo) }));
 
-  // No body, or no `npcs`, makes a world with every NPC there is.
+  // Persist an entire checked request or none of it. Model calls already made still consume quota;
+  // rejected transactions never expose effects to a game or start artwork.
+  const save = (c: Context, w: GameWorld, next: GameWorld['world']): Response | null => {
+    if (next.events.length > maxEvents) return c.json({ error: `This action would exceed this world's log limit (${maxEvents} events). Make a new world.` }, 429);
+    w.world = next;
+    return null;
+  };
+
+  // Neither selection field means all startup NPCs, even if the Workshop library was edited later.
   app.post('/worlds', async (c) => {
     const text = await c.req.text();
+    if (Buffer.byteLength(text, 'utf8') > MAX_WORLD_CREATE_BYTES) return c.json({ error: 'request too large' }, 413);
     const parsed = NewWorldBody.safeParse(text.trim() === '' ? {} : parseJson(text));
     if (!parsed.success) {
       const why = parsed.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ');
-      return c.json({ error: `expected { npcs?: [<npc id>, …], start?: { <actor id>: { gold, stock } } } (GET /api/v1/npcs lists the NPCs). ${why}` }, 400);
+      return c.json({ error: `expected { npcs?: [<npc id>, …], definitions?: [<NPC draft>, …], start?: { <actor id>: { gold, stock } } }; choose npcs or definitions (GET /api/v1/npcs lists the NPCs). ${why}` }, 400);
     }
-    const ids = parsed.data.npcs ?? NPCS.map((n) => n.id);
-    const unknown = ids.filter((id) => !NPCS.some((n) => n.id === id));
+    const definitions = parsed.data.definitions;
+    const ids = definitions?.map((d) => d.id) ?? parsed.data.npcs ?? NPCS.map((n) => n.id);
+    const unknown = definitions ? [] : ids.filter((id) => !NPCS.some((n) => n.id === id));
     if (unknown.length) return c.json({ error: `no NPC called ${unknown.map((id) => `'${id}'`).join(', ')} (there are: ${NPCS.map((n) => n.id).join(', ')})` }, 400);
     if (new Set(ids).size !== ids.length) return c.json({ error: 'each NPC once' }, 400);
     const start = parsed.data.start ?? {};
@@ -173,7 +196,7 @@ export function createV1(deps: V1Deps) {
     if (stranger !== undefined) return c.json({ error: `start: '${stranger}' isn't in this world (the player is 'player')` }, 400);
 
     // In the game's order: who acts first when several NPCs' triggers fire at once and none has waited longer.
-    const created = worlds.create(deps.clientIp?.(c) ?? null, ids.map((id) => NPCS.find((n) => n.id === id)!), start);
+    const created = worlds.create(deps.clientIp?.(c) ?? null, definitions ?? ids.map((id) => NPC_DRAFTS.find((n) => n.id === id)!), start, definitions ? undefined : null);
     if (!created.ok) return c.json({ error: created.error }, created.status);
     const w = created.entry;
     return c.json({ world_id: w.id, token: w.token, npcs: w.cast.map((n) => n.id), state: stateOf(w) } satisfies ApiWorldCreated, 201);
@@ -182,6 +205,14 @@ export function createV1(deps: V1Deps) {
   app.get('/worlds/:id', (c) => {
     const w = open(c);
     return w instanceof Response ? w : c.json(stateOf(w));
+  });
+
+  // Evidence is private to the authenticated world, recorded only after a committed external /say.
+  app.get('/worlds/:id/connection', (c) => {
+    c.header('Cache-Control', 'no-store');
+    const w = open(c);
+    return w instanceof Response ? w : c.json({ world_id: w.id, busy: w.busy !== null,
+      calls_left: Math.max(0, callsPerWorld - w.calls), npcs: w.connection } satisfies ApiConnection);
   });
 
   // The log from just after `since` (an event id), or from the start: at most `limit` events, `more` if there are others.
@@ -209,19 +240,28 @@ export function createV1(deps: V1Deps) {
     if (full) return full;
     if (!answers(npc)) {
       const r = playerSpeaks(w.world, parsed.data.text, npc, { act: w.act });
-      w.world = r.world;
+      const refused = save(c, w, r.world);
+      if (refused) return refused;
       return result(c, w, r);
     }
 
     if (!canCall(w)) return noCalls(c, w);
     const model = modelFor(w, npc.model);
-    if (!model) return c.json({ error: `${npc.name} isn't at the ${placeAt(npc, w.world.tick).replace(/_/g, ' ')} right now. Try again later.` }, 503);
+    if (!model) {
+      w.connection.find((n) => n.id === npc.id)!.last_say = 'unavailable';
+      return c.json({ error: `${npc.name} isn't at the ${placeAt(npc, w.world.tick).replace(/_/g, ' ')} right now. Try again later.` }, 503);
+    }
     w.busy = npc.name;
     try {
       const r = await playerSays(w.world, parsed.data.text, model, npc, { act: w.act });
-      w.world = r.world;
+      const refused = save(c, w, r.world);
+      if (refused) return refused;
       if (!('attempts' in r)) return result(c, w, r);
-      spent(w, r.attempts.length);
+      const evidence = w.connection.find((n) => n.id === npc.id)!;
+      const reply = r.outcome === 'acted' && r.attempts.some((a) => a.ok)
+        ? r.events.find((e) => e.type === 'SAID' && e.actor === npc.id && e.target === 'player') : undefined;
+      evidence.last_say = reply ? 'reply' : r.outcome === 'acted' ? 'no_reply' : r.outcome;
+      if (reply && !evidence.first_reply) evidence.first_reply = { event_id: reply.id, at: new Date(now()).toISOString() };
       return result(c, w, { ok: true, reason: null, events: r.events }, r.outcome);
     } finally {
       w.busy = null;
@@ -237,7 +277,8 @@ export function createV1(deps: V1Deps) {
     const full = logFull(c, w);
     if (full) return full;
     const r = playerAccepts(w.world, parsed.data.contract_id, { act: w.act });
-    w.world = r.world;
+    const refused = save(c, w, r.world);
+    if (refused) return refused;
     // Work has started, so the item is settled: draw it while the clock runs. Not awaited.
     if (r.ok) {
       const contract = w.world.contracts[parsed.data.contract_id];
@@ -255,7 +296,8 @@ export function createV1(deps: V1Deps) {
     const full = logFull(c, w);
     if (full) return full;
     const r = playerGives(w.world, parsed.data.to, parsed.data.gift, { act: w.act });
-    w.world = r.world;
+    const refused = save(c, w, r.world);
+    if (refused) return refused;
     return result(c, w, r);
   });
 
@@ -272,8 +314,8 @@ export function createV1(deps: V1Deps) {
     w.busy = 'The town';
     try {
       const r = await passTime(w.world, parsed.data.hours, townModel(w), { npcs: w.cast, act: w.act, sense: w.sense });
-      w.world = r.world;
-      spent(w, r.attempts.length);
+      const refused = save(c, w, r.world);
+      if (refused) return refused;
       return result(c, w, { ok: true, reason: null, events: r.events }, r.outcome);
     } finally {
       w.busy = null;
@@ -292,8 +334,8 @@ export function createV1(deps: V1Deps) {
     w.busy = 'The town';
     try {
       const r = await worldReports(w.world, raw, townModel(w), { npcs: w.cast, act: w.act, report: w.report });
-      w.world = r.world;
-      spent(w, r.attempts.length);
+      const refused = save(c, w, r.world);
+      if (refused) return refused;
       return result(c, w, r, r.outcome);
     } finally {
       w.busy = null;
@@ -310,7 +352,8 @@ export function createV1(deps: V1Deps) {
     const full = logFull(c, w);
     if (full) return full;
     const r = w.sync(w.world, raw);
-    w.world = r.world;
+    const refused = save(c, w, r.world);
+    if (refused) return refused;
     return result(c, w, r);
   });
 

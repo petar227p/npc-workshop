@@ -438,7 +438,9 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .editor-nav { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
 .editor-nav button[aria-current="page"] { background: var(--accent); color: #2a1a05; border-color: var(--accent); }
 
-.workshop-editor { min-width: 0; }
+.workshop-editor { min-width: 0; border: 0; padding: 0; margin: 0; }
+.starter-transfer { display: flex; flex-wrap: wrap; gap: 8px; }
+.transfer-help { margin: 12px 0 0; max-width: 85ch; }
 .workshop-editor [hidden] { display: none !important; }
 .overview-disclosure { margin-bottom: 16px; }
 .overview-disclosure > summary { padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; }
@@ -452,3 +454,37 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .bench-tools > summary, .bench-details > summary { color: var(--text); }
 .bench-tools[open] > summary, .bench-details[open] > summary { margin-bottom: 8px; }
 .bench-verdict { padding: 8px 10px; background: var(--panel-2); border-radius: 6px; font-size: 13px; }
+
+/* The handoff is a screen within Workshop; hidden forms/bench stay mounted to retain their state. */
+.workshop[hidden] { display: none !important; }
+.handoff-ready { box-shadow: 0 0 0 2px var(--ok); }
+.bench-handoff { margin-top: 14px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+.bench-handoff.ready { border-color: var(--ok); background: var(--panel-2); }
+.bench-handoff p { margin: 0 0 10px; }
+.game-connection { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.connection-top { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.connection-intro h2 { font-size: clamp(23px, 4vw, 31px); color: var(--accent); overflow-wrap: anywhere; }
+.connection-intro p { max-width: 80ch; }
+.connection-intro .eyebrow { margin: 0 0 8px; color: var(--muted); font-size: 12px; }
+.connection-snapshot { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 12px 0; border-block: 1px solid var(--line); }
+.connection-snapshot dt { color: var(--muted); font-size: 12px; }
+.connection-snapshot dd { margin: 3px 0 0; overflow-wrap: anywhere; }
+.snapshot-details .code { max-height: 260px; }
+.connection-stale { border: 1px solid var(--accent); background: var(--panel-2); border-radius: 8px; padding: 14px; }
+.connection-stale p { margin: 6px 0 0; }
+.connection-steps { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.connection-step { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; }
+.connection-step h3 { margin: 2px 0 8px; font-size: 18px; }
+.connection-step p { margin: 8px 0 12px; overflow-wrap: anywhere; }
+.step-number { width: 30px; height: 30px; border: 1px solid var(--accent); color: var(--accent); border-radius: 50%; display: grid; place-items: center; }
+.connection-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.connection-fields label { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.connection-fields input { width: 100%; min-width: 0; font: inherit; padding: 8px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; }
+.connection-command { white-space: pre-wrap; overflow-wrap: anywhere; max-height: none; }
+.game-connection button, .bench-handoff button { min-height: 40px; }
+@media (max-width: 600px) {
+  .connection-snapshot, .connection-fields { grid-template-columns: minmax(0, 1fr); }
+  .connection-step { grid-template-columns: 24px minmax(0, 1fr); gap: 8px; }
+  .step-number { width: 24px; height: 24px; }
+  .connection-step { padding: 12px 10px; }
+}

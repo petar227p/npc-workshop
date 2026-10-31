@@ -3,7 +3,8 @@ import { DEFAULT_SPRITE, type ContractView, type KnowerView, type ModelChoice, t
 import type { NpcModel } from './agents/npc';
 import { artView, type Gallery } from './art';
 import { availableStock, memoriesOf, placeAt, type World } from './engine';
-import { nameOf, newVillage, summarize, type NpcSpec } from './npcs';
+import { newVillage, summarize, type NpcSpec } from './npcs';
+import { vocabularyFor } from './npcs/news';
 import type { ImageClient } from './models/image';
 import { PLACE_NAMES } from './village';
 
@@ -142,10 +143,11 @@ const NEWS_SHOWN = 6;
 
 // The latest events anyone in the cast knows about, each with who knows it and how sure they are.
 function newsView(world: World, cast: Cast): NewsView[] {
+  const vocabulary = vocabularyFor(cast);
   const knowers = new Map<string, KnowerView[]>();
   for (const n of cast) {
     for (const m of memoriesOf(world, n.id)) {
-      const k: KnowerView = { id: n.id, name: n.name, how: m.how_learned, told_by: m.told_by && nameOf(m.told_by), confidence: m.confidence, claim: m.claim };
+      const k: KnowerView = { id: n.id, name: n.name, how: m.how_learned, told_by: m.told_by && vocabulary.nameOf(m.told_by), confidence: m.confidence, claim: m.claim };
       knowers.set(m.event_id, [...(knowers.get(m.event_id) ?? []), k]);
     }
   }
@@ -157,14 +159,14 @@ function newsView(world: World, cast: Cast): NewsView[] {
       event_id: e.id,
       tick: e.tick,
       place: e.location,
-      text: summarize(world, e) ?? e.type,
+      text: summarize(world, e, vocabulary) ?? e.type,
       knowers: knowers.get(e.id)!.sort((a, b) => b.confidence - a.confidence),
     }));
 }
 
 // The NPCs a view shows: their names label each seller's stock (an actor without one is shown by its id),
 // and where they are comes from their schedule.
-export type Cast = readonly Pick<NpcSpec, 'id' | 'name' | 'sprite' | 'location' | 'schedule' | 'model'>[];
+export type Cast = readonly Pick<NpcSpec, 'id' | 'name' | 'sprite' | 'location' | 'schedule' | 'model' | 'labels'>[];
 
 export function toView(world: World, busy: boolean, art: Gallery = new Map(), cast: Cast = [], customer = 'player'): StateView {
   const names = Object.fromEntries(cast.map((n) => [n.id, n.name]));
