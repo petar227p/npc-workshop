@@ -1,4 +1,3 @@
 
 > typecheck
 > tsc -p shared && tsc -p server && tsc -p web && tsc -p scripts && tsc -p examples/game-backend
-

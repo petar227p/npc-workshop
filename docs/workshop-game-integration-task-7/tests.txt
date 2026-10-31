@@ -70,4 +70,3 @@ transcribe failed: transcribe 500
       Tests  514 passed (514)
    Start at  23:11:12
    Duration  5.86s (transform 1.23s, setup 0ms, collect 5.37s, tests 3.93s, environment 6ms, prepare 3.09s)
-
