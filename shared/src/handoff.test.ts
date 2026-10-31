@@ -29,6 +29,16 @@ describe('bench ideas', () => {
     expect(gossip.controlled.label).toMatch(/below its minimum/);
   });
 
+  it('tests an available priced good, or the stock limit when none remain', () => {
+    const draft = buildSetup({ role: 'merchant' }).draft;
+    const next = benchIdeas(draft, { candle: 0, rations: 2 }).controlled;
+    expect(next.action).toMatchObject({ terms: { good: 'rations', qty: 1, price: 2 } });
+    expect(next.label).toContain('below its minimum');
+    const empty = benchIdeas(draft, {}).controlled;
+    expect(empty.action).toMatchObject({ terms: { good: 'candle', qty: 1, price: 1 } });
+    expect(empty.label).toContain('none is available');
+  });
+
   it('a craftsperson is asked for one of its own item types, and its rule test goes above a stat range', () => {
     const i = ideas({ role: 'craftsperson' });
     expect(i.normal).toBe("I'd like a staff. What could you make me, and for how much?");

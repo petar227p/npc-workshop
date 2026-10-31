@@ -60,6 +60,24 @@ describe('guided setups on the server', () => {
     expect(((await bad.json()) as ControlledResponse).errors.join()).toMatch(/id:/);
   });
 
+  it('controlled tests match their labels when merchant stock is missing', async () => {
+    const app = createApi({ makeModel: () => { throw new Error('unexpected model call'); } });
+    const merchant = buildSetup({ role: 'merchant' }, taken).draft;
+    merchant.start.stock.candle = 0;
+    const send = async () => {
+      const res = await app.request('/api/editor/bench/controlled', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ npc: merchant }) });
+      return await res.json() as ControlledResponse;
+    };
+    const stocked = await send();
+    expect(stocked.label).toContain('rations');
+    expect(stocked.reason).toContain('below the minimum');
+    for (const good of Object.keys(merchant.start.stock)) merchant.start.stock[good] = 0;
+    const empty = await send();
+    expect(empty.label).toContain('none is available');
+    expect(empty.reason).toContain('only 0 in stock');
+    expect(empty.accepted).toBe(false);
+  });
+
   it("each dependency the setup adds is one the server refuses a draft without", () => {
     const fails = (d: NpcDraft) => !buildNpc(d).ok;
     const without = <T>(list: T[], x: T) => list.filter((v) => v !== x);

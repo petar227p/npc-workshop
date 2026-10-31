@@ -1033,6 +1033,12 @@ function Bench({ draft, valid, onBusy }: { draft: NpcDraft; valid: boolean; onBu
   const [unsent, setUnsent] = useState<string | null>(null); // a line that didn't get through, to send again
   const [controlled, setControlled] = useState<Set<string>>(() => new Set()); // ids of events the workshop proposed, not the model
   const box = useRef<HTMLDivElement>(null);
+  const viewKey = useRef<string | null>(null);
+  const key = JSON.stringify([draft.id, draft.start]);
+  const showView = (next: StateView) => {
+    viewKey.current = key;
+    setView(next);
+  };
   const busy = pending !== null || passing || testing;
   // While anything is under way the editor won't swap the draft: the answer belongs to this one.
   useEffect(() => onBusy(busy), [busy, onBusy]);
@@ -1042,7 +1048,7 @@ function Bench({ draft, valid, onBusy }: { draft: NpcDraft; valid: boolean; onBu
   }, [view?.events.length, pending]);
 
   const timed = draft.triggers.some((t) => t.kind === 'every_hours');
-  const ideas = benchIdeas(draft);
+  const ideas = benchIdeas(draft, view && viewKey.current === key ? (view.shops.find((shop) => shop.id === draft.id)?.stock ?? {}) : undefined);
 
   const send = async (line: string) => {
     if (busy || !valid) return;
@@ -1051,7 +1057,7 @@ function Bench({ draft, valid, onBusy }: { draft: NpcDraft; valid: boolean; onBu
     setPending(line);
     try {
       const r = await editorApi.say(draft, line);
-      setView(r.view);
+      showView(r.view);
       if (!r.ok) setError(r.errors.join('; '));
       else setTurns((t) => [...t, { kind: 'model', text: line, attempts: r.attempts, outcome: r.outcome }]);
     } catch (e) {
@@ -1077,7 +1083,7 @@ function Bench({ draft, valid, onBusy }: { draft: NpcDraft; valid: boolean; onBu
     setPassing(true);
     try {
       const r = await editorApi.tick(draft, ticks);
-      setView(r.view);
+      showView(r.view);
       if (!r.ok) setError(r.errors.join('; '));
       else if (r.attempts.length) setTurns((t) => [...t, { kind: 'model', text: `(${ticks} h passed)`, attempts: r.attempts, outcome: r.outcome }]);
     } catch (e) {
@@ -1094,11 +1100,11 @@ function Bench({ draft, valid, onBusy }: { draft: NpcDraft; valid: boolean; onBu
     setTesting(true);
     try {
       const r = await editorApi.controlled(draft);
-      setView(r.view);
+      showView(r.view);
       if (!r.ok) setError(r.errors.join('; '));
       else {
         setControlled((ids) => new Set([...ids, ...r.events.map((e) => e.id)]));
-        setTurns((t) => [...t, { kind: 'controlled', label: ideas.controlled.label, proposal: r.proposal, accepted: r.accepted, reason: r.reason }]);
+        setTurns((t) => [...t, { kind: 'controlled', label: r.label ?? ideas.controlled.label, proposal: r.proposal, accepted: r.accepted, reason: r.reason }]);
       }
     } catch (e) {
       setError((e as Error).message);
@@ -1111,7 +1117,9 @@ function Bench({ draft, valid, onBusy }: { draft: NpcDraft; valid: boolean; onBu
     setError(null);
     setUnsent(null);
     try {
-      setView((await editorApi.reset()).view);
+      await editorApi.reset();
+      viewKey.current = null;
+      setView(null);
       setTurns([]);
       setControlled(new Set());
     } catch (e) {

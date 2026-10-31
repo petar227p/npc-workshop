@@ -153,4 +153,4 @@ export type BenchResponse = {
 
 // A rule-breaking proposal the workshop sent straight to the ledger for the draft, without the model (handoff.ts
 // benchIdeas): what it proposed and the ledger's verdict.
-export type ControlledResponse = BenchResponse & { proposal: Record<string, unknown> | null; accepted: boolean; reason: string | null };
+export type ControlledResponse = BenchResponse & { label?: string; proposal: Record<string, unknown> | null; accepted: boolean; reason: string | null };
