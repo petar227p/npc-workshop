@@ -15,7 +15,6 @@ import {
   MODEL_INFO,
   MODEL_VERBS,
   NPC_SPRITES,
-  TRIGGER_INFO,
   VERB_INFO,
   type LedgerVerb,
   type ModelVerb,
@@ -29,6 +28,9 @@ import { clockText, editorApi } from './api';
 import { ArtForm } from './ArtForm';
 import { CatalogueForm } from './CatalogueForm';
 import { Questionnaire } from './Questionnaire';
+import { readPersonality, writePersonality } from './personality';
+import { validationHelp, type ValidationHelp } from './validationHelp';
+import { GuidedSetup } from './GuidedSetup';
 import { ContractCard, gaveText, speechFirst } from './Chat';
 
 // The NPC workshop: edit a definition on the left, try it on the test bench on the right.
@@ -185,12 +187,14 @@ export function Editor() {
   const [started, setStarted] = useState(0); // drafts started here; each gets a fresh bench and forms
   const [applying, setApplying] = useState(false);
   const [benchBusy, setBenchBusy] = useState(false);
+  const [section, setSection] = useState('character');
   const [overview, setOverview] = useState(false); // the at-a-glance card after a template or the questions
   // The draft as it was started or saved, to tell whether replacing it loses edits. A restored draft's start is
   // unknown, so it counts as edited.
   const baseline = useRef<string | null>(null);
   const latest = useRef(0);
   const advanced = useRef<HTMLDetailsElement>(null);
+  const characterAdvanced = useRef<HTMLDetailsElement>(null);
 
   useEffect(() => {
     editorApi.library().then(
@@ -303,12 +307,41 @@ export function Editor() {
   };
 
   // The bench is beside the definition on a wide screen and below it on a narrow one: this takes the keys there.
-  const test = () => document.getElementById('bench-input')?.focus();
-  const edit = (section: string) => document.getElementById(`${section}-h`)?.focus();
-  const openPermissions = () => {
-    if (advanced.current) advanced.current.open = true;
-    document.getElementById('permissions')?.focus();
+  const test = () => {
+    setSection('test');
+    requestAnimationFrame(() => document.getElementById('test-heading')?.focus());
   };
+  const edit = (id: string) => {
+    setSection(id === 'world' || id === 'advanced' ? 'abilities' : id === 'appearance' ? 'character' : id);
+    requestAnimationFrame(() => document.getElementById(`${id}-h`)?.focus());
+  };
+  const openPermissions = () => {
+    setSection('abilities');
+    if (advanced.current) advanced.current.open = true;
+    requestAnimationFrame(() => document.getElementById('permissions')?.focus());
+  };
+
+  const goToProblem = (target: ValidationHelp['target']) => {
+    if (!target) return;
+    if (target === 'permissions') return openPermissions();
+    if (target === 'character-advanced') {
+      setSection('character');
+      if (characterAdvanced.current) characterAdvanced.current.open = true;
+      requestAnimationFrame(() => document.getElementById('character-settings')?.focus());
+      return;
+    }
+    setSection(target === 'character' || target === 'appearance' ? 'character' : 'abilities');
+    requestAnimationFrame(() => document.getElementById(target === 'catalogue' ? 'catalogue-h' : target === 'character' ? 'character-name' : `${target}-h`)?.focus());
+  };
+  const problemList = status === 'invalid' && problems.length > 0 && (
+    <div className="errors" role="alert">
+      <b>{problems.length === 1 ? 'One setting needs attention' : `${problems.length} settings need attention`}</b>
+      <ul>{problems.map((error, index) => {
+        const help = validationHelp(error);
+        return <li key={`${error}-${index}`}>{help.message} {help.target && <button type="button" className="secondary small" onClick={() => goToProblem(help.target)}>{help.label}</button>}</li>;
+      })}</ul>
+    </div>
+  );
 
   return (
     <div className="workshop">
@@ -351,7 +384,7 @@ export function Editor() {
                 Check again
               </button>
             )}
-            <button className="test" onClick={test} disabled={!valid}>
+            <button className="test" onClick={test}>
               Test on the bench
             </button>
           </div>
@@ -366,28 +399,35 @@ export function Editor() {
       {(!draft || starting) && <Starters first={!draft} library={library} locked={locked} onTemplate={fromTemplate} onAnswers={fromAnswers} onBlank={blank} onLoad={load} />}
 
       {draft && (
-        <div className="cols editor">
-          <section className="panel definition" aria-label="Definition">
-            {problems.length > 0 && (
-              <ul className={`errors${status === 'checking' ? ' stale' : ''}`} role="alert" aria-label="Problems with this draft">
-                {problems.map((e) => (
-                  <li key={e}>{e}</li>
-                ))}
-              </ul>
-            )}
+        <div className="workshop-editor">
+          <nav className="editor-nav" aria-label="Workshop sections">
+            {([['character', 'Character'], ['abilities', 'Abilities & rules'], ['test', 'Test']] as const).map(([id, label]) => (
+              <button key={id} type="button" className="secondary" aria-current={section === id ? 'page' : undefined} onClick={() => setSection(id)}>{label}</button>
+            ))}
+          </nav>
+          <section className="panel definition" aria-label="Definition" hidden={section === 'test'}>
+            {problemList}
 
-            {overview && <Overview draft={draft} valid={valid} onEdit={edit} onTest={test} onHide={() => setOverview(false)} />}
+            {overview && <details className="overview-disclosure"><summary>{draft.name} at a glance</summary><Overview draft={draft} onEdit={edit} onTest={test} onHide={() => setOverview(false)} /></details>}
 
-            <Section id="character" title="Character" intro="Who it is and how it talks. The persona goes to the model first, every turn.">
-              <div className="row2">
+            <Section active={section === 'character'} id="character" title="Character" intro="Who it is and how it talks. The persona goes to the model first, every turn.">
+              <div>
                 <Field label="Name">
-                  <input value={draft.name} maxLength={40} onChange={(e) => set('name', e.target.value)} />
+                  <input id="character-name" value={draft.name} maxLength={40} onChange={(e) => set('name', e.target.value)} />
                 </Field>
+              </div>
+              <Field label="Personality notes" hint="Add traits or a speaking style. These notes are added to the existing character instructions.">
+                <textarea rows={3} maxLength={300} value={readPersonality(draft.persona)} placeholder="e.g. Friendly, proud of her work, and wary of strangers." onChange={(e) => {
+                  const persona = writePersonality(draft.persona, e.target.value);
+                  if (persona.length <= MAX_PERSONA_LENGTH) set('persona', persona);
+                }} />
+              </Field>
+              <details className="character-advanced" ref={characterAdvanced}>
+                <summary id="character-settings" tabIndex={-1}>Advanced character settings</summary>
                 <Field label="Id" hint="its file name: lowercase, digits, _">
                   <input value={draft.id} maxLength={41} onChange={(e) => set('id', e.target.value)} />
                 </Field>
-              </div>
-              <Field label="Persona" hint={`${draft.persona.length} / ${MAX_PERSONA_LENGTH} · sent first, as the system prompt`}>
+              <Field label="Full persona" hint={`${draft.persona.length} / ${MAX_PERSONA_LENGTH} · sent first, as the system prompt`}>
                 <textarea className="persona" value={draft.persona} maxLength={MAX_PERSONA_LENGTH} onChange={(e) => set('persona', e.target.value)} />
               </Field>
               <div className="row2">
@@ -423,24 +463,25 @@ export function Editor() {
                   />
                 </Field>
               </div>
+              </details>
             </Section>
 
-            <Section id="abilities" title="Abilities" intro="What it can do. Each action is a proposal: the ledger checks it before anything changes.">
+            <Section active={section === 'abilities'} id="abilities" title="Abilities" intro="What this character can do. The ledger checks actions against the rules you set.">
               <ul className="abilities">
                 {describeAbilities(draft).map((line) => (
                   <li key={line}>{line}</li>
                 ))}
               </ul>
               <p className="muted small">
-                The exact verbs it may use are under Advanced.{' '}
+                Change the actions available to this character under Advanced.{' '}
                 <button type="button" className="secondary small" onClick={openPermissions}>
                   Show permissions
                 </button>
               </p>
-              <h4>What it sells or makes</h4>
-              <p className="muted small">Only used when it may make offers. For an NPC that only talks, leave both boxes unticked.</p>
+              <h4 id="catalogue-h" tabIndex={-1}>What it sells or makes</h4>
+              <p className="muted small">Set up goods for sale or items made to order. Leave both options off for a character that only talks.</p>
               {(draft.catalogue.in_stock || draft.catalogue.made_to_order) && !draft.model_verbs.includes('OFFER') && (
-                <p className="note bad small left">It has a catalogue but may not offer anything from it. Allow OFFER under Advanced, or untick both boxes.</p>
+                <p className="note bad small left">This character has items listed but cannot offer them yet. Enable OFFER under Advanced, or turn off both options below.</p>
               )}
               <CatalogueForm value={draft} onChange={({ catalogue, start }) => setDraft((d) => ({ ...d, catalogue, start }))} />
               <h4>What it can ask the game for</h4>
@@ -448,18 +489,17 @@ export function Editor() {
                 <Signals value={draft.signals} onChange={(signals) => set('signals', signals)} />
               ) : (
                 <p className="muted small">
-                  Signals let it ask your game for something the ledger doesn&apos;t do, such as opening a gate. Your game&apos;s code decides whether it
-                  happens. Allow SIGNAL under Advanced to add some.
+                  A character can request an action, such as opening a gate. Your game decides whether to carry it out. Enable SIGNAL under Advanced to add requests.
                 </p>
               )}
             </Section>
 
-            <Section id="world" title="World behaviour" intro="Where it is during the day, how far it sees, and when it acts without being asked.">
+            <Section active={section === 'abilities'} id="world" title="World behaviour" intro="Choose where the character goes, what it can see, and when it acts on its own.">
               <div className="row2">
-                <Field label="Place" hint="where it is when its day says nothing else">
+                <Field label="Default location" hint="Where the character stays when no other stop is scheduled.">
                   <PlacePicker places={places} value={draft.location} onChange={(p) => set('location', p)} />
                 </Field>
-                <Field label="Perception radius" hint="tiles: how far from where it stands it sees what happens">
+                <Field label="How far can it see?" hint="Distance in village tiles.">
                   <input
                     type="number"
                     min={0}
@@ -472,12 +512,12 @@ export function Editor() {
               <Schedule places={places} home={draft.location} value={draft.schedule} onChange={(s) => set('schedule', s)} />
               <h4>When it acts</h4>
               <Triggers triggers={draft.triggers} onChange={(triggers) => set('triggers', triggers)} />
-              <Field label="Cue when spoken to" hint="the instruction after the conversation">
+              <Field label="Instruction when spoken to" hint="Tells the character how to respond to a conversation.">
                 <input value={draft.cue} maxLength={300} onChange={(e) => set('cue', e.target.value)} />
               </Field>
             </Section>
 
-            <Section id="appearance" title="Appearance" intro="How it looks in the village, and how pictures of what it makes are drawn.">
+            <Section active={section === 'character'} id="appearance" title="Appearance" intro="How it looks in the village, and how pictures of what it makes are drawn.">
               <Field label="Look">
                 <SpritePicker value={draft.sprite} onChange={(s) => set('sprite', s)} />
               </Field>
@@ -489,7 +529,7 @@ export function Editor() {
               <ArtForm key={started} draft={draft} valid={valid} onChange={(art) => set('art', art)} />
             </Section>
 
-            <details className="ed-section advanced" ref={advanced}>
+            <details className="ed-section advanced" ref={advanced} hidden={section !== 'abilities'}>
               <summary>
                 Advanced <span className="muted small">permissions, facts, labels and what the model gets</span>
               </summary>
@@ -535,9 +575,17 @@ export function Editor() {
                 <p className="muted small">{status === 'checking' ? 'Checking the draft…' : 'Fix the definition to see it.'}</p>
               )}
             </details>
+            <div className="editor-next">
+              {section === 'character' && <button type="button" onClick={() => edit('abilities')}>Continue to abilities</button>}
+              {section === 'abilities' && <button type="button" onClick={test}>Try your NPC</button>}
+            </div>
           </section>
 
-          <aside className="side-col bench-col" aria-label="Test bench">
+          <aside className="side-col bench-col" aria-label="Test bench" hidden={section !== 'test'}>
+            <h2 id="test-heading" className="sr-only" tabIndex={-1}>Test your NPC</h2>
+            {status === 'checking' && <p className="note-box" role="status">Checking your draft before testing…</p>}
+            {status === 'invalid' && problemList}
+            {status === 'error' && <div className="note-box" role="alert">Couldn’t check this draft. <button type="button" className="secondary small" onClick={() => setRetry(n => n + 1)}>Check again</button></div>}
             <Bench key={started} draft={draft} valid={valid} onBusy={setBenchBusy} />
           </aside>
         </div>
@@ -567,11 +615,16 @@ function Starters({
 }) {
   const [pick, setPick] = useState('');
   const [asking, setAsking] = useState(false);
+  const [guiding, setGuiding] = useState(false);
   const chosen = library.find((n) => n.id === pick);
+  if (guiding) return <GuidedSetup taken={library.map((n) => n.id)} locked={locked} onUse={onAnswers} onCancel={() => setGuiding(false)} />;
   if (asking) return <Questionnaire taken={library.map((n) => n.id)} locked={locked} onUse={onAnswers} onCancel={() => setAsking(false)} />;
   return (
     <section className="panel starters" id="starters" aria-labelledby="starters-h">
-      <h3 id="starters-h">{first ? 'Pick a starting point' : 'Start a new NPC'}</h3>
+      <h3 id="starters-h">{first ? 'Create your first NPC' : 'Start a new NPC'}</h3>
+      <p>Choose a role, give your character a personality, and try a conversation.</p>
+      <button type="button" disabled={locked} onClick={() => setGuiding(true)}>Create your NPC</button>
+      <details className="starter-alternatives"><summary>Other starting points</summary>
       <p className="muted small">A template is a new draft with example settings, ready to test and change. It doesn&apos;t touch the village or its NPCs.</p>
       <div className="starter-ask">
         <button type="button" className="secondary" onClick={() => setAsking(true)}>
@@ -619,6 +672,7 @@ function Starters({
           </button>
         </span>
       </div>
+      </details>
       {locked && <p className="muted small">Waiting for the test bench to finish…</p>}
     </section>
   );
@@ -626,7 +680,7 @@ function Starters({
 
 // The draft at a glance after a template or the questions. Read from the draft itself, so it follows every edit; the
 // sections below are where things change.
-function Overview({ draft, valid, onEdit, onTest, onHide }: { draft: NpcDraft; valid: boolean; onEdit: (section: string) => void; onTest: () => void; onHide: () => void }) {
+function Overview({ draft, onEdit, onTest, onHide }: { draft: NpcDraft; onEdit: (section: string) => void; onTest: () => void; onHide: () => void }) {
   return (
     <section className="overview" aria-labelledby="overview-h">
       <div className="ov-top">
@@ -668,7 +722,7 @@ function Overview({ draft, valid, onEdit, onTest, onHide }: { draft: NpcDraft; v
           <b>Next: test it.</b>{' '}
           <span className="muted small">On the bench, try a normal request, then a cheat line, then the rejection button to see the ledger&apos;s rule on its own.</span>
         </span>
-        <button type="button" onClick={onTest} disabled={!valid}>
+        <button type="button" onClick={onTest}>
           Test on the bench
         </button>
       </div>
@@ -676,9 +730,9 @@ function Overview({ draft, valid, onEdit, onTest, onHide }: { draft: NpcDraft; v
   );
 }
 
-function Section({ id, title, intro, children }: { id: string; title: string; intro: string; children: ReactNode }) {
+function Section({ id, title, intro, children, active }: { id: string; title: string; intro: string; children: ReactNode; active: boolean }) {
   return (
-    <section className="ed-section" aria-labelledby={`${id}-h`}>
+    <section className="ed-section" hidden={!active} aria-labelledby={`${id}-h`}>
       <h3 id={`${id}-h`} tabIndex={-1}>
         {title}
       </h3>
@@ -749,7 +803,7 @@ function Schedule({ places, home, value, onChange }: { places: string[]; home: s
   return (
     <div className="field">
       <span className="field-label">
-        Its day <span className="muted">· the village walks it there; whatever it does happens where it stands</span>
+        Daily schedule <span className="muted">· the character travels between these places</span>
       </span>
       {sorted.length === 0 && <span className="muted small">At the {placeLabel(home)} all day.</span>}
       {sorted.map((e, i) => (
@@ -858,6 +912,13 @@ function Signals({ value, onChange }: { value: Record<string, string>; onChange:
   );
 }
 
+const TRIGGER_LABELS = {
+  on_spoken_to: { label: 'When someone speaks to them', description: 'Reply to conversations. Turn this on if the character should answer players.' },
+  every_hours: { label: 'At regular intervals', description: 'Act on their own after a set number of in-game hours.' },
+  on_meet: { label: 'When meeting someone', description: 'Share known news when arriving near someone who has not heard it.' },
+  on_new_memory: { label: 'After learning news', description: 'Share new information with nearby characters when at their own location.' },
+};
+
 type CueTrigger = Extract<Trigger, { kind: 'on_meet' | 'on_new_memory' }>;
 const DEFAULT_CUE: Record<CueTrigger['kind'], string> = {
   on_meet: "Someone has just come by. Pass on one piece of news they haven't heard (TELL).",
@@ -891,11 +952,11 @@ function Triggers({ triggers, onChange }: { triggers: Trigger[]; onChange: (t: T
       <label className="check">
         <input type="checkbox" checked={t !== undefined} onChange={(e) => emit(set(e.target.checked ? last.current[kind] : undefined))} />
         <span>
-          <b>{TRIGGER_INFO[kind].label}</b> <span className="muted">{TRIGGER_INFO[kind].description}</span>
+          <b>{TRIGGER_LABELS[kind].label}</b> <span className="muted">{TRIGGER_LABELS[kind].description}</span>
         </span>
       </label>
       {t && (
-        <Field label={`Cue ${kind === 'on_meet' ? 'on meeting someone' : 'on hearing news'}`} hint="what it should do then">
+        <Field label={`Instruction ${kind === 'on_meet' ? 'when meeting someone' : 'when hearing news'}`} hint="What the character should do.">
           <input value={t.cue} maxLength={300} onChange={(e) => emit(set({ ...t, cue: e.target.value }))} />
         </Field>
       )}
@@ -906,13 +967,13 @@ function Triggers({ triggers, onChange }: { triggers: Trigger[]; onChange: (t: T
       <label className="check">
         <input type="checkbox" checked={spoken} onChange={(e) => emit({ ...now, spoken: e.target.checked })} />
         <span>
-          <b>{TRIGGER_INFO.on_spoken_to.label}</b> <span className="muted">{TRIGGER_INFO.on_spoken_to.description}</span>
+          <b>{TRIGGER_LABELS.on_spoken_to.label}</b> <span className="muted">{TRIGGER_LABELS.on_spoken_to.description}</span>
         </span>
       </label>
       <label className="check">
         <input type="checkbox" checked={timer !== undefined} onChange={(e) => emit({ ...now, timer: e.target.checked ? last.current.timer : undefined })} />
         <span>
-          <b>{TRIGGER_INFO.every_hours.label}</b> <span className="muted">{TRIGGER_INFO.every_hours.description}</span>
+          <b>{TRIGGER_LABELS.every_hours.label}</b> <span className="muted">{TRIGGER_LABELS.every_hours.description}</span>
         </span>
       </label>
       {timer && (
@@ -927,7 +988,7 @@ function Triggers({ triggers, onChange }: { triggers: Trigger[]; onChange: (t: T
               onBlur={() => setHoursText(null)}
             />
           </Field>
-          <Field label="Cue on the timer" hint="what it should do, unasked">
+          <Field label="Instruction on the timer" hint="What the character should do on its own.">
             <input value={timer.cue} maxLength={300} onChange={(e) => emit({ ...now, timer: { ...timer, cue: e.target.value } })} />
           </Field>
         </div>
@@ -936,7 +997,7 @@ function Triggers({ triggers, onChange }: { triggers: Trigger[]; onChange: (t: T
       {cued('on_new_memory', heard, (t) => ({ ...now, heard: t as typeof heard }))}
       {triggers.length === 0 && (
         <div className="note bad" role="alert">
-          With nothing ticked it never acts: it hears what is said to it and stays silent.
+          Choose at least one option if you want this character to act. Without one, it will not reply or act on its own.
         </div>
       )}
     </div>
@@ -1171,6 +1232,16 @@ function Bench({ draft, valid, onBusy }: { draft: NpcDraft; valid: boolean; onBu
           <button disabled={busy || !valid || !text.trim()}>Send</button>
         </form>
         <div className="attacks">
+          <span className="muted small">Try a normal request:</span>
+          <button className="secondary small" disabled={busy || !valid} onClick={() => void send(ideas.normal)}>
+            {ideas.normal}
+          </button>
+        </div>
+        {last && <p className="bench-verdict" role="status">{last.kind === 'model' ? outcomeText(last) : `${last.accepted ? 'Ledger accepted' : 'Ledger rejected'} the test proposal.${last.reason ? ` ${last.reason}` : ''}`}</p>}
+        <details className="bench-tools">
+          <summary>Test the rules</summary>
+          <p className="muted small">Try challenging the character or advance time to see how it behaves.</p>
+        <div className="attacks">
           <span className="muted small">
             {view ? clockText(view.tick) : clockText(0)}
             {timed ? ' · pass time to see its timer' : ''}:
@@ -1180,12 +1251,6 @@ function Bench({ draft, valid, onBusy }: { draft: NpcDraft; valid: boolean; onBu
               +{h} h
             </button>
           ))}
-        </div>
-        <div className="attacks">
-          <span className="muted small">Try a normal request:</span>
-          <button className="secondary small" disabled={busy || !valid} onClick={() => void send(ideas.normal)}>
-            {ideas.normal}
-          </button>
         </div>
         <div className="attacks">
           <span className="muted small">Try to cheat it:</span>
@@ -1206,6 +1271,7 @@ function Bench({ draft, valid, onBusy }: { draft: NpcDraft; valid: boolean; onBu
           cheat line won&apos;t always end in a rejection. The rejection button skips the model: the workshop sends a rule-breaking proposal
           straight to the ledger.
         </p>
+        </details>
         {error && (
           <div className="error" role="alert">
             {error}
@@ -1220,8 +1286,8 @@ function Bench({ draft, valid, onBusy }: { draft: NpcDraft; valid: boolean; onBu
         )}
       </section>
 
-      <section className="panel">
-        <h2>Under the hood</h2>
+      <details className="panel bench-details">
+        <summary>View technical details</summary>
         {!last && <p className="muted">Each model answer and the ledger's verdict on it show up here.</p>}
         {last?.kind === 'controlled' && (
           <>
@@ -1256,7 +1322,7 @@ function Bench({ draft, valid, onBusy }: { draft: NpcDraft; valid: boolean; onBu
             ))}
           </>
         )}
-      </section>
+      </details>
     </>
   );
 }
