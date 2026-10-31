@@ -150,3 +150,7 @@ export type BenchResponse = {
   events: EngineEvent[]; // this turn's
   view: StateView; // the bench world, from the player's side
 };
+
+// A rule-breaking proposal the workshop sent straight to the ledger for the draft, without the model (handoff.ts
+// benchIdeas): what it proposed and the ledger's verdict.
+export type ControlledResponse = BenchResponse & { proposal: Record<string, unknown> | null; accepted: boolean; reason: string | null };

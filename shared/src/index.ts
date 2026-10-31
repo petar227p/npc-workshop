@@ -112,8 +112,11 @@ export type GameEvent = z.infer<typeof EventSchema>;
 
 export * from './clock';
 export * from './events';
+export * from './handoff';
 export * from './limits';
 export * from './npc';
 export * from './npc-info';
+export * from './questions';
+export * from './setup';
 export * from './trade';
 export * from './village';

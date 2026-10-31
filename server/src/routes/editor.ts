@@ -1,10 +1,12 @@
 import {
+  benchIdeas,
   MAX_SAY_LENGTH,
   MAX_SKETCH_SUBJECT,
   MAX_TRIGGER_HOURS,
   MODEL_INFO,
   type ModelChoice,
   type BenchResponse,
+  type ControlledResponse,
   type EditorLibrary,
   type PreviewResponse,
   type SaveResponse,
@@ -176,6 +178,24 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
     } finally {
       s.busy = null;
     }
+  });
+
+  // Shows a rejection without the model: a proposal that breaks one of the draft's rules goes straight to the bench's
+  // ledger, the same act() the model's answers go through, and is logged like any other. No model call, so no quota.
+  app.post('/api/editor/bench/controlled', async (c) => {
+    const s = c.get('session');
+    const parsed = await body(c, DraftBody);
+    if (!parsed.success) return c.json({ error: 'expected { npc }' }, 400);
+    if (s.busy) return busy(c);
+    const built = buildNpc(parsed.data.npc);
+    const none = { outcome: null, attempts: [], events: [], proposal: null, accepted: false, reason: null };
+    if (!built.ok) return c.json({ ok: false, errors: built.errors, ...none, view: benchView(s) } satisfies ControlledResponse);
+
+    const { action } = benchIdeas(built.draft).controlled;
+    const { act } = createEngine([player, built.npc]);
+    const r = act(benchOf(s, built.npc), built.npc.id, action, { customer: 'player', to: 'player' });
+    s.bench = r.world;
+    return c.json({ ...none, ok: true, errors: [], events: r.events, view: benchView(s, built.npc), proposal: action, accepted: r.ok, reason: r.reason } satisfies ControlledResponse);
   });
 
   app.post('/api/editor/bench/reset', (c) => {

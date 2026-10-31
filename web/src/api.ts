@@ -1,4 +1,4 @@
-import type { ActionResponse, ArtResponse, BenchResponse, EditorLibrary, Gift, NpcDraft, PreviewResponse, ReadNoteResponse, SaveResponse, SketchResponse, StateView, TranscribeResponse, WorldReport } from '@blacksmith/shared';
+import type { ActionResponse, ArtResponse, BenchResponse, ControlledResponse, EditorLibrary, Gift, NpcDraft, PreviewResponse, ReadNoteResponse, SaveResponse, SketchResponse, StateView, TranscribeResponse, WorldReport } from '@blacksmith/shared';
 
 export class ApiError extends Error {}
 
@@ -44,6 +44,7 @@ export const editorApi = {
   preview: (npc: NpcDraft) => call<PreviewResponse>('editor/preview', { npc: lean(npc) }),
   say: (npc: NpcDraft, text: string) => call<BenchResponse>('editor/bench/say', { npc: lean(npc), text }),
   tick: (npc: NpcDraft, ticks: number) => call<BenchResponse>('editor/bench/tick', { npc: lean(npc), ticks }),
+  controlled: (npc: NpcDraft) => call<ControlledResponse>('editor/bench/controlled', { npc: lean(npc) }),
   reset: () => call<BenchResponse>('editor/bench/reset', {}),
   save: (npc: NpcDraft, overwrite = false) => call<SaveResponse>('editor/save', { npc, overwrite }),
   sketch: (npc: NpcDraft, subject: string) => call<SketchResponse>('editor/sketch', { npc, subject }),
