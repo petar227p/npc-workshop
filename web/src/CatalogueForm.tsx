@@ -55,9 +55,9 @@ function toForm({ catalogue, start }: Value): Form {
 // The draft's catalogue and start, or the reason the rows can't be one yet.
 function fromForm(f: Form): { value: Value } | { problem: string } {
   // The ledger refuses an empty list, so a ticked box needs rows. (Removing the last good unticks its box instead.)
-  if (f.sells && f.goods.length === 0) return { problem: 'Add a good, or untick "Sells from stock".' };
+  if (f.sells && f.goods.length === 0) return { problem: 'Add an item, or turn off "Sells items in stock".' };
   if (f.makes && (f.items.length === 0 || f.materials.length === 0)) {
-    return { problem: 'Making to order needs at least one item type and one material, or untick "Makes to order".' };
+    return { problem: 'Add an item type and a material, or turn off "Makes items to order".' };
   }
   const lists = [...(f.sells ? [f.goods] : []), ...(f.makes ? [f.items, f.materials] : [])];
   if (lists.some((rows) => rows.some((r) => !r.name.trim()))) return { problem: 'Every row needs a name.' };
@@ -128,15 +128,15 @@ export function CatalogueForm({ value, onChange }: { value: Value; onChange: (v:
       <label className="check">
         <input type="checkbox" checked={form.sells} onChange={(e) => patch({ sells: e.target.checked, goods: form.goods.length ? form.goods : [{ ...NEW_GOOD }] })} />
         <span>
-          <b>Sells from stock</b> <span className="muted">Handed over as soon as the customer accepts.</span>
+          <b>Sells items in stock</b> <span className="muted">The customer receives items when they accept an offer.</span>
         </span>
       </label>
       {form.sells && (
-        <Rows head={['Good', 'Min price each', 'In stock', '']} onAdd={() => patch({ goods: [...form.goods, { ...NEW_GOOD }] })} addLabel="Add a good">
+        <Rows head={['Item', 'Minimum price each', 'In stock', '']} onAdd={() => patch({ goods: [...form.goods, { ...NEW_GOOD }] })} addLabel="Add an item">
           {form.goods.map((g, i) => (
             <tr key={i}>
               <td>
-                <Name value={g.name} onChange={(name) => row('goods', i, { name })} label="Good name" />
+                <Name value={g.name} onChange={(name) => row('goods', i, { name })} label="Item name" />
               </td>
               <td>
                 <Cell value={g.min_price} onChange={(min_price) => row('goods', i, { min_price })} label={`${g.name || 'Good'} minimum price`} />
@@ -165,7 +165,7 @@ export function CatalogueForm({ value, onChange }: { value: Value; onChange: (v:
           }
         />
         <span>
-          <b>Makes to order</b> <span className="muted">Accepting starts a timer; the clock hands the item over when it's done.</span>
+          <b>Makes items to order</b> <span className="muted">Work starts when an offer is accepted; the item is delivered when it is ready.</span>
         </span>
       </label>
       {form.makes && (
@@ -220,7 +220,7 @@ export function CatalogueForm({ value, onChange }: { value: Value; onChange: (v:
       )}
       {problem && (
         <div className="note bad" role="alert">
-          {problem} The draft keeps the last version that had none.
+          {problem} The draft keeps the last valid settings until this is fixed.
         </div>
       )}
     </div>

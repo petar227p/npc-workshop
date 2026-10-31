@@ -390,3 +390,21 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .sketch img { width: 128px; height: 128px; flex: none; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); image-rendering: pixelated; }
 .sketch > div { min-width: 0; flex: 1; }
 @media (max-width: 520px) { .sketch { flex-direction: column; } }
+
+.editor-nav { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.editor-nav button[aria-current="page"] { background: var(--accent); color: #2a1a05; border-color: var(--accent); }
+
+.workshop-editor { min-width: 0; }
+.workshop-editor [hidden] { display: none !important; }
+.overview-disclosure { margin-bottom: 16px; }
+.overview-disclosure > summary { padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; }
+.overview-disclosure .overview { margin-top: 8px; }
+.editor-next { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); }
+
+.character-advanced { margin-top: 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; }
+.character-advanced[open] > summary { margin-bottom: 12px; }
+
+.bench-tools { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.bench-tools > summary, .bench-details > summary { color: var(--text); }
+.bench-tools[open] > summary, .bench-details[open] > summary { margin-bottom: 8px; }
+.bench-verdict { padding: 8px 10px; background: var(--panel-2); border-radius: 6px; font-size: 13px; }
