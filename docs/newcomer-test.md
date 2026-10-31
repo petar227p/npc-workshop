@@ -1,22 +1,40 @@
-# Newcomer test (Oct 31)
+# Newcomer test (revised Oct 31)
 
-One or two people who haven't seen the game, about 15–20 minutes each. You run the session; don't explain the controls first.
+One or two people who haven't seen NPC Workshop, about 20–25 minutes each. You run the session; don't explain the product or controls first. **Human sessions remain pending until actual observations are recorded.** Scripted browser checks are separate regression evidence.
 
 ## Before each session
 
-- `npm run dev` with real keys and `REPLAY` empty. Open http://localhost:5174 in Chrome and click **New game**.
+- `npm run dev` with real keys and `REPLAY` empty. Use a fresh test browser profile to preserve existing drafts. Prepare a new game through **Demo → Menu → New game**, then return to [home](http://localhost:5174/#/) before the tester sees the screen.
 - Microphone allowed in the browser (typing works too; note which they use).
 - A terminal ready to run `npm run ledger-proof`, or the latest `logs/ledger-proof-*.md` open.
 - Screen recording, if the tester agrees. Note the start time. After their first message, the newest `logs/*.jsonl` is their session's model log; write its name below.
 
-## Task card (read it aloud, then hand it over)
+## First impression — before giving instructions
+
+Show home and ask, without explaining or correcting their answers:
+
+1. “What is this product for?”
+2. “Where would you create your own NPC?”
+3. “What does the blacksmith demonstrate?”
+
+Record their words and what they point at before continuing. These are comprehension questions, not a test of the participant.
+
+## Authoring task card
+
+> **Create a merchant, change one setting, and test a conversation. Then visit the blacksmith demo and return to your draft.**
+
+Observe whether they find the workshop, choose a starter, understand the example settings, find validation and the isolated test session, and recognize that testing did not publish their NPC to the village. Record whether the draft survives the round trip and whether they distinguish NPC speech, a model rejection and a controlled rejection. Let them choose a template, guided setup, questionnaire or manual path.
+
+If stuck for about two minutes, offer one hint at a time and log it: “Where would you build an NPC?” → “Which starting role fits?” → “What tells you the settings are ready to test?” → “Where could you try a conversation?” → “How would you return to what you were editing?” Do not save files or replace their draft for them.
+
+## Demo task card (read it aloud, then hand it over)
 
 > **Buy something from the blacksmith, collect it, and find someone who knows about what happened.**
 
 If they're stuck for about two minutes, give the next hint down this list and log it. Never skip ahead.
 
 1. "Who in the village makes things?"
-2. "Walk up to someone and press E" (or: "the picker above the chat chooses who you talk to").
+2. "Click a villager to talk" (or: "walk up to someone and press E" / "the picker above the chat chooses who you talk to").
 3. "Look at what's under his answer."
 4. "Time doesn't pass on its own here."
 5. "Where would something you own show up?"
@@ -39,6 +57,28 @@ Also note whether they think a model produced those inputs. That misreading is w
 ## Observation log (copy once per tester)
 
 Tester: ______  Date/time: ______  Device/browser: ______  Voice or typing: ______  Model log: `logs/________.jsonl`
+
+First-impression answers (verbatim):
+
+| Question | Answer / what they pointed at |
+| --- | --- |
+| What is this product for? | |
+| Where would you create your own NPC? | |
+| What does the blacksmith demonstrate? | |
+
+Authoring observations:
+
+| Step | Unaided? (y/n) | Time | Hesitations / hints / result |
+| --- | --- | --- | --- |
+| Finds Workshop and chooses a merchant starter | | | |
+| Understands proposed abilities and example settings | | | |
+| Changes one setting and notices validation | | | |
+| Tests a conversation and distinguishes speech from checked actions | | | |
+| Understands controlled test versus model response, if tried | | | |
+| Visits demo and returns to the same draft | | | |
+| Explains browser draft / test session / development file saving | | | |
+
+Demo observations (retain the original purchase and ledger-comprehension scoring):
 
 | # | Step | Unaided? (y/n) | Time | Hesitations, questions, wrong turns | Hints given |
 |---|---|---|---|---|---|

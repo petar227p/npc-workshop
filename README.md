@@ -1,16 +1,18 @@
 # NPC Workshop
 
-Build NPCs that talk freely but can't cheat.
+Build NPCs that act within your game's rules.
 
-An LLM plays the character. A deterministic **ledger** decides what actually happens. The model only *proposes* an action as JSON (`PROPOSE_CONTRACT`, `REFUSE`, `SAY`, ...); plain code checks it against the world state (gold, stock, price floor, forge time) and either commits it as an event or rejects it. Talk the blacksmith into a free sword and the ledger says no. Prompt-inject him and nothing in the world changes.
+**NPC Workshop is an authoring and testing tool.** Create a character, choose its supported abilities and limits, then test conversations and actions in an isolated session. Start from a role template, use the guided setup or questionnaire, or load an editable example. Drafts stay in your browser; the server validates their settings.
 
-The demo NPC is **Brann the blacksmith**. You order an item, haggle, accept a contract, wait for the forge, and get exactly the item you agreed to, with a pixel-art picture drawn by Muse Image. The **NPC workshop** is the editor for making more NPCs like him.
+The model proposes actions as JSON (`OFFER`, `REFUSE`, `SAY`, ...). A deterministic **ledger** checks what can happen against code-owned rules: stock, gold, price floors, item limits and timers. Accepted actions become events; rejected proposals are logged. The model never writes the delivered item's stats.
+
+**Brann the blacksmith is the playable demonstration**, inside the example village. Negotiate an order, accept a checked offer, and collect the finished item. The workshop and demo are separate destinations: testing a draft does not publish it to the village. To connect saved definitions to another game, follow [the developer API instructions](#use-the-npcs-from-your-own-game).
 
 Built for the Meta Muse hackathon (Nov 2026).
 
 ## Why
 
-A raw LLM in a shop is a push-over: it agrees to anything, forgets what it promised, and announces deals the game can't honour. NPC Workshop splits the job:
+Dialogue alone cannot establish which trades a game can honour. NPC Workshop separates character decisions from authoritative state changes:
 
 | The model does | The code does |
 |---|---|
@@ -22,26 +24,27 @@ The world is rebuilt by replaying the event log, so every session is auditable a
 
 ## What works today
 
+- **NPC Workshop** (`#/workshop`): generic Merchant, Craftsperson, Villager, Bard / Town crier and Guard starters; guided creation and a short questionnaire; editable persona, model, permissions, catalogues, signals, schedules, perception, appearance, labels and fallbacks. Validation checks the current revision. An **isolated test session** runs the draft through the same action checks as the demo. Suggested normal/challenge messages call its configured model; a separately labeled controlled test submits an invalid proposal without calling a model.
 - **Engine** (`server/src/engine/`): pure functions, no I/O. `act(world, actor, rawJson)` parses, checks the actor's role, validates, then commits or logs `ACTION_REJECTED`. Verbs are a library of one schema + one rule each.
 - **NPCs as data**: `npcs/<id>.json` (name, verbs, which verbs the model may choose, fact blocks, cue, fallbacks) plus `prompts/<id>.md` (persona). Adding an NPC means adding two files.
 - **Generic agent turn** (`server/src/agents/`): builds a strict flat JSON schema from the NPC's model verbs, calls the model, maps the reply to an action, retries once with the rejection reason, then falls back to a safe line.
-- **Playable web app**: chat with inline contract cards, a forge panel with progress and a skip-time button, your gear, stock, and a live ledger showing every event including the rejections.
+- **Blacksmith demo** (`#/village`): a walkable Phaser village with Brann selected initially, chat and checked offer cards, timed forge delivery, gear and stock, contextual hints, knowledge inspection and the event ledger. **Build your own NPC** returns to the normal workshop draft or starter screen.
+- **Schedules, perception and gossip**: server-owned positions determine witnesses. Villagers can pass on known events; the bard retells and the crier announces news. Knowledge inspection distinguishes witnessing from secondhand reports and shows their sources and confidence. Wording can drift; cited event IDs are checked.
 - **Item pictures**: Muse Image renders the accepted item as a pixel sprite, snapped to a fixed palette.
 - **Speak instead of typing**: the mic beside the chat box records a line (up to 30 s), the browser encodes it as 16 kHz WAV itself, and Muse Voice Transcribe turns it into text in the box. You read it over and press Send; typing always works.
 - **Signals**: an NPC can ask the game to do something the ledger has no verb for (open a gate, raise the alarm), only from a list it declares. The game's own code decides whether it happens. Garrick the guard at the gate uses them.
-- **NPC workshop** (`#/workshop`): edit persona, verbs, fact blocks, cue, fallbacks and radius. The server checks the draft on every edit and shows the generated schema and facts. A **test bench** runs the draft against the real model on a throwaway world, shows the ledger's verdict on each answer, and has cheat-line buttons for quick exploit tests.
 - **Dev API** (`/api/v1`): another game makes its own world from the NPCs it picks, then sends what its player says and does and gets back the events to show. No cookie, a bearer token per world, the same ledger. See [Use the NPCs from your own game](#use-the-npcs-from-your-own-game).
 - **Model layer**: plain `fetch` clients for the Meta Model API and Baseten, with retries, a JSONL recorder, replay and mock clients. Keys stay on the server.
-- **Tests**: 100+ Vitest tests, including injection and exploit cases for the engine.
+- **Tests and proof**: Vitest coverage for the engine, API, guided setup and UI helpers; `npm run ledger-proof` verifies controlled invalid proposals separately from live-model behavior. See [the product-hierarchy verification record](docs/product-hierarchy-final-2026-10-31/README.md).
 
-Not built yet: the walkable village, villagers that gossip, and the live-site budget caps. `prototype/` has a Phaser village mock-up with Kenney art. The design for the rest is below.
+Current limits: abilities come from the supported code-owned library. The editor's map-dependent settings use the bundled village, and bench/village worlds still share server-session infrastructure. Browser drafts have no deployment/export flow or automatic update of a running village. Development file saving plus a server restart is the current handoff; broader runtime separation and a live-site spend budget remain future work.
 
 ## Models
 
 | Role | Model | Via |
 |---|---|---|
 | Brann, the blacksmith (haggling over made-to-order work) | Muse Spark 1.3 | Meta Model API |
-| Mira, the merchant, and later villagers, gossip and attackers | Muse Spark Open (`meta-models/muse-spark-open-1026`) | Baseten |
+| Mira, villagers, gossip and attackers | Muse Spark Open (`meta-models/muse-spark-open-1026`, configurable) | Baseten |
 | Item picture | Muse Image | Meta Model API |
 | Spoken lines to text (the chat box's mic) | Muse Voice Transcribe | Meta Model API |
 
@@ -57,9 +60,12 @@ cp .env.example .env   # add MODEL_API_KEY (Meta) and BASETEN_API_KEY
 npm run dev
 ```
 
-Open http://localhost:5174. The API runs on :8787. The server starts without keys; the smith only needs one when you first talk to him.
+Open [NPC Workshop](http://localhost:5174/#/). The API runs on :8787. The server starts without keys: starters, questionnaire and validation work without model calls. Conversations require the selected NPC's provider key; image generation and transcription require the Meta key.
 
-Open http://localhost:5174/#/workshop for the NPC editor and test bench. Saving an NPC to disk is only enabled by `npm run dev`, and never in production. Saved NPCs appear in the village on the next server start.
+- [Workshop](http://localhost:5174/#/workshop): create, configure and test an NPC.
+- [Blacksmith demo](http://localhost:5174/#/village): play the existing example village.
+
+**Save to files — development only** is enabled by the development runner, and never in production. It writes definition/persona files and optional art references on that server. Existing files require overwrite confirmation. Restart the server to load saved definitions into the village and developer API registry; this also recreates in-memory worlds. Browser drafts and test sessions remain separate from these files.
 
 Other scripts:
 
@@ -73,9 +79,14 @@ npm run ledger-proof  # controlled inputs (no model): a valid offer, then invali
 
 Every model call is recorded to `logs/<session>.jsonl` (no keys). Play one back offline with `REPLAY=logs/<file> npm run smith-demo`.
 
-## Make an NPC
+## Create and test an NPC
 
-An NPC is two files.
+1. Open Workshop and choose **Create your NPC**, a role template, **Help me choose**, or **Blank NPC**. Named library entries are examples, separate from role templates.
+2. Set the character's personality and supported abilities. Change catalogue limits, signals or automatic behavior as needed. Location, schedule, perception and NPC sprite controls currently use the example village context; generated item artwork is configured separately.
+3. Wait for a valid preview, then choose **Test your NPC**. Try a normal conversation and a challenge. A valid configuration is checked again when it proposes an action. The controlled rejection test is explicitly separate from the model's answer.
+4. Return from the demo to continue the draft. To use it outside the browser, follow the development file workflow and [developer API setup](#use-the-npcs-from-your-own-game).
+
+An NPC definition is `npcs/<id>.json` plus its persona in `prompts/<id>.md`, with optional art references. This is an excerpt from [Brann's complete definition](npcs/smith.json); the full file also supplies the catalogue, starting stock, model and example-world settings:
 
 `npcs/smith.json`:
 
@@ -83,8 +94,8 @@ An NPC is two files.
 {
   "id": "smith",
   "name": "Brann",
-  "verbs": ["SAY", "PROPOSE_CONTRACT", "COUNTER_OFFER", "REFUSE", "START_WORK"],
-  "model_verbs": ["SAY", "PROPOSE_CONTRACT", "COUNTER_OFFER", "REFUSE"],
+  "verbs": ["SAY", "OFFER", "COUNTER_OFFER", "REFUSE", "START_WORK"],
+  "model_verbs": ["SAY", "OFFER", "COUNTER_OFFER", "REFUSE"],
   "facts": ["clock", "purse", "stock", "catalogue", "price_floor", "open_offers"],
   "perception_radius": 4,
   "cue": "Reply to the customer's last words.",
@@ -97,11 +108,13 @@ An NPC is two files.
 
 `prompts/smith.md` is the persona. Optional `labels` say what the NPC calls a good or item type whose name isn't a word (see [Your game's items](#your-games-items)). `verbs` is what the ledger allows the NPC to do; `model_verbs` is the subset the model may choose, and the rest (like `START_WORK`) are issued by code only. Fact blocks are named, code-owned snapshots of the world that go into the prompt, so the model never has to remember the price floor.
 
-Or use the workshop and click **Save to files**.
+The workshop's development save control writes these files; testing alone does not.
 
 ## Use the NPCs from your own game
 
-Any engine or script that can send HTTP can use the NPCs. The server owns the world: your game says what the player did and draws the events it gets back. Every action still goes through the ledger, so your game's code can't skip the rules either.
+An engine or script that sends HTTP can call the running NPC server. The server owns its world: your game sends what the player did and renders the returned events. Each supported action goes through the ledger. Game-specific actions requested through signals remain your game's responsibility.
+
+Start by saving the definition/persona on a development server and restarting it, or by placing the files in that server's configuration before starting it. `GET /api/v1/npcs` lists the loaded registry; worlds select from those IDs. The browser draft is not sent to this API or deployed to another game. The existing server still uses bundled village geography; adapting world/map behavior is additional integration work. The routes below describe the current file/server workflow, not an engine plugin or live publication feature.
 
 ```bash
 # Which NPCs there are, and what each sells
@@ -111,8 +124,8 @@ curl -s localhost:8787/api/v1/npcs
 curl -s -X POST localhost:8787/api/v1/worlds -H 'content-type: application/json' -d '{"npcs":["smith","merchant"]}'
 # → { "world_id": "…", "token": "…", "npcs": [...], "state": {...} }
 
-W=localhost:8787/api/v1/worlds/<world_id>
-AUTH="authorization: Bearer <token>"
+W='http://localhost:8787/api/v1/worlds/REPLACE_WORLD_ID'
+AUTH='authorization: Bearer REPLACE_TOKEN'
 
 curl -s -X POST $W/say    -H "$AUTH" -H 'content-type: application/json' -d '{"npc":"smith","text":"A plain iron dagger, please."}'
 curl -s -X POST $W/accept -H "$AUTH" -H 'content-type: application/json' -d '{"contract_id":"c_001"}'
@@ -146,7 +159,7 @@ Goods, materials and item types are plain names (lowercase letters, digits, `_`)
 "labels":    { "itm_torch_01": "pitch torch", "itm_rope_7": "hemp rope", "itm_wolf_pelt": "wolf pelt" }
 ```
 
-- **Labels** are what the model and players read. The NPC's facts, history and answer schema are in those words ("pitch torch"); code turns its answer back into the id, so the ledger, the log and the API only ever see `itm_torch_01`. Two things can't share a word. A label can also name something the NPC doesn't hold yet (`itm_wolf_pelt`), so a giver can hand it over once your game syncs it in. The workshop has a box for each name under "What it calls things".
+- **Labels** are what the model and players read. The NPC's facts, history and answer schema are in those words ("pitch torch"); code turns its answer back into the id, so the ledger, the log and the API only ever see `itm_torch_01`. Two things can't share a word. A label can also name something the NPC doesn't hold yet (`itm_wolf_pelt`), so a giver can hand it over once your game syncs it in. The workshop exposes these under **Abilities & rules → Advanced → Names and labels**.
 - **Your save comes first.** `POST /worlds` takes `start` for the player and any NPC, so the world begins with what your game says they hold.
 - **Two-way, with one owner per change.** Changes the ledger makes (sales, deliveries, gifts) come to you as events: apply them on your side. Changes your game makes itself (loot, theft, crafting) go to the ledger as a `sync` of the new totals. A sync sent twice changes nothing; one that would take away what is promised to accepted work is refused. No verb leads to sync, so no model can ask for it.
 - **Made-to-order items** arrive in `ITEM_DELIVERED` with an `item_type`, stats and an id (`i_c_001`). If your game can make custom items, map the type to a base item and apply the stats, and keep `i_c_001` → your own instance id. If it can only hand out fixed items, key the item types by your item ids and give each stat range one value (min = max): the NPC can then only promise exactly that item, at a price the ledger checks against its floor.
@@ -174,7 +187,7 @@ server/src/
   models/      Meta + Baseten clients (chat, image, voice), recorder, replay, mock
   art/         Muse Image prompt, background removal, palette snapping
   routes/      the village's HTTP API, the dev API (/api/v1) and the workshop's preview / bench / save endpoints
-web/src/       React app: chat, side panels, workshop editor
+web/src/       React product home, workshop and playable demo; game/ contains the Phaser village
 npcs/ prompts/ NPC data files and personas
 prototype/     Phaser village mock-up (Kenney art)
 docs/          API notes (rate limits, latency, costs), market research
@@ -183,12 +196,11 @@ scripts/       dev runner, smith demo, latency test
 
 ## Roadmap
 
-- Walkable Phaser village with NPC schedules; the server owns positions.
-- **Perception and gossip**: an NPC only knows events it witnessed or was told, with a confidence that decays as the story passes on.
-- Villagers and gossip on Muse Spark Open through Baseten (Mira already runs on it).
-- A raw-LLM versus ledger side-by-side, and a per-NPC exploit suite.
+- Separate authoring/runtime concerns and support game-specific world configuration beyond the bundled village.
+- Export/deployment and adding saved definitions to a running world without a restart.
+- A recorded raw-LLM versus ledger comparison (not yet run); the existing per-NPC exploit reports are separate evidence.
 - A non-game NPC (a parts-supplier quote desk) on the same engine, to show it isn't only for games.
-- Session and budget caps for the public demo.
+- Human newcomer sessions, spoken recording, deployment and a global spend budget; existing session/turn limits are already implemented.
 
 ## Credits
 

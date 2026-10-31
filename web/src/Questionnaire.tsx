@@ -150,8 +150,8 @@ export function Questionnaire({ taken, locked, onUse, onCancel }: { taken: strin
             Proposed setup: {result.draft.name}, {result.summary.role.toLowerCase()}
           </h4>
           <p className="muted small">
-            Nothing has changed yet. <b>Use this setup</b> starts a new draft from it; everything stays editable afterwards, and it stays in this
-            browser until saved.
+            Nothing has changed yet. <b>Use this setup</b> starts an editable draft in this browser.
+            Test it in an isolated session; testing does not publish to the example village. Saving to files is a separate development workflow.
           </p>
           <dl className="answers">
             {steps.map((s) => (
@@ -191,7 +191,7 @@ export function Questionnaire({ taken, locked, onUse, onCancel }: { taken: strin
               Cancel
             </button>
           </div>
-          {locked && <p className="muted small">Waiting for the test bench to finish…</p>}
+          {locked && <p className="muted small">Waiting for the test session to finish…</p>}
         </div>
       )}
     </section>

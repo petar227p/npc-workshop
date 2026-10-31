@@ -37,12 +37,12 @@ export function GuidedSetup({ taken, locked, onUse, onCancel }: { taken: string[
     {step === 2 && result && <><p><b>{result.draft.name}</b> · {result.summary.role}</p>
       <h4>What they can do</h4><ul className="abilities">{result.summary.abilities.map(x => <li key={x}>{x}</li>)}</ul>
       <h4>When they act</h4><ul className="abilities">{result.summary.behaviour.map(x => <li key={x}>{x}</li>)}</ul>
-      <p className="muted small">This uses example settings you can edit. After starting, try a suggested message on the test bench.</p>
+      <p className="muted small">This creates an editable draft in this browser with example settings. Try a suggested message in an isolated test session. Testing does not publish to the example village.</p>
       {idea && <p><b>Try asking:</b> “{idea.normal}”</p>}
     </>}
     <div className="actions">{step < 2 ? <button type="button" disabled={step === 0 && !role} onClick={() => setStep(step + 1)}>Next</button> : <button type="button" disabled={locked || !result} onClick={() => result && onUse(result)}>Create draft and test</button>}
       <button type="button" className="secondary" disabled={step === 0} onClick={() => setStep(step - 1)}>Back</button>
       <button type="button" className="secondary" onClick={onCancel}>Cancel</button></div>
-    {locked && <p className="muted small">Waiting for the test bench to finish…</p>}
+    {locked && <p className="muted small">Waiting for the test session to finish…</p>}
   </section>;
 }
