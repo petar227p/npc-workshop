@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { MAX_REFERENCE_BYTES, type BenchResponse, type EditorLibrary, type NpcDraft, type PreviewResponse, type SaveResponse, type SketchResponse, type StateView } from '@blacksmith/shared';
+import { MAX_REFERENCE_BYTES, type BenchResponse, type ControlledResponse, type EditorLibrary, type NpcDraft, type PreviewResponse, type SaveResponse, type SketchResponse, type StateView } from '@blacksmith/shared';
 import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
 import { mockClient, mockImageClient, type ChatClient, type ChatRequest } from '../../models';
@@ -171,6 +171,27 @@ describe('NPC editor api', () => {
     expect(r.json.attempts.map((a) => a.reason)).toEqual(['miller may not use OFFER', 'miller may not use OFFER']);
     expect(r.json.view.contracts).toEqual([]);
     expect(r.json.events.at(-1)).toMatchObject({ type: 'SAID', actor: 'miller', data: { text: 'Eh?' } });
+  });
+
+  it('keeps controlled rejection provenance in later bench views without labeling model rejections as controlled', async () => {
+    const { send } = setup([offer, offer]);
+    const controlled = await send<ControlledResponse>('/api/editor/bench/controlled', { npc: miller });
+    const rejection = controlled.json.events[0];
+    expect(rejection).toMatchObject({ type: 'ACTION_REJECTED', data: { source: 'workshop-controlled' } });
+    expect(controlled.json.view.events).toContainEqual(rejection);
+
+    // After a page reload the browser only has the subsequent view, not its old set of controlled event ids.
+    const later = await send<BenchResponse>('/api/editor/bench/say', { npc: miller, text: 'Forge me a sword.' });
+    expect(later.json.view.events).toContainEqual(rejection);
+    const modelRejections = later.json.events.filter((e) => e.type === 'ACTION_REJECTED');
+    expect(modelRejections).toHaveLength(2);
+    for (const event of modelRejections) expect(event.data).not.toHaveProperty('source');
+
+    const reset = await send<BenchResponse>('/api/editor/bench/reset', {});
+    expect(reset.json.view.events).toEqual([]);
+    const fresh = await send<ControlledResponse>('/api/editor/bench/controlled', { npc: miller });
+    expect(fresh.json.view.events).toEqual(fresh.json.events);
+    expect(fresh.json.events[0].data).toMatchObject({ source: 'workshop-controlled' });
   });
 
   it('a draft that may offer contracts gets them checked by the same rules, under its own name', async () => {

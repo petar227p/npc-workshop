@@ -195,8 +195,11 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
     const { action, label } = benchIdeas(built.draft, availableStock(world, built.npc.id)).controlled;
     const { act } = createEngine([player, built.npc]);
     const r = act(world, built.npc.id, action, { customer: 'player', to: 'player' });
-    s.bench = r.world;
-    return c.json({ ...none, ok: true, errors: [], events: r.events, view: benchView(s, built.npc), label, proposal: action, accepted: r.ok, reason: r.reason } satisfies ControlledResponse);
+    // Keep provenance in the log: later bench responses must not attribute this proposal to the model after a reload.
+    const events = r.events.map((e) => e.type === 'ACTION_REJECTED' ? { ...e, data: { ...e.data, source: 'workshop-controlled' as const } } : e);
+    const marked = new Map(events.map((e) => [e.id, e]));
+    s.bench = { ...r.world, events: r.world.events.map((e) => marked.get(e.id) ?? e) };
+    return c.json({ ...none, ok: true, errors: [], events, view: benchView(s, built.npc), label, proposal: action, accepted: r.ok, reason: r.reason } satisfies ControlledResponse);
   });
 
   app.post('/api/editor/bench/reset', (c) => {

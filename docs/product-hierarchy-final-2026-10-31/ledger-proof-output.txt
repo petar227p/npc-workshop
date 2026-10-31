@@ -1,0 +1,25 @@
+
+> ledger-proof
+> tsx scripts/ledger-proof.ts
+
+PASS  1. Valid dagger offer (control)
+      Controlled valid proposal — submitted by the test harness; no model generated this request.
+      smith proposed {"action":"OFFER","terms":{"kind":"made_to_order","item_name":"Plain Iron Dagger","item_type":"dagger","description":"A plain iron dagger with a leather grip.","stats":{"damage":6,"weight":2,"durability":40},"materials_used":{"iron":1,"leather":1},"price":20,"delivery_ticks":3,"remarks":"Ready in three hours."}}
+      accepted
+PASS  2. Underpriced offer (invalid)
+      Controlled invalid proposal — submitted by the test harness; no model generated this request.
+      smith proposed {"action":"OFFER","terms":{"kind":"made_to_order","item_name":"Plain Iron Dagger","item_type":"dagger","description":"A plain iron dagger with a leather grip.","stats":{"damage":6,"weight":2,"durability":40},"materials_used":{"iron":1,"leather":1},"price":1,"delivery_ticks":3,"remarks":"Ready in three hours."}}
+      rejected: price 1 is below the minimum of 20 (materials 16 + 20% margin)
+PASS  3. Impossible stats (invalid)
+      Controlled invalid proposal — submitted by the test harness; no model generated this request.
+      smith proposed {"action":"OFFER","terms":{"kind":"made_to_order","item_name":"Plain Iron Dagger","item_type":"dagger","description":"A plain iron dagger with a leather grip.","stats":{"damage":500,"weight":2,"durability":40},"materials_used":{"iron":1,"leather":1},"price":20,"delivery_ticks":3,"remarks":"Ready in three hours."}}
+      rejected: damage 500 is above the cap of 10 for a dagger
+PASS  4. Unauthorized early delivery (invalid)
+      Controlled invalid proposal — submitted by the test harness; no model generated this request.
+      smith proposed {"action":"DELIVER","contract_id":"c_001"}
+      rejected: only the clock delivers items, once the work is done
+PASS  5. The clock delivers at the due time (control)
+      Controlled clock advance — run by the test harness; no model is involved.
+      delivered once
+
+5 of 5 cases pass. Report: logs/ledger-proof-2026-10-31T17-04-27-354Z.md (and .json)

@@ -1,0 +1,335 @@
+[
+  {
+    "check": "home desktop",
+    "url": "http://127.0.0.1:5188/",
+    "focus": "page",
+    "nav": [],
+    "scrollTop": 0,
+    "scrollWidth": 1280,
+    "title": "NPC Workshop",
+    "width": 1280
+  },
+  {
+    "check": "home refresh",
+    "url": "http://127.0.0.1:5188/",
+    "focus": "page",
+    "nav": [],
+    "scrollTop": 0,
+    "scrollWidth": 1280,
+    "title": "NPC Workshop",
+    "width": 1280
+  },
+  {
+    "check": "home phone",
+    "url": "http://127.0.0.1:5188/",
+    "focus": "entrance-build",
+    "nav": [],
+    "scrollTop": 0,
+    "scrollWidth": 375,
+    "title": "NPC Workshop",
+    "width": 375
+  },
+  {
+    "check": "fresh workshop starters",
+    "url": "http://127.0.0.1:5188/#/workshop",
+    "focus": "page",
+    "nav": [
+      {
+        "current": "page",
+        "href": "#/workshop",
+        "text": "Workshop"
+      },
+      {
+        "current": null,
+        "href": "#/village",
+        "text": "Demo"
+      }
+    ],
+    "scrollTop": 0,
+    "scrollWidth": 375,
+    "title": "Workshop · NPC Workshop",
+    "width": 375
+  },
+  {
+    "check": "workshop phone restored draft",
+    "url": "http://127.0.0.1:5188/#/workshop",
+    "focus": "page",
+    "nav": [
+      {
+        "current": "page",
+        "href": "#/workshop",
+        "text": "Workshop"
+      },
+      {
+        "current": null,
+        "href": "#/village",
+        "text": "Demo"
+      }
+    ],
+    "scrollTop": 0,
+    "scrollWidth": 375,
+    "title": "Workshop · NPC Workshop",
+    "width": 375
+  },
+  {
+    "check": "workshop desktop",
+    "url": "http://127.0.0.1:5188/#/workshop",
+    "focus": "page",
+    "nav": [
+      {
+        "current": "page",
+        "href": "#/workshop",
+        "text": "Workshop"
+      },
+      {
+        "current": null,
+        "href": "#/village",
+        "text": "Demo"
+      }
+    ],
+    "scrollTop": 0,
+    "scrollWidth": 1280,
+    "title": "Workshop · NPC Workshop",
+    "width": 1280
+  },
+  {
+    "check": "workshop deep-link refresh",
+    "url": "http://127.0.0.1:5188/#/workshop",
+    "focus": "page",
+    "nav": [
+      {
+        "current": "page",
+        "href": "#/workshop",
+        "text": "Workshop"
+      },
+      {
+        "current": null,
+        "href": "#/village",
+        "text": "Demo"
+      }
+    ],
+    "scrollTop": 0,
+    "scrollWidth": 1280,
+    "title": "Workshop · NPC Workshop",
+    "width": 1280
+  },
+  {
+    "check": "preview and model failure recovery",
+    "url": "http://127.0.0.1:5188/#/workshop",
+    "focus": "",
+    "nav": [
+      {
+        "current": "page",
+        "href": "#/workshop",
+        "text": "Workshop"
+      },
+      {
+        "current": null,
+        "href": "#/village",
+        "text": "Demo"
+      }
+    ],
+    "scrollTop": 60,
+    "scrollWidth": 1280,
+    "title": "Workshop · NPC Workshop",
+    "width": 1280
+  },
+  {
+    "check": "home to demo desktop",
+    "url": "http://127.0.0.1:5188/#/village",
+    "focus": "page",
+    "nav": [
+      {
+        "current": null,
+        "href": "#/workshop",
+        "text": "Workshop"
+      },
+      {
+        "current": "page",
+        "href": "#/village",
+        "text": "Demo"
+      }
+    ],
+    "scrollTop": 0,
+    "scrollWidth": 1280,
+    "title": "Blacksmith demo · NPC Workshop",
+    "width": 1280
+  },
+  {
+    "check": "demo phone",
+    "url": "http://127.0.0.1:5188/#/village",
+    "focus": "page",
+    "nav": [
+      {
+        "current": null,
+        "href": "#/workshop",
+        "text": "Workshop"
+      },
+      {
+        "current": "page",
+        "href": "#/village",
+        "text": "Demo"
+      }
+    ],
+    "scrollTop": 0,
+    "scrollWidth": 375,
+    "title": "Blacksmith demo · NPC Workshop",
+    "width": 375
+  },
+  {
+    "check": "demo authoring link restores draft",
+    "url": "http://127.0.0.1:5188/#/workshop",
+    "focus": "page",
+    "nav": [
+      {
+        "current": "page",
+        "href": "#/workshop",
+        "text": "Workshop"
+      },
+      {
+        "current": null,
+        "href": "#/village",
+        "text": "Demo"
+      }
+    ],
+    "scrollTop": 0,
+    "scrollWidth": 375,
+    "title": "Workshop · NPC Workshop",
+    "width": 375
+  },
+  {
+    "check": "scrolled demo before Back",
+    "url": "http://127.0.0.1:5188/#/village",
+    "focus": "page",
+    "nav": [
+      {
+        "current": null,
+        "href": "#/workshop",
+        "text": "Workshop"
+      },
+      {
+        "current": "page",
+        "href": "#/village",
+        "text": "Demo"
+      }
+    ],
+    "scrollTop": 769.5,
+    "scrollWidth": 375,
+    "title": "Blacksmith demo · NPC Workshop",
+    "width": 375
+  },
+  {
+    "check": "Back to workshop",
+    "url": "http://127.0.0.1:5188/#/workshop",
+    "focus": "page",
+    "nav": [
+      {
+        "current": "page",
+        "href": "#/workshop",
+        "text": "Workshop"
+      },
+      {
+        "current": null,
+        "href": "#/village",
+        "text": "Demo"
+      }
+    ],
+    "scrollTop": 0,
+    "scrollWidth": 375,
+    "title": "Workshop · NPC Workshop",
+    "width": 375
+  },
+  {
+    "check": "Forward to demo",
+    "url": "http://127.0.0.1:5188/#/village",
+    "focus": "page",
+    "nav": [
+      {
+        "current": null,
+        "href": "#/workshop",
+        "text": "Workshop"
+      },
+      {
+        "current": "page",
+        "href": "#/village",
+        "text": "Demo"
+      }
+    ],
+    "scrollTop": 0,
+    "scrollWidth": 375,
+    "title": "Blacksmith demo · NPC Workshop",
+    "width": 375
+  },
+  {
+    "check": "demo deep-link refresh",
+    "url": "http://127.0.0.1:5188/#/village",
+    "focus": "page",
+    "nav": [
+      {
+        "current": null,
+        "href": "#/workshop",
+        "text": "Workshop"
+      },
+      {
+        "current": "page",
+        "href": "#/village",
+        "text": "Demo"
+      }
+    ],
+    "scrollTop": 0,
+    "scrollWidth": 375,
+    "title": "Blacksmith demo · NPC Workshop",
+    "width": 375
+  },
+  {
+    "check": "unknown hash normalized to home",
+    "url": "http://127.0.0.1:5188/#/",
+    "focus": "page",
+    "nav": [],
+    "scrollTop": 0,
+    "scrollWidth": 375,
+    "title": "NPC Workshop",
+    "width": 375
+  },
+  {
+    "check": "Back skips unknown hash",
+    "url": "http://127.0.0.1:5188/#/workshop",
+    "focus": "page",
+    "nav": [
+      {
+        "current": "page",
+        "href": "#/workshop",
+        "text": "Workshop"
+      },
+      {
+        "current": null,
+        "href": "#/village",
+        "text": "Demo"
+      }
+    ],
+    "scrollTop": 0,
+    "scrollWidth": 375,
+    "title": "Workshop · NPC Workshop",
+    "width": 375
+  },
+  {
+    "check": "Forward to normalized home",
+    "url": "http://127.0.0.1:5188/#/",
+    "focus": "page",
+    "nav": [],
+    "scrollTop": 0,
+    "scrollWidth": 375,
+    "title": "NPC Workshop",
+    "width": 375
+  },
+  {
+    "check": "compact home layout",
+    "url": "http://127.0.0.1:5188/#/",
+    "focus": "page",
+    "nav": [],
+    "scrollTop": 0,
+    "scrollWidth": 640,
+    "title": "NPC Workshop",
+    "width": 640
+  }
+]

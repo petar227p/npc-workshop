@@ -61,7 +61,7 @@ export type EngineEvent =
   | Base<'SIGNALED', { signal: string }> // target: who it was talking to, if anyone. The game acts on it; the ledger changes nothing
   | Base<'SYNCED', { changes: Change[]; reason: string }> // actor: 'world'; target: whose inventory the game changed itself. Nobody sees it
   | Base<'TRIGGER_FIRED', { trigger: Trigger }> // an NPC acting on its own; its turn's events follow
-  | Base<'ACTION_REJECTED', { verb: string | null; reason: string; proposed: unknown }>
+  | Base<'ACTION_REJECTED', { verb: string | null; reason: string; proposed: unknown; source?: 'workshop-controlled' }>
   | Base<'CLOCK_ADVANCED', { from: number }>;
 
 export type EventType = EngineEvent['type'];

@@ -7,7 +7,7 @@ import './style.css';
 
 type Page = 'home' | 'village' | 'workshop';
 const ROUTES: Record<string, Page> = { '': 'home', '#': 'home', '#/': 'home', '#/village': 'village', '#/workshop': 'workshop' };
-const TITLES: Record<Page, string> = { home: 'NPC Workshop', village: 'Village · NPC Workshop', workshop: 'Workshop · NPC Workshop' };
+const TITLES: Record<Page, string> = { home: 'NPC Workshop', village: 'Blacksmith demo · NPC Workshop', workshop: 'Workshop · NPC Workshop' };
 // An unknown hash goes to the entrance, and the address says so (replaced, so Back doesn't land on it again).
 const pageFromHash = (): Page => {
   const page = ROUTES[location.hash];
@@ -42,11 +42,11 @@ function App() {
           </a>
           <span className="tag">Models propose. Code decides.</span>
           <nav className="tabs" aria-label="Pages">
-            <a href="#/village" aria-current={page === 'village' ? 'page' : undefined}>
-              Village
-            </a>
             <a href="#/workshop" aria-current={page === 'workshop' ? 'page' : undefined}>
               Workshop
+            </a>
+            <a href="#/village" aria-current={page === 'village' ? 'page' : undefined}>
+              Demo
             </a>
           </nav>
         </header>

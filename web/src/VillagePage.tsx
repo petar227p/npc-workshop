@@ -14,6 +14,18 @@ const Village = lazy(() => import('./game/Village').then((m) => ({ default: m.Vi
 
 type Panel = 'knowledge' | 'events' | 'sandbox' | 'stock';
 
+function DemoIntro() {
+  return (
+    <section className="demo-intro" aria-labelledby="demo-heading">
+      <div className="demo-intro-copy">
+        <h2 id="demo-heading">Blacksmith demo — built with NPC Workshop</h2>
+        <p>Meet Brann in the example village. Negotiate an order, accept a checked offer, and collect the finished item.</p>
+      </div>
+      <a className="demo-build" href="#/workshop">Build your own NPC <span aria-hidden="true">→</span></a>
+    </section>
+  );
+}
+
 // Someone heard of an event from someone else: one key per (event, listener), so a retelling to a new person is new.
 const heardKeys = (view: StateView) => new Set(view.news.flatMap((n) => n.knowers.filter((k) => k.how === 'told_by').map((k) => `${n.event_id}:${k.id}`)));
 
@@ -206,7 +218,7 @@ export function VillagePage() {
   // Another seller's stock, or none: the stock panel belongs to whoever the chat is with.
   useEffect(() => setPanel((p) => (p === 'stock' ? null : p)), [talkTo]);
 
-  if (!view) return <div className="loading">{error ?? 'Waking the village…'}</div>;
+  if (!view) return <div className="demo-page"><DemoIntro /><div className="loading">{error ?? 'Waking the village…'}</div></div>;
   const busy = pending !== null || waiting;
   const seller = view.shops.some((s) => s.id === talkTo);
   const shown = panel === 'stock' && !seller ? null : panel;
@@ -224,88 +236,91 @@ export function VillagePage() {
   );
 
   return (
-    <div className="cols">
-      <div className="main-col village-col">
-        <Suspense fallback={<div className="game" />}>
-          <Village view={view} onTalk={talk} />
-        </Suspense>
-        {hud('hud-top')}
-        <HintBar
-          hint={hints.hint}
-          onDismiss={hints.dismiss}
-          onExample={(text) => setPrefill((p) => ({ text, n: (p?.n ?? 0) + 1 }))}
-          onLink={follow}
-          onTurnOff={() => hints.setEnabled(false)}
-        />
-        <Chat
-          view={view}
-          talkTo={talkTo}
-          onTalkTo={pickNpc}
-          onInputFocus={() => setEngagedWorld(view.world_id ?? null)}
-          prefill={prefill}
-          pending={pending}
-          onSay={say}
-          onAccept={(id) => run(api.accept(id))}
-          inputRef={chatInput}
-          onError={setError}
-          headExtra={
-            seller && (
-              <button className="secondary small" aria-expanded={shown === 'stock'} onClick={(e) => toggle('stock', e)}>
-                {nameOf(view, talkTo)}'s stock
+    <div className="demo-page">
+      <DemoIntro />
+      <div className="cols">
+        <div className="main-col village-col">
+          <Suspense fallback={<div className="game" />}>
+            <Village view={view} onTalk={talk} />
+          </Suspense>
+          {hud('hud-top')}
+          <HintBar
+            hint={hints.hint}
+            onDismiss={hints.dismiss}
+            onExample={(text) => setPrefill((p) => ({ text, n: (p?.n ?? 0) + 1 }))}
+            onLink={follow}
+            onTurnOff={() => hints.setEnabled(false)}
+          />
+          <Chat
+            view={view}
+            talkTo={talkTo}
+            onTalkTo={pickNpc}
+            onInputFocus={() => setEngagedWorld(view.world_id ?? null)}
+            prefill={prefill}
+            pending={pending}
+            onSay={say}
+            onAccept={(id) => run(api.accept(id))}
+            inputRef={chatInput}
+            onError={setError}
+            headExtra={
+              seller && (
+                <button className="secondary small" aria-expanded={shown === 'stock'} onClick={(e) => toggle('stock', e)}>
+                  {nameOf(view, talkTo)}'s stock
+                </button>
+              )
+            }
+          />
+          {error && (
+            <div className="error" role="alert">
+              {error}
+            </div>
+          )}
+        </div>
+        <aside className="side-col" aria-label="Your things and village tools">
+          {hud('hud-side')}
+          <Forge view={view} disabled={busy} onSkip={(n) => run(api.tick(n))} />
+          <Inventory view={view} disabled={busy} onGive={give} open={gearOpen} onToggle={() => setGearOpen((o) => !o)} />
+          <nav className="panel tools" aria-label="Village tools">
+            <button ref={knowledgeButton} className="secondary" aria-expanded={shown === 'knowledge'} onClick={(e) => toggle('knowledge', e)}>
+              Who knows what
+              {arrivals.heard && shown !== 'knowledge' && <span className="cue">new</span>}
+            </button>
+            <Tip text="See the recorded actions and the rules that accepted or rejected them.">
+              <button className="secondary" aria-expanded={shown === 'events'} onClick={(e) => toggle('events', e)}>
+                Inspect events
               </button>
-            )
-          }
-        />
-        {error && (
-          <div className="error" role="alert">
-            {error}
-          </div>
+            </Tip>
+            <button className="secondary" aria-expanded={shown === 'sandbox'} onClick={(e) => toggle('sandbox', e)}>
+              Sandbox tools
+            </button>
+          </nav>
+        </aside>
+        {shown === 'knowledge' && (
+          <Drawer title="Who knows what" onClose={closePanel} opener={opener.current}>
+            <News view={view} />
+          </Drawer>
+        )}
+        {shown === 'events' && (
+          <Drawer title="Inspect events" onClose={closePanel} opener={opener.current}>
+            <p className="muted small">Every recorded action, newest first, and the rules that accepted or rejected it.</p>
+            <Ledger view={view} />
+          </Drawer>
+        )}
+        {shown === 'sandbox' && (
+          <Drawer title="Sandbox tools" onClose={closePanel} opener={opener.current}>
+            <God view={view} disabled={busy} onRead={readNote} onReport={(r) => run(api.report(r))} />
+          </Drawer>
+        )}
+        {shown === 'stock' && (
+          <Drawer title={`${nameOf(view, talkTo)}'s stock`} onClose={closePanel} opener={opener.current}>
+            <p className="muted small">
+              What {nameOf(view, talkTo)} has on hand right now, not counting reserved materials{' '}
+              <Help about="reserved materials" text="These materials are set aside for accepted orders." />
+            </p>
+            <Stock view={view} shop={talkTo} />
+          </Drawer>
         )}
       </div>
-      <aside className="side-col" aria-label="Your things and village tools">
-        {hud('hud-side')}
-        <Forge view={view} disabled={busy} onSkip={(n) => run(api.tick(n))} />
-        <Inventory view={view} disabled={busy} onGive={give} open={gearOpen} onToggle={() => setGearOpen((o) => !o)} />
-        <nav className="panel tools" aria-label="Village tools">
-          <button ref={knowledgeButton} className="secondary" aria-expanded={shown === 'knowledge'} onClick={(e) => toggle('knowledge', e)}>
-            Who knows what
-            {arrivals.heard && shown !== 'knowledge' && <span className="cue">new</span>}
-          </button>
-          <Tip text="See the recorded actions and the rules that accepted or rejected them.">
-            <button className="secondary" aria-expanded={shown === 'events'} onClick={(e) => toggle('events', e)}>
-              Inspect events
-            </button>
-          </Tip>
-          <button className="secondary" aria-expanded={shown === 'sandbox'} onClick={(e) => toggle('sandbox', e)}>
-            Sandbox tools
-          </button>
-        </nav>
-      </aside>
-      {shown === 'knowledge' && (
-        <Drawer title="Who knows what" onClose={closePanel} opener={opener.current}>
-          <News view={view} />
-        </Drawer>
-      )}
-      {shown === 'events' && (
-        <Drawer title="Inspect events" onClose={closePanel} opener={opener.current}>
-          <p className="muted small">Every recorded action, newest first, and the rules that accepted or rejected it.</p>
-          <Ledger view={view} />
-        </Drawer>
-      )}
-      {shown === 'sandbox' && (
-        <Drawer title="Sandbox tools" onClose={closePanel} opener={opener.current}>
-          <God view={view} disabled={busy} onRead={readNote} onReport={(r) => run(api.report(r))} />
-        </Drawer>
-      )}
-      {shown === 'stock' && (
-        <Drawer title={`${nameOf(view, talkTo)}'s stock`} onClose={closePanel} opener={opener.current}>
-          <p className="muted small">
-            What {nameOf(view, talkTo)} has on hand right now, not counting reserved materials{' '}
-            <Help about="reserved materials" text="These materials are set aside for accepted orders." />
-          </p>
-          <Stock view={view} shop={talkTo} />
-        </Drawer>
-      )}
     </div>
   );
 }
