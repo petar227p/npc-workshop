@@ -6,5 +6,6 @@ logs/
 !.env.example
 .DS_Store
 *.log
+__pycache__/
 HANDOVER.md
 PLAN.md

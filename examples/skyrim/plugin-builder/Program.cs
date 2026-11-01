@@ -48,6 +48,13 @@ if (args.FirstOrDefault() == "--build")
     };
     placed.Base.SetTo(npc.FormKey); cell.Persistent.Add(placed); mod.Worldspaces.Add(world);
 
+    // Put activation behavior on this one placed reference, not the actor base.
+    placed.VirtualMachineAdapter = new VirtualMachineAdapter { Version = 5, ObjectFormat = 2 };
+    var activationScript = new ScriptEntry { Name = "NWBrannActor" };
+    var bridgeProperty = new ScriptObjectProperty { Name = "Bridge", Flags = ScriptProperty.Flag.Edited, Alias = -1 };
+    bridgeProperty.Object.SetTo(key(0x802)); activationScript.Properties.Add(bridgeProperty);
+    placed.VirtualMachineAdapter.Scripts.Add(activationScript);
+
     var quest = new Quest(key(0x802), SkyrimRelease.SkyrimSE) {
         EditorID = "NWIntegrationQuest", Name = "NPC Workshop: Brann", Priority = 10,
         Flags = Quest.Flag.StartGameEnabled, NextAliasID = 1,
@@ -102,14 +109,31 @@ if (args.FirstOrDefault() == "--build")
         check.ModHeader.MasterReferences.Count != 1 || check.ModHeader.MasterReferences[0].Master != source.ModKey)
         throw new Exception("Actor inventory/isolation/master check failed");
     var checkedQuest = check.Quests.Single();
-    if (checkedQuest.VirtualMachineAdapter!.Scripts.Single().Properties.OfType<IScriptObjectPropertyGetter>().Single().Object.FormKey != placed.FormKey ||
+    var checkedReference = check.Worldspaces.Single().TopCell!.Persistent.OfType<IPlacedNpcGetter>().Single();
+    var checkedQuestScript = checkedQuest.VirtualMachineAdapter!.Scripts.Single();
+    var checkedBrannProperty = checkedQuestScript.Properties.OfType<IScriptObjectPropertyGetter>().Single();
+    if (checkedNpc.FormKey != key(0x800) || checkedReference.FormKey != key(0x801) || checkedQuest.FormKey != key(0x802) ||
+        checkedReference.Base.FormKey != checkedNpc.FormKey || checkedReference.EditorID != "NWBrannRef" ||
+        !checkedReference.MajorFlags.HasFlag(PlacedNpc.MajorFlag.Persistent) ||
+        checkedQuestScript.Name != "NWBridgeQuest" || checkedBrannProperty.Name != "Brann" ||
+        checkedBrannProperty.Alias != -1 || checkedBrannProperty.Object.FormKey != checkedReference.FormKey ||
         checkedQuest.VirtualMachineAdapter.Aliases.Single().Scripts.Single().Name != "NWPlayerAlias" ||
         checkedQuest.Aliases.Single().ForcedReference.FormKey.ID != 0x14 ||
         check.Worldspaces.Single().TopCell!.Persistent.Single().FormKey != placed.FormKey)
         throw new Exception("Quest/property/alias/reference round-trip failed");
+    var checkedActivation = checkedReference.VirtualMachineAdapter ?? throw new Exception("Missing reference activation VMAD");
+    var checkedActivationScript = checkedActivation.Scripts.Single();
+    var checkedBridgeProperty = checkedActivationScript.Properties.OfType<IScriptObjectPropertyGetter>().Single();
+    if (checkedActivation.Version != 5 || checkedActivation.ObjectFormat != 2 ||
+        checkedActivationScript.Name != "NWBrannActor" || checkedActivationScript.Properties.Count != 1 ||
+        checkedBridgeProperty.Name != "Bridge" || checkedBridgeProperty.Alias != -1 ||
+        checkedBridgeProperty.Flags != ScriptProperty.Flag.Edited || checkedBridgeProperty.Object.FormKey != checkedQuest.FormKey ||
+        check.Worldspaces.Single().TopCell!.Temporary.Count != 0)
+        throw new Exception("Brann-only activation script/property round-trip failed");
     Console.WriteLine($"Built and reparsed {path}");
     Console.WriteLine($"NPC {npc.FormKey}; reference {placed.FormKey}; quest {quest.FormKey}; position {placed.Placement.Position}");
     Console.WriteLine("5 records: new NPC/reference/quest plus Whiterun world/persistent-cell overrides. In-game verification still required.");
+    Console.WriteLine("Activation verified: NWBrannRef -> NWBrannActor.Bridge -> NWIntegrationQuest -> NWBridgeQuest.Brann -> NWBrannRef; NPC base has no scripts.");
     return;
 }
 
