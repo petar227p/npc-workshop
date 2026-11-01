@@ -8,8 +8,10 @@ export function Entrance() {
     <div className="entrance">
       <section className="entrance-hero" aria-labelledby="entrance-heading">
         <div className="entrance-intro">
-          <p className="entrance-brand">NPC Workshop</p>
-          <h1 id="entrance-heading">Build NPCs that act within your game&apos;s rules.</h1>
+          <div className="entrance-heading-group">
+            <img className="entrance-brand" src="/brand/npc-workshop-logo.png" alt="NPC Workshop" width="600" height="336" />
+            <h1 id="entrance-heading">Build NPCs that act within your game&apos;s rules.</h1>
+          </div>
           <p className="entrance-description">
             Define a character, choose its supported abilities, and test how it responds. The model proposes actions; code checks what can happen.
           </p>
