@@ -49,7 +49,7 @@ function answerText(step: Step, a: Answers, r: SetupResult): string {
   return `${name}; ${a.personality?.trim() ? 'your personality' : "the template's personality"}`;
 }
 
-export function Questionnaire({ taken, locked, onUse, onCancel }: { taken: string[]; locked: boolean; onUse: (r: SetupResult) => void; onCancel: () => void }) {
+export function Questionnaire({ taken, locked, onUse, onCancel, cancelLabel = 'Cancel' }: { taken: string[]; locked: boolean; onUse: (r: SetupResult) => void; onCancel: () => void; cancelLabel?: string }) {
   const [answers, setAnswers] = useState<Answers>({});
   const [step, setStep] = useState<Step | 'review'>('job');
   const [editing, setEditing] = useState(false); // came from the review to change one answer: Next goes straight back
@@ -137,8 +137,8 @@ export function Questionnaire({ taken, locked, onUse, onCancel }: { taken: strin
             <button type="button" className="secondary" onClick={back} disabled={prevStep(answers, step) === null}>
               Back
             </button>
-            <button type="button" className="secondary" onClick={onCancel}>
-              Cancel
+            <button type="button" className="secondary" disabled={locked} onClick={onCancel}>
+              {cancelLabel}
             </button>
           </div>
         </form>
@@ -187,8 +187,8 @@ export function Questionnaire({ taken, locked, onUse, onCancel }: { taken: strin
             <button type="button" className="secondary" onClick={back}>
               Back
             </button>
-            <button type="button" className="secondary" onClick={onCancel}>
-              Cancel
+            <button type="button" className="secondary" disabled={locked} onClick={onCancel}>
+              {cancelLabel}
             </button>
           </div>
           {locked && <p className="muted small">Waiting for the test session to finish…</p>}

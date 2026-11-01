@@ -6,7 +6,7 @@ import { markSetupPersonality } from './personality';
 
 const ROLE_HINTS: Record<SetupRole, string> = { merchant: 'Sells goods and bargains.', craftsperson: 'Makes items to order.', villager: 'Chats and can share news.', storyteller: 'Shares stories or news with a crowd.', guard: 'Offers passes and can request actions from your game.' };
 
-export function GuidedSetup({ taken, locked, onUse, onCancel }: { taken: string[]; locked: boolean; onUse: (result: SetupResult) => void; onCancel: () => void }) {
+export function GuidedSetup({ taken, locked, onUse, onCancel, cancelLabel = 'Cancel' }: { taken: string[]; locked: boolean; onUse: (result: SetupResult) => void; onCancel: () => void; cancelLabel?: string }) {
   const [step, setStep] = useState(0);
   const [role, setRole] = useState<SetupRole | null>(null);
   const [teller, setTeller] = useState<Teller>('bard');
@@ -42,7 +42,7 @@ export function GuidedSetup({ taken, locked, onUse, onCancel }: { taken: string[
     </>}
     <div className="actions">{step < 2 ? <button type="button" disabled={step === 0 && !role} onClick={() => setStep(step + 1)}>Next</button> : <button type="button" disabled={locked || !result} onClick={() => result && onUse(result)}>Create draft and test</button>}
       <button type="button" className="secondary" disabled={step === 0} onClick={() => setStep(step - 1)}>Back</button>
-      <button type="button" className="secondary" onClick={onCancel}>Cancel</button></div>
+      <button type="button" className="secondary" disabled={locked} onClick={onCancel}>{cancelLabel}</button></div>
     {locked && <p className="muted small">Waiting for the test session to finish…</p>}
   </section>;
 }
