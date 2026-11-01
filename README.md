@@ -52,6 +52,8 @@ Muse Spark and Muse Spark Open always reason, so the clients send a low `reasoni
 
 ## Run it
 
+The Windows Skyrim adapter is in [examples/skyrim](examples/skyrim/README.md): text negotiation and checked stock sales with Papyrus inventory transfers. Its API/ledger path is automated-tested; the scripts and ESP are built, and the native HTTP plugin loads on this PC. The in-game HTTP, trade and save/load journey still need verification. See its compatibility report and first-play instructions.
+
 Developed on Node 26 (older versions are untested).
 
 ```bash
