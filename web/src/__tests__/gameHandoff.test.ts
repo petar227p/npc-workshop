@@ -1,7 +1,7 @@
 import type { BenchResponse, NpcDraft } from '@blacksmith/shared';
 import { buildSetup } from '@blacksmith/shared/src/setup';
 import { describe, expect, it } from 'vitest';
-import { draftKey, gameExampleCommand, hasModelReply } from '../gameHandoff';
+import { draftKey, gameExampleCommand, hasCheckedModelAction, hasModelReply } from '../gameHandoff';
 import { createNpcDownload } from '../npcTransfer';
 
 const npc = (): NpcDraft => buildSetup({ role: 'guard', name: 'Portable Ada', news: 'tells' }).draft;
@@ -12,6 +12,24 @@ const reply = (): BenchResponse => ({
 });
 
 describe('Workshop game handoff', () => {
+  it('recognizes an accepted nonverbal model action as a successful test', () => {
+    const result = reply();
+    result.attempts[0].content = '{"action":"EMOTE","emote":"nods"}';
+    result.events = [{ ...result.events[0], type: 'EMOTED', data: { text: 'nods' } }];
+    expect(hasCheckedModelAction(result, 'ada')).toBe(true);
+    expect(hasModelReply(result, 'ada')).toBe(false);
+  });
+
+  it('does not count controlled tests, fallback lines, outages or a silent trigger as checked model actions', () => {
+    const result = reply();
+    expect(hasCheckedModelAction(result, 'ada')).toBe(true);
+    expect(hasCheckedModelAction({ ...result, attempts: [] }, 'ada')).toBe(false);
+    expect(hasCheckedModelAction({ ...result, outcome: 'fallback' }, 'ada')).toBe(false);
+    expect(hasCheckedModelAction({ ...result, outcome: 'unavailable' }, 'ada')).toBe(false);
+    expect(hasCheckedModelAction({ ...result, events: [] }, 'ada')).toBe(false);
+    expect(hasCheckedModelAction(result, 'another_npc')).toBe(false);
+  });
+
   it('requires an accepted model answer with a direct NPC spoken reply', () => {
     expect(hasModelReply(reply(), 'ada')).toBe(true);
     const repaired = reply();

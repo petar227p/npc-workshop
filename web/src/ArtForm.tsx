@@ -74,6 +74,7 @@ export function ArtForm({ draft, valid, onChange }: { draft: NpcDraft; valid: bo
           Art direction <span className="muted">added to every picture of what it makes</span>
         </span>
         <textarea
+          data-field="art.style"
           rows={2}
           value={art.style}
           maxLength={MAX_ART_STYLE}
@@ -109,6 +110,7 @@ export function ArtForm({ draft, valid, onChange }: { draft: NpcDraft; valid: bo
                   type="button"
                   className="secondary small"
                   aria-label={`Remove reference ${i + 1}`}
+                  data-field={`art.references.${i}`}
                   onClick={(e) => (e.stopPropagation(), onChange({ ...art, references: art.references.filter((_, j) => j !== i) }))}
                 >
                   ×
