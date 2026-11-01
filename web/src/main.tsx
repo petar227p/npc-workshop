@@ -38,7 +38,8 @@ function App() {
       {page !== 'home' && (
         <header className="top">
           <a className="brand" href="#/">
-            NPC Workshop
+            <img className="brand-icon" src="/brand/npc-workshop-icon.png" alt="" width="40" height="40" />
+            <span>NPC Workshop</span>
           </a>
           <span className="tag">Models propose. Code decides.</span>
           <nav className="tabs" aria-label="Pages">
