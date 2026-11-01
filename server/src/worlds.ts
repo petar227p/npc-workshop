@@ -1,10 +1,12 @@
-import { randomBytes, timingSafeEqual } from 'node:crypto';
-import type { ModelChoice, Start } from '@blacksmith/shared';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { draftKey, type ApiConnection } from '@blacksmith/shared/src/snapshot';
+import type { ModelChoice, NpcDraft, Start } from '@blacksmith/shared';
 import type { NpcModel } from './agents/npc';
 import type { Gallery } from './art';
 import { createEngine, createWorld, senses, type Act, type Report, type Sense, type Sync, type World } from './engine';
 import type { ImageClient } from './models/image';
 import { player, type NpcDefinition } from './npcs';
+import { buildCast } from './npcs/load';
 import { cappedStore } from './sessions';
 import { PLACE_NAMES, placeDistance } from './village';
 
@@ -16,6 +18,7 @@ export type GameWorld = {
   id: string;
   token: string;
   cast: readonly NpcDefinition[];
+  connection: ApiConnection['npcs'];
   act: Act;
   report: Report;
   sync: Sync;
@@ -40,16 +43,18 @@ export type WorldLimits = {
 
 // `start`: what the game says the player and any NPC hold when the world begins (its own saved inventories), in place
 // of what their files say. The world is seeded from it, so replay starts from the same place.
-function gameWorld(id: string, lastSeen: number, picked: readonly NpcDefinition[], start: Record<string, Start>): GameWorld {
+function gameWorld(id: string, lastSeen: number, picked: readonly NpcDefinition[], drafts: readonly NpcDraft[], start: Record<string, Start>): GameWorld {
+  start = structuredClone(start);
   const from = <T extends { id: string; start?: Start }>(a: T): T => (Object.hasOwn(start, a.id) ? { ...a, start: start[a.id] } : a);
   const cast = picked.map(from);
-  const actors = [from(player), ...cast];
+  const actors = [from({ ...player, start: structuredClone(player.start) }), ...cast];
   const sense = senses(actors, placeDistance);
   const { act, report, sync } = createEngine(actors, { sense, places: PLACE_NAMES });
   return {
     id,
     token: randomBytes(24).toString('base64url'),
     cast,
+    connection: drafts.map((d) => ({ id: d.id, name: d.name, snapshot: `sha256:${createHash('sha256').update(draftKey(d)).digest('hex')}`, first_reply: null, last_say: null })),
     act,
     report,
     sync,
@@ -86,7 +91,11 @@ export function createWorldStore(limits: WorldLimits = {}) {
 
   return {
     get: store.get,
-    create: (ip: string | null, cast: readonly NpcDefinition[], start: Record<string, Start> = {}) => store.add(ip, (id, t) => gameWorld(id, t, cast, start)),
+    create(ip: string | null, drafts: readonly NpcDraft[], start: Record<string, Start> = {}, places: readonly string[] | null = PLACE_NAMES) {
+      const built = buildCast(drafts, places);
+      if (!built.ok) return { ok: false as const, status: 400 as const, error: built.errors.join('; ') };
+      return store.add(ip, (id, t) => gameWorld(id, t, built.cast, drafts, start));
+    },
     delete: store.delete,
     get size() {
       return store.size;

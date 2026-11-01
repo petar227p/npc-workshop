@@ -33,6 +33,9 @@ import { readPersonality, writePersonality } from './personality';
 import { validationHelp, type ValidationHelp } from './validationHelp';
 import { GuidedSetup } from './GuidedSetup';
 import { ContractCard, gaveText, speechFirst } from './Chat';
+import { ImportNpcButton } from './ImportNpcButton';
+import { GameConnection } from './GameConnection';
+import { draftKey, hasModelReply, type HandoffSnapshot } from './gameHandoff';
 
 // The NPC workshop: edit a definition on the left, try it on the test bench on the right.
 // The draft lives in this browser; the server checks it on every preview and bench turn.
@@ -188,6 +191,14 @@ export function Editor() {
   const [started, setStarted] = useState(0); // drafts started here; each gets a fresh bench and forms
   const [applying, setApplying] = useState(false);
   const [benchBusy, setBenchBusy] = useState(false);
+  const [transferBusy, setTransferBusy] = useState(false);
+  const [transferError, setTransferError] = useState<{ title: string; errors: string[] } | null>(null);
+  const transferLock = useRef(false);
+  const [connectionOpen, setConnectionOpen] = useState(false);
+  const [snapshot, setSnapshot] = useState<HandoffSnapshot | null>(null);
+  const [downloaded, setDownloaded] = useState(false);
+  const [testedKey, setTestedKey] = useState<string | null>(null);
+  const returnTo = useRef<{ element: HTMLElement | null; scroll: number }>({ element: null, scroll: 0 });
   const [section, setSection] = useState('character');
   const [overview, setOverview] = useState(false); // the at-a-glance card after a template or the questions
   // The draft as it was started or saved, to tell whether replacing it loses edits. A restored draft's start is
@@ -196,6 +207,8 @@ export function Editor() {
   const latest = useRef(0);
   const advanced = useRef<HTMLDetailsElement>(null);
   const characterAdvanced = useRef<HTMLDetailsElement>(null);
+  const currentDoc = useRef(doc);
+  currentDoc.current = doc;
 
   useEffect(() => {
     editorApi.library().then(
@@ -231,16 +244,19 @@ export function Editor() {
   const fresh = check?.rev === doc.rev ? check : null;
   const status: Status = !fresh ? 'checking' : 'error' in fresh ? 'error' : fresh.result.ok ? 'ok' : 'invalid';
   const valid = status === 'ok';
+  const currentKey = draft ? draftKey(draft) : null;
+  const tested = currentKey !== null && testedKey === currentKey;
   const ready = fresh && 'result' in fresh && fresh.result.ok ? fresh.result : null;
   // This draft's problems. While a newer edit is being checked the last ones stay, dimmed.
   const problems = check && 'result' in check && !check.result.ok ? check.result.errors : [];
-  const locked = applying || benchBusy;
+  const locked = applying || benchBusy || transferBusy;
 
   // Every new starting point (a template, a blank NPC, a file from the library) comes through here. The old
   // conversation belongs to another NPC, so the bench is cleared first and the draft switches only once it's gone; if
   // it can't be cleared, the draft and the conversation stay as they were.
   const applyDraft = async (next: NpcDraft, what: string, done: string, fromSetup = false, openTest = false) => {
-    if (locked) return;
+    // Imports hold the transfer lock while using this same replacement path.
+    if (applying || benchBusy) return;
     if (draft && JSON.stringify(draft) !== baseline.current) {
       if (!confirm(`${what}? It replaces “${draft.name}” in this browser, and your changes to it are lost. Saved files aren't touched.`)) return;
     }
@@ -254,7 +270,12 @@ export function Editor() {
     } finally {
       setApplying(false);
     }
+    setConnectionOpen(false);
+    setSnapshot(null);
+    setDownloaded(false);
+    setTestedKey(null);
     baseline.current = JSON.stringify(next);
+    setTransferError(null);
     setCheck(null);
     setDoc((s) => ({ draft: next, rev: s.rev + 1 }));
     setStarted((n) => n + 1);
@@ -288,6 +309,95 @@ export function Editor() {
   const blank = () => void applyDraft({ ...BLANK, id: freshNpcId(BLANK.id, BLANK.id, ids) }, 'Start a blank NPC', 'Started a blank NPC in this browser.');
   const load = (n: NpcDraft) =>
     void applyDraft(n, `Load example ${n.name}`, `Editing a draft copy of ${n.name} from the example library (npcs/${n.id}.json). The example village keeps using its saved definition.`);
+
+  const importNpc = async (file: File) => {
+    if (locked || transferLock.current) return;
+    transferLock.current = true;
+    setTransferBusy(true);
+    setTransferError(null);
+    try {
+      const { prepareNpcImport } = await import('./npcTransfer');
+      const imported = await prepareNpcImport(file, editorApi.preview);
+      if (!imported.ok) {
+        setTransferError({ title: 'Couldn’t import NPC', errors: imported.errors });
+        return;
+      }
+      // An already-running picture read can finish while validation is in flight. Never replace those edits
+      // using a confirmation based on an older draft, even though the form is disabled during import.
+      if (currentDoc.current.rev !== doc.rev) {
+        setTransferError({ title: 'Import paused', errors: ['Your draft changed while the file was being checked. Import it again when your changes are ready.'] });
+        return;
+      }
+      await applyDraft(imported.draft, `Import ${imported.draft.name}`, `Imported ${imported.draft.name}. A fresh test conversation is ready. This restores the character’s settings, not an earlier conversation or world.`, true, true);
+    } catch (e) {
+      setTransferError({ title: 'Couldn’t import NPC', errors: [e instanceof Error ? e.message : 'Try choosing the file again.'] });
+    } finally {
+      transferLock.current = false;
+      setTransferBusy(false);
+    }
+  };
+
+  const downloadNpc = async () => {
+    if (!draft || !valid || locked || transferLock.current) return;
+    transferLock.current = true;
+    setTransferBusy(true);
+    setTransferError(null);
+    let url: string | null = null;
+    try {
+      const { createNpcDownload } = await import('./npcTransfer');
+      const download = createNpcDownload(draft);
+      if (!download.ok) {
+        setTransferError({ title: 'Couldn’t download NPC', errors: download.errors });
+        return;
+      }
+      url = URL.createObjectURL(new Blob([download.text], { type: 'application/json' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = download.filename;
+      document.body.append(link);
+      try { link.click(); } finally { link.remove(); }
+      setSnapshot({ npc: download.npc, filename: download.filename, sourceKey: draftKey(draft) });
+      setDownloaded(true);
+      setNotice(`Download requested: ${download.filename}. It contains ${draft.name}’s settings and embedded reference pictures. Conversations, world progress and generated item pictures are not included.`);
+    } catch (e) {
+      setTransferError({ title: 'Couldn’t download NPC', errors: [e instanceof Error ? e.message : 'Try downloading again.'] });
+    } finally {
+      // Allow the browser to begin reading the file before releasing the object URL.
+      if (url) { const downloadedUrl = url; setTimeout(() => URL.revokeObjectURL(downloadedUrl), 1000); }
+      transferLock.current = false;
+      setTransferBusy(false);
+    }
+  };
+
+  const openConnection = async () => {
+    if (!draft || !valid || locked || transferLock.current) return;
+    returnTo.current = { element: document.activeElement instanceof HTMLElement ? document.activeElement : null, scroll: window.scrollY };
+    transferLock.current = true;
+    setTransferBusy(true);
+    setTransferError(null);
+    try {
+      // Preparing the handoff is entirely local: no model, world creation or test reset.
+      const { createNpcDownload } = await import('./npcTransfer');
+      const prepared = createNpcDownload(draft);
+      if (!prepared.ok) { setTransferError({ title: 'Couldn’t prepare this NPC', errors: prepared.errors }); return; }
+      if (currentDoc.current.rev !== doc.rev) { setTransferError({ title: 'Draft changed', errors: ['Wait for validation and open Use in your game again.'] }); return; }
+      if (!snapshot || !downloaded) setSnapshot({ npc: prepared.npc, filename: prepared.filename, sourceKey: draftKey(draft) });
+      setNotice(null);
+      setConnectionOpen(true);
+    } catch (e) {
+      setTransferError({ title: 'Couldn’t prepare this NPC', errors: [e instanceof Error ? e.message : 'Try again.'] });
+    } finally {
+      transferLock.current = false;
+      setTransferBusy(false);
+    }
+  };
+  const closeConnection = () => {
+    setConnectionOpen(false);
+    requestAnimationFrame(() => {
+      returnTo.current.element?.focus({ preventScroll: true });
+      scrollTo(0, returnTo.current.scroll);
+    });
+  };
 
   const save = async () => {
     if (!draft) return;
@@ -350,7 +460,8 @@ export function Editor() {
   );
 
   return (
-    <div className="workshop">
+    <>
+    <div className="workshop" hidden={connectionOpen}>
       <section className="panel workshop-head" aria-labelledby="workshop-h">
         <div className="wh-top">
           <div className="wh-text">
@@ -365,9 +476,12 @@ export function Editor() {
           </div>
           {draft && (
             <div className="wh-actions">
-              <button className="secondary" aria-expanded={starting} aria-controls="starters" onClick={() => setStarting((s) => !s)}>
+              <button className="secondary" disabled={locked} aria-expanded={starting} aria-controls="starters" onClick={() => setStarting((s) => !s)}>
                 {starting ? 'Close starting points' : 'New NPC…'}
               </button>
+              <ImportNpcButton disabled={locked} onImport={(file) => void importNpc(file)} />
+              <button className="secondary" disabled={!valid || locked} onClick={() => void downloadNpc()} title="Download a portable copy of this character’s settings">Download NPC</button>
+              <button type="button" className={tested ? 'handoff-ready' : 'secondary'} disabled={!valid || locked} onClick={() => void openConnection()}>Use in your game</button>
               {canSave && (
                 <button className="secondary" onClick={save} disabled={!valid || locked} title="Writes npcs/<id>.json and prompts/<id>.md (dev server only)">
                   Save to files — development only
@@ -393,11 +507,12 @@ export function Editor() {
                 Check again
               </button>
             )}
-            <button className="test" onClick={test}>
+            <button className="test" disabled={locked} onClick={test}>
               Test your NPC
             </button>
           </div>
         )}
+        <p className="muted small transfer-help">Download a character’s settings to keep or import later. Reference pictures are embedded; conversations and world progress stay separate. The character’s look uses the bundled sprite sheet.</p>
         <details className="workshop-file-help">
           <summary>Development file workflow</summary>
           {!canSave && <p className="muted small">File saving is not enabled on this server.</p>}
@@ -414,10 +529,12 @@ export function Editor() {
           {notice}
         </div>
       )}
-      {(!draft || starting) && <Starters first={!draft} library={library} locked={locked} onTemplate={fromTemplate} onAnswers={fromAnswers} onBlank={blank} onLoad={load} />}
+      {transferBusy && <div className="note-box" role="status">Preparing the NPC file…</div>}
+      {transferError && <div className="errors" role="alert"><b>{transferError.title}</b><ul>{transferError.errors.map((error, i) => <li key={i}>{error}</li>)}</ul><p>Your current draft and test conversation have been kept.</p></div>}
+      {(!draft || starting) && <Starters first={!draft} library={library} locked={locked} onTemplate={fromTemplate} onAnswers={fromAnswers} onBlank={blank} onLoad={load} onImport={(file) => void importNpc(file)} />}
 
       {draft && (
-        <div className="workshop-editor">
+        <fieldset className="workshop-editor" aria-label="NPC editor and test session" disabled={applying || transferBusy}>
           <nav className="editor-nav" aria-label="Workshop sections">
             {([['character', 'Character'], ['abilities', 'Abilities & rules'], ['test', 'Test']] as const).map(([id, label]) => (
               <button key={id} type="button" className="secondary" aria-current={section === id ? 'page' : undefined} onClick={() => setSection(id)}>{label}</button>
@@ -604,11 +721,13 @@ export function Editor() {
             {status === 'checking' && <p className="note-box" role="status">Checking your draft before testing…</p>}
             {status === 'invalid' && problemList}
             {status === 'error' && <div className="note-box" role="alert">Couldn’t check this draft. <button type="button" className="secondary small" onClick={() => setRetry(n => n + 1)}>Check again</button></div>}
-            <Bench key={started} draft={draft} valid={valid} onBusy={setBenchBusy} />
+            <Bench key={started} draft={draft} valid={valid} onBusy={setBenchBusy} tested={tested} onModelReply={(npc) => setTestedKey(draftKey(npc))} onReset={() => setTestedKey(null)} onUseInGame={() => void openConnection()} />
           </aside>
-        </div>
+        </fieldset>
       )}
     </div>
+    {connectionOpen && snapshot && draft && <GameConnection snapshot={snapshot} downloaded={downloaded} stale={snapshot.sourceKey !== currentKey} valid={valid} busy={locked} currentName={draft.name} notice={notice} errors={transferError} onBack={closeConnection} onDownload={() => void downloadNpc()} onImport={(file) => void importNpc(file)} />}
+    </>
   );
 }
 
@@ -622,6 +741,7 @@ function Starters({
   onAnswers,
   onBlank,
   onLoad,
+  onImport,
 }: {
   first: boolean;
   library: NpcDraft[];
@@ -630,6 +750,7 @@ function Starters({
   onAnswers: (r: SetupResult, openTest?: boolean) => void;
   onBlank: () => void;
   onLoad: (n: NpcDraft) => void;
+  onImport: (file: File) => void;
 }) {
   const [pick, setPick] = useState('');
   const [asking, setAsking] = useState(false);
@@ -641,11 +762,11 @@ function Starters({
     <section className="panel starters" id="starters" aria-labelledby="starters-h">
       <h3 id="starters-h">{first ? 'Create your first NPC' : 'Start a new NPC'}</h3>
       <p>Choose a role, give your character a personality, and try a conversation.</p>
-      <button type="button" disabled={locked} onClick={() => setGuiding(true)}>Create your NPC</button>
+      <div className="starter-transfer"><button type="button" disabled={locked} onClick={() => setGuiding(true)}>Create your NPC</button><ImportNpcButton disabled={locked} onImport={onImport} /></div>
       <details className="starter-alternatives"><summary>Other starting points</summary>
       <p className="muted small">A template is a new draft with example settings, ready to test and change. It doesn&apos;t touch the village or its NPCs.</p>
       <div className="starter-ask">
-        <button type="button" className="secondary" onClick={() => setAsking(true)}>
+        <button type="button" className="secondary" disabled={locked} onClick={() => setAsking(true)}>
           Help me choose
         </button>
         <span className="muted small">Not sure which? Answer up to four questions, then check the proposal before it replaces anything.</span>
@@ -1085,7 +1206,10 @@ function VerbTable({ draft, onChange }: { draft: NpcDraft; onChange: (verbs: Led
   );
 }
 
-function Bench({ draft, valid, onBusy }: { draft: NpcDraft; valid: boolean; onBusy: (busy: boolean) => void }) {
+function Bench({ draft, valid, onBusy, tested, onModelReply, onReset, onUseInGame }: {
+  draft: NpcDraft; valid: boolean; onBusy: (busy: boolean) => void; tested: boolean;
+  onModelReply: (draft: NpcDraft) => void; onReset: () => void; onUseInGame: () => void;
+}) {
   const [view, setView] = useState<StateView | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [pending, setPending] = useState<string | null>(null);
@@ -1122,7 +1246,10 @@ function Bench({ draft, valid, onBusy }: { draft: NpcDraft; valid: boolean; onBu
       const r = await editorApi.say(draft, line);
       showView(r.view);
       if (!r.ok) setError(r.errors.join('; '));
-      else setTurns((t) => [...t, { kind: 'model', text: line, attempts: r.attempts, outcome: r.outcome }]);
+      else {
+        setTurns((t) => [...t, { kind: 'model', text: line, attempts: r.attempts, outcome: r.outcome }]);
+        if (hasModelReply(r, draft.id)) onModelReply(draft);
+      }
     } catch (e) {
       setError((e as Error).message);
       setUnsent(line);
@@ -1185,6 +1312,7 @@ function Bench({ draft, valid, onBusy }: { draft: NpcDraft; valid: boolean; onBu
       setView(null);
       setTurns([]);
       setControlled(new Set());
+      onReset();
     } catch (e) {
       setError((e as Error).message);
     }
@@ -1244,6 +1372,10 @@ function Bench({ draft, valid, onBusy }: { draft: NpcDraft; valid: boolean; onBu
           </button>
         </div>
         {last && <p className="bench-verdict" role="status">{last.kind === 'model' ? outcomeText(last) : `Controlled test · no model. ${last.accepted ? 'Ledger accepted' : 'Ledger rejected'} the test proposal.${last.reason ? ` ${last.reason}` : ''}`}</p>}
+        <div className={`bench-handoff${tested ? ' ready' : ''}`}>
+          <p>{tested ? `${draft.name} replied in this test conversation. Try this character from your own game next.` : valid ? 'Use this character from your own game when you’re ready. You can test it here first.' : 'Make this draft valid before using it in your game.'}</p>
+          <button type="button" className={tested ? undefined : 'secondary'} disabled={busy || !valid} onClick={onUseInGame}>Use in your game</button>
+        </div>
         <details className="bench-tools">
           <summary>Test the rules</summary>
           <p className="muted small">Try challenging the character or advance time to see how it behaves.</p>

@@ -7,8 +7,9 @@ import { player } from './player';
 // Every actor in the village: the player plus each npcs/<id>.json. Adding an NPC is one file (and its persona).
 export const NPC_FILES = npcFiles();
 // Labels first: an NPC's words for things another file labels are built with them.
-registerLabels(NPC_FILES.list());
-export const NPCS = NPC_FILES.list().map(toNpc);
+export const NPC_DRAFTS = NPC_FILES.list();
+registerLabels(NPC_DRAFTS);
+export const NPCS = NPC_DRAFTS.map(toNpc);
 export const ACTORS = [player, ...NPCS];
 
 registerNames(NPCS);

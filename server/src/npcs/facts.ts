@@ -1,6 +1,6 @@
 import { clockText, type Catalogue, type Contract, type FactBlock } from '@blacksmith/shared';
 import { activeJobs, availableStock, minDeliveryTicks, type World } from '../engine';
-import { labelOf, memoriesText } from './news';
+import { labelOf, memoriesText, villageVocabulary, type Vocabulary } from './news';
 
 // The facts an NPC can be told, one block each. Code-owned numbers, so the model can quote prices and limits that will pass.
 // A definition picks blocks by name; their text is joined in this order. Every block reads the NPC's own catalogue and stock.
@@ -8,7 +8,7 @@ import { labelOf, memoriesText } from './news';
 // (npcs/news.ts labelsFor): a game's own item id reads as its label, the same word the model's schema takes.
 
 type Label = (name: string) => string;
-type Own = { catalogue: Catalogue; label: Label; signals: Record<string, string> };
+type Own = { catalogue: Catalogue; label: Label; signals: Record<string, string>; vocabulary: Vocabulary };
 type Block = (world: World, npcId: string, customer: string, own: Own) => string | null;
 
 export const FACTS: Record<FactBlock, Block> = {
@@ -73,7 +73,7 @@ export const FACTS: Record<FactBlock, Block> = {
     return `Your open offers to this customer:\n${offers}`;
   },
   // What it saw or was told, with the event ids TELL, RETELL and ANNOUNCE must cite.
-  memories: (world, npcId) => memoriesText(world, npcId),
+  memories: (world, npcId, _customer, { vocabulary }) => memoriesText(world, npcId, vocabulary),
   // What it may ask the game to do, and what each means. The game decides whether it happens, so it is a request.
   signals: (_world, _npc, _customer, { signals }) => {
     const lines = Object.entries(signals).map(([name, meaning]) => `- ${name}: ${meaning}`);
@@ -90,9 +90,10 @@ export function factsFor(
   catalogue: Catalogue,
   label: Label = (n) => n,
   signals: Record<string, string> = {},
+  vocabulary: Vocabulary = villageVocabulary,
 ): (world: World, customer: string) => string {
   const chosen = Object.keys(FACTS).filter((b) => blocks.includes(b as FactBlock)) as FactBlock[];
-  const own = { catalogue, label, signals };
+  const own = { catalogue, label, signals, vocabulary };
   return (world, customer) =>
     chosen
       .map((b) => FACTS[b](world, npcId, customer, own))

@@ -2,11 +2,11 @@
 
 Build NPCs that act within your game's rules.
 
-**NPC Workshop is an authoring and testing tool.** Create a character, choose its supported abilities and limits, then test conversations and actions in an isolated session. Start from a role template, use the guided setup or questionnaire, or load an editable example. Drafts stay in your browser; the server validates their settings.
+**NPC Workshop is an authoring and testing tool.** Create a character, choose its supported abilities and limits, then test conversations and actions in an isolated session. Start from a role template, use the guided setup or questionnaire, or load an editable example. Drafts stay in your browser; the server validates their settings. **Use in your game** hands a portable download to the runnable backend example.
 
 The model proposes actions as JSON (`OFFER`, `REFUSE`, `SAY`, ...). A deterministic **ledger** checks what can happen against code-owned rules: stock, gold, price floors, item limits and timers. Accepted actions become events; rejected proposals are logged. The model never writes the delivered item's stats.
 
-**Brann the blacksmith is the playable demonstration**, inside the example village. Negotiate an order, accept a checked offer, and collect the finished item. The workshop and demo are separate destinations: testing a draft does not publish it to the village. To connect saved definitions to another game, follow [the developer API instructions](#use-the-npcs-from-your-own-game).
+**Brann the blacksmith is the playable demonstration**, inside the example village. Negotiate an order, accept a checked offer, and collect the finished item. The workshop and demo are separate destinations: testing a draft does not publish it to the village. To connect a downloaded NPC to another game, follow [the developer API instructions](#use-the-npcs-from-your-own-game).
 
 Built for the Meta Muse hackathon (Nov 2026).
 
@@ -37,7 +37,7 @@ The world is rebuilt by replaying the event log, so every session is auditable a
 - **Model layer**: plain `fetch` clients for the Meta Model API and Baseten, with retries, a JSONL recorder, replay and mock clients. Keys stay on the server.
 - **Tests and proof**: Vitest coverage for the engine, API, guided setup and UI helpers; `npm run ledger-proof` verifies controlled invalid proposals separately from live-model behavior. See [the product-hierarchy verification record](docs/product-hierarchy-final-2026-10-31/README.md).
 
-Current limits: abilities come from the supported code-owned library. The editor's map-dependent settings use the bundled village, and bench/village worlds still share server-session infrastructure. Browser drafts have no deployment/export flow or automatic update of a running village. Development file saving plus a server restart is the current handoff; broader runtime separation and a live-site spend budget remain future work.
+Current limits: abilities come from the supported code-owned library. The editor's map-dependent settings use the bundled village, and bench/village worlds still share server-session infrastructure. Workshop downloads can create independent API worlds through the backend example. Edits do not automatically update a running village or API world. The Workshop handoff screen verifies an authenticated external reply for the exact downloaded configuration. Engine adapters, durable runtime storage and a live-site spend budget remain future work.
 
 ## Models
 
@@ -72,6 +72,7 @@ Other scripts:
 ```bash
 npm test              # Vitest
 npm run typecheck     # shared, server, web, scripts
+npm run game-example -- --help  # connect a downloaded NPC from a JavaScript backend
 npm run smith-demo    # live order -> accept -> skip -> delivery, then an absurd request and an injection attempt
 npm run latency-test  # times each model setup, checks each answer against the ledger
 npm run ledger-proof  # controlled inputs (no model): a valid offer, then invalid ones the ledger must refuse unchanged
@@ -81,12 +82,16 @@ Every model call is recorded to `logs/<session>.jsonl` (no keys). Play one back 
 
 ## Create and test an NPC
 
-1. Open Workshop and choose **Create your NPC**, a role template, **Help me choose**, or **Blank NPC**. Named library entries are examples, separate from role templates.
+1. Open Workshop and choose **Create your NPC**, **Import NPC**, a role template, **Help me choose**, or **Blank NPC**. Named library entries are examples, separate from role templates.
 2. Set the character's personality and supported abilities. Change catalogue limits, signals or automatic behavior as needed. Location, schedule, perception and NPC sprite controls currently use the example village context; generated item artwork is configured separately.
 3. Wait for a valid preview, then choose **Test your NPC**. Try a normal conversation and a challenge. A valid configuration is checked again when it proposes an action. The controlled rejection test is explicitly separate from the model's answer.
-4. Return from the demo to continue the draft. To use it outside the browser, follow the development file workflow and [developer API setup](#use-the-npcs-from-your-own-game).
+4. Choose **Download NPC** for a valid draft to keep a portable `<id>.npc.json` file. It includes the complete character settings, persona and embedded reference pictures. It excludes conversations, world progress and generated item pictures. The character sprite still uses the bundled sprite sheet. Files are limited to 2 MiB.
+5. Choose **Use in your game** for a valid draft. After an accepted model conversation it is highlighted in Test. The screen shows the selected character copy, download/import, and a runnable backend command. If you edit after downloading, it flags the old copy and asks for an updated download. Back to Workshop preserves your draft, conversation and unsent message. In the interactive example, type `/verify`, open its temporary loopback page and copy the world ID and token into step 3. Only a matching configuration with a successful external API reply earns “Your game connected.” Wrong credentials, configuration mismatches, provider failures and missing worlds show recovery guidance. Credentials stay in memory and clear on leaving or resetting this flow.
+6. Choose **Import NPC** in the starting points, Workshop toolbar or handoff screen to restore a downloaded character. The file is checked locally and by the normal server validation before replacing anything; confirm replacement if your current draft has edits. A successful import opens a fresh test conversation. Failed or cancelled imports keep your draft and test conversation.
 
-An NPC definition is `npcs/<id>.json` plus its persona in `prompts/<id>.md`, with optional art references. This is an excerpt from [Brann's complete definition](npcs/smith.json); the full file also supplies the catalogue, starting stock, model and example-world settings:
+Download/import works without development file saving and never writes NPC registry files. It restores configuration, not a running world. Use a downloaded draft directly with the [runnable backend example](examples/game-backend/README.md) and [developer API](#use-the-npcs-from-your-own-game).
+
+In the development file workflow, an NPC definition is `npcs/<id>.json` plus its persona in `prompts/<id>.md`, with optional art references. This is an excerpt from [Brann's complete definition](npcs/smith.json); the full file also supplies the catalogue, starting stock, model and example-world settings:
 
 `npcs/smith.json`:
 
@@ -114,7 +119,17 @@ The workshop's development save control writes these files; testing alone does n
 
 An engine or script that sends HTTP can call the running NPC server. The server owns its world: your game sends what the player did and renders the returned events. Each supported action goes through the ledger. Game-specific actions requested through signals remain your game's responsibility.
 
-Start by saving the definition/persona on a development server and restarting it, or by placing the files in that server's configuration before starting it. `GET /api/v1/npcs` lists the loaded registry; worlds select from those IDs. The browser draft is not sent to this API or deployed to another game. The existing server still uses bundled village geography; adapting world/map behavior is additional integration work. The routes below describe the current file/server workflow, not an engine plugin or live publication feature.
+Download an NPC from Workshop, then send its bundle's `npc` configuration as `{ definitions: [bundle.npc] }` to `POST /api/v1/worlds` from your backend. The server validates the draft and creates a new world without writing registry files or restarting. Each world owns a configuration snapshot; later edits affect newly created worlds. See the [request contract](docs/workshop-game-integration-contract.md#draft-based-world-creation-contract) and [implementation evidence](docs/workshop-game-integration-task-3/README.md). Keep the returned token on your game's backend. The local verification flow briefly copies it into Workshop memory; never put it in URLs, analytics, logs, committed files or a distributed game client. Serve Workshop on localhost or HTTPS for browser snapshot hashing.
+
+Run the example from this repository's root while the NPC server is running:
+
+```bash
+npm run game-example -- --server http://localhost:8787 --bundle "$HOME/Downloads/your_npc.npc.json"
+```
+
+It keeps the token in memory and consumes checked events once. Add `--interactive` to continue the same world with messages, `/accept ID`, `/tick HOURS`, `/events` and `/verify`. See [setup, signal handling and recovery](examples/game-backend/README.md) and [the scripted verification transcript](docs/workshop-game-integration-task-4/transcript.txt).
+
+Alternatively, `GET /api/v1/npcs` lists startup registry IDs for the existing `npcs` selection shown below. Choose `definitions` or `npcs` in each request; omitting both selects all startup NPCs. Worlds still use the bundled village geography and disappear on server restart. The [runnable JavaScript backend example](examples/game-backend/README.md) creates a world from your download, sends normal/challenge messages and optionally accepts offers and handles signals. Workshop’s **Use in your game** screen compares a SHA-256 fingerprint of the complete normalized draft with private server-side reply evidence. World creation, Workshop bench calls and timer activity do not count. Verification polls only after you enter credentials, at most six times per submission, with manual retry. Restarting loses worlds and their evidence; reimporting the bundle restores settings into a fresh world, not an old conversation or inventory. See the [complete journey verification](docs/workshop-game-integration-task-7/README.md).
 
 ```bash
 # Which NPCs there are, and what each sells
@@ -134,9 +149,10 @@ curl -s -X POST $W/tick   -H "$AUTH" -H 'content-type: application/json' -d '{"h
 
 | Route | Body | What it does |
 |---|---|---|
-| `GET /api/v1/npcs` | | The NPCs a world can be made with |
-| `POST /api/v1/worlds` | `{ npcs?: [id…], start?: { <actor id>: { gold, stock } } }` | A new world (all NPCs if none are given), optionally starting from your game's own save; returns `world_id` and `token` |
+| `GET /api/v1/npcs` | | The startup registry; custom drafts can also create worlds |
+| `POST /api/v1/worlds` | `{ npcs?: [id…], definitions?: [NpcDraft…], start?: { <actor id>: { gold, stock } } }` | A new world from registry IDs or 1–8 drafts (choose one), optionally starting from your game's own save; returns `world_id` and `token` |
 | `GET …/worlds/:id` | | The world now: tick, the player's gold, goods, items and offers, who is where, the news |
+| `GET …/worlds/:id/connection` | | Authenticated snapshot hashes, first committed external spoken reply per NPC, latest say outcome, busy state and remaining calls; no token or conversation text |
 | `GET …/worlds/:id/events?since=<event id>&limit=` | | The log from just after `since`, up to 500 events, `more` if there are others |
 | `POST …/worlds/:id/say` | `{ npc, text }` | The player speaks; the NPC answers through the ledger |
 | `POST …/worlds/:id/accept` | `{ contract_id }` | The player accepts an offer: gold moves, work starts |
@@ -174,7 +190,7 @@ The ledger only knows trade, gifts and news. Anything else (open a gate, follow 
 
 The guard does both: it hands out passes (counted) and signals `open_gate` once you hold one (your call). In the village there is no game code behind a signal, so the chat shows what a game would be asked.
 
-Limits, so a public server can't be run up: 150 model calls per world (a world out of calls still keeps time, its NPCs just stop acting on their own), 60 calls a minute across all worlds, 5,000 events per world, 200 worlds in memory (only ones idle for 30 minutes are dropped), 5 new worlds a minute per address and 20 overall, request bodies up to 16 KB.
+Limits, so a public server can't be run up: 150 model calls per world (a world out of calls still keeps time, its NPCs just stop acting on their own), 60 calls a minute across all worlds, 5,000 events per world, 200 worlds in memory (only ones idle for 30 minutes are dropped), 5 new worlds a minute per address and 20 overall, API action bodies up to 16 KiB and world-creation bodies up to 4 MiB. Each custom draft is bounded to 2 MiB; picture-heavy casts may reach the combined limit sooner. Repair calls and provider failures consume model-call quota. An action that would exceed the event cap returns 429 and saves no partial changes; model calls already made still count.
 
 ## Layout
 
@@ -192,12 +208,13 @@ npcs/ prompts/ NPC data files and personas
 prototype/     Phaser village mock-up (Kenney art)
 docs/          API notes (rate limits, latency, costs), market research
 scripts/       dev runner, smith demo, latency test
+examples/      runnable JavaScript backend integration
 ```
 
 ## Roadmap
 
 - Separate authoring/runtime concerns and support game-specific world configuration beyond the bundled village.
-- Export/deployment and adding saved definitions to a running world without a restart.
+- Engine adapters and adding definitions to an existing world.
 - A recorded raw-LLM versus ledger comparison (not yet run); the existing per-NPC exploit reports are separate evidence.
 - A non-game NPC (a parts-supplier quote desk) on the same engine, to show it isn't only for games.
 - Human newcomer sessions, spoken recording, deployment and a global spend budget; existing session/turn limits are already implemented.

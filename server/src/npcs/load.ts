@@ -6,7 +6,7 @@ import { verbs } from '../engine';
 import { PLACE_NAMES } from '../village';
 import { factsFor } from './facts';
 import { historyFor } from './history';
-import { labelsFor } from './news';
+import { labelsFor, vocabularyFor, type Vocabulary } from './news';
 import { defineNpc, type NpcDefinition } from './types';
 
 // NPCs as data: npcs/<id>.json holds the settings, prompts/<id>.md the persona, npcs/art/<id>-<n>.<ext> its reference
@@ -62,7 +62,7 @@ function offMap(d: Pick<NpcDraft, 'location' | 'schedule'>, places: readonly str
 
 // Every problem as one readable line, for the editor. `places` are the named places on the village map;
 // null skips that check (files at start, see `toNpc`).
-export function buildNpc(input: unknown, places: readonly string[] | null = PLACE_NAMES): Built {
+export function buildNpc(input: unknown, places: readonly string[] | null = PLACE_NAMES, vocabulary?: Vocabulary): Built {
   const parsed = NpcDraftSchema.safeParse(input);
   if (!parsed.success) return { ok: false, errors: parsed.error.issues.map((i) => `${i.path.join('.') || 'npc'}: ${i.message}`) };
   const d = parsed.data;
@@ -75,7 +75,7 @@ export function buildNpc(input: unknown, places: readonly string[] | null = PLAC
   if (d.model_verbs.includes('SIGNAL') && !d.facts.includes('signals')) return { ok: false, errors: ['SIGNAL needs the "What it can ask the game for" facts, or it can\'t know what its signals mean'] };
   try {
     // What it calls each thing, the same in its schema, its facts and its history. Throws if two things share a word.
-    const label = labelsFor(d.labels);
+    const label = vocabulary?.labelOf ?? labelsFor(d.labels);
     const goods = goodsOf(d);
     const words = flat.wordsFor([...goods, ...Object.keys(d.catalogue.made_to_order?.items ?? {})], label);
     const npc = defineNpc({
@@ -95,13 +95,38 @@ export function buildNpc(input: unknown, places: readonly string[] | null = PLAC
       perception_radius: d.perception_radius,
       model: d.model,
       effort: d.effort,
-      facts: factsFor(d.id, d.facts, d.catalogue, label, d.signals),
-      history: historyFor(d.id, d.name, label),
+      facts: factsFor(d.id, d.facts, d.catalogue, label, d.signals, vocabulary),
+      history: historyFor(d.id, d.name, label, vocabulary?.nameOf),
       triggers: d.triggers,
       cue: d.cue,
       fallbacks: d.fallbacks,
     });
     return { ok: true, npc, draft: d };
+  } catch (err) {
+    return { ok: false, errors: [(err as Error).message] };
+  }
+}
+
+// Parse into owned data before constructing the local vocabulary and every closure/schema. This also
+// rebuilds registry NPCs, so a world never retains their nested configuration or village resolvers.
+export function buildCast(inputs: readonly NpcDraft[], places: readonly string[] | null = PLACE_NAMES): { ok: true; cast: NpcDefinition[] } | { ok: false; errors: string[] } {
+  const drafts: NpcDraft[] = [];
+  const errors: string[] = [];
+  inputs.forEach((input, i) => {
+    const parsed = NpcDraftSchema.safeParse(input);
+    if (parsed.success) drafts.push(parsed.data);
+    else errors.push(...parsed.error.issues.map((e) => `definitions.${i}.${e.path.join('.')}: ${e.message}`));
+  });
+  if (errors.length) return { ok: false, errors };
+  try {
+    const vocabulary = vocabularyFor(drafts);
+    const cast: NpcDefinition[] = [];
+    drafts.forEach((d, i) => {
+      const built = buildNpc(d, places, vocabulary);
+      if (built.ok) cast.push(built.npc);
+      else errors.push(...built.errors.map((e) => `definitions.${i}: ${e}`));
+    });
+    return errors.length ? { ok: false, errors } : { ok: true, cast };
   } catch (err) {
     return { ok: false, errors: [(err as Error).message] };
   }

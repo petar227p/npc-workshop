@@ -11,3 +11,9 @@ export const MAX_SYNC_REASON = 200; // why a game changed an inventory itself ("
 export const MAX_SIGNAL_TEXT = 200; // what one signal asks the game to do, as the model is told it
 export const MAX_SIGNALS = 20; // signals one NPC may declare
 export const MAX_VOICE_SECONDS = 30; // one spoken line for the chat box; the browser stops recording there, the server refuses longer
+
+// Portable configuration, including embedded reference pictures. World creation has a separate total cap:
+// eight text-only characters fit easily, but a cast with many pictures may need smaller references.
+export const MAX_NPC_BUNDLE_BYTES = 2 * 1024 * 1024;
+export const MAX_WORLD_DEFINITIONS = 8; // independent of how many NPCs the startup registry contains
+export const MAX_WORLD_CREATE_BYTES = 4 * 1024 * 1024;
