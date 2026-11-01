@@ -123,8 +123,6 @@ export function CatalogueForm({ value, onChange }: { value: Value; onChange: (v:
 
   return (
     <div className="catalogue">
-      <Num label="Starting gold" value={form.gold} onChange={(gold) => patch({ gold })} />
-
       <label className="check">
         <input type="checkbox" checked={form.sells} onChange={(e) => patch({ sells: e.target.checked, goods: form.goods.length ? form.goods : [{ ...NEW_GOOD }] })} />
         <span>
@@ -136,13 +134,13 @@ export function CatalogueForm({ value, onChange }: { value: Value; onChange: (v:
           {form.goods.map((g, i) => (
             <tr key={i}>
               <td>
-                <Name value={g.name} onChange={(name) => row('goods', i, { name })} label="Item name" />
+                <Name value={g.name} field={`catalogue.in_stock.${g.name}`} onChange={(name) => row('goods', i, { name })} label="Item name" />
               </td>
               <td>
-                <Cell value={g.min_price} onChange={(min_price) => row('goods', i, { min_price })} label={`${g.name || 'Good'} minimum price`} />
+                <Cell value={g.min_price} field={`catalogue.in_stock.${g.name}.min_price`} onChange={(min_price) => row('goods', i, { min_price })} label={`${g.name || 'Good'} minimum price`} />
               </td>
               <td>
-                <Cell value={g.stock} onChange={(stock) => row('goods', i, { stock })} label={`${g.name || 'Good'} in stock`} />
+                <Cell value={g.stock} field={`start.stock.${g.name}`} onChange={(stock) => row('goods', i, { stock })} label={`${g.name || 'Good'} in stock`} />
               </td>
               <td>
                 <Remove onClick={() => remove('goods', i)} label={`Remove ${g.name || 'good'}`} />
@@ -174,19 +172,19 @@ export function CatalogueForm({ value, onChange }: { value: Value; onChange: (v:
             {form.items.map((it, i) => (
               <tr key={i}>
                 <td>
-                  <Name value={it.name} onChange={(name) => row('items', i, { name })} label="Item type" />
+                  <Name value={it.name} field={`catalogue.made_to_order.items.${it.name}`} onChange={(name) => row('items', i, { name })} label="Item type" />
                 </td>
                 {STATS.map((s) => (
                   <td key={s} className="range">
                     <span>
-                      <Cell value={it[s].min} onChange={(min) => row('items', i, { [s]: { ...it[s], min } })} label={`${it.name || 'Item'} ${s} min`} />
+                      <Cell value={it[s].min} field={`catalogue.made_to_order.items.${it.name}.${s}.min`} onChange={(min) => row('items', i, { [s]: { ...it[s], min } })} label={`${it.name || 'Item'} ${s} min`} />
                       <span className="muted">–</span>
-                      <Cell value={it[s].max} onChange={(max) => row('items', i, { [s]: { ...it[s], max } })} label={`${it.name || 'Item'} ${s} max`} />
+                      <Cell value={it[s].max} field={`catalogue.made_to_order.items.${it.name}.${s}.max`} onChange={(max) => row('items', i, { [s]: { ...it[s], max } })} label={`${it.name || 'Item'} ${s} max`} />
                     </span>
                   </td>
                 ))}
                 <td>
-                  <Cell value={it.base_ticks} onChange={(base_ticks) => row('items', i, { base_ticks })} label={`${it.name || 'Item'} base hours`} />
+                  <Cell value={it.base_ticks} field={`catalogue.made_to_order.items.${it.name}.base_ticks`} onChange={(base_ticks) => row('items', i, { base_ticks })} label={`${it.name || 'Item'} base hours`} />
                 </td>
                 <td>
                   <Remove onClick={() => remove('items', i)} label={`Remove ${it.name || 'item type'}`} />
@@ -198,13 +196,13 @@ export function CatalogueForm({ value, onChange }: { value: Value; onChange: (v:
             {form.materials.map((m, i) => (
               <tr key={i}>
                 <td>
-                  <Name value={m.name} onChange={(name) => row('materials', i, { name })} label="Material name" />
+                  <Name value={m.name} field={`catalogue.made_to_order.materials.${m.name}.__name`} onChange={(name) => row('materials', i, { name })} label="Material name" />
                 </td>
                 <td>
-                  <Cell value={m.cost} onChange={(cost) => row('materials', i, { cost })} label={`${m.name || 'Material'} cost`} />
+                  <Cell value={m.cost} field={`catalogue.made_to_order.materials.${m.name}`} onChange={(cost) => row('materials', i, { cost })} label={`${m.name || 'Material'} cost`} />
                 </td>
                 <td>
-                  <Cell value={m.stock} onChange={(stock) => row('materials', i, { stock })} label={`${m.name || 'Material'} in stock`} />
+                  <Cell value={m.stock} field={`start.stock.${m.name}`} onChange={(stock) => row('materials', i, { stock })} label={`${m.name || 'Material'} in stock`} />
                 </td>
                 <td>
                   <Remove onClick={() => remove('materials', i)} label={`Remove ${m.name || 'material'}`} />
@@ -213,11 +211,12 @@ export function CatalogueForm({ value, onChange }: { value: Value; onChange: (v:
             ))}
           </Rows>
           <div className="row2">
-            <Num label="Margin on materials, %" value={form.margin_pct} step={5} onChange={(margin_pct) => patch({ margin_pct })} />
-            <Num label="Extra time per job in hand, %" value={form.workload_pct} step={5} onChange={(workload_pct) => patch({ workload_pct })} />
+            <Num label="Margin on materials, %" field="catalogue.made_to_order.min_margin" value={form.margin_pct} step={5} onChange={(margin_pct) => patch({ margin_pct })} />
+            <Num label="Extra time per job in hand, %" field="catalogue.made_to_order.workload_per_job" value={form.workload_pct} step={5} onChange={(workload_pct) => patch({ workload_pct })} />
           </div>
         </>
       )}
+      <Num label="Starting gold" field="start.gold" value={form.gold} onChange={(gold) => patch({ gold })} />
       {problem && (
         <div className="note bad" role="alert">
           {problem} The draft keeps the last valid settings until this is fixed.
@@ -254,15 +253,15 @@ const toInt = (s: string) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-function Name({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
-  return <input className="cat-name" value={value} maxLength={41} placeholder="name" aria-label={label} onChange={(e) => onChange(e.target.value)} />;
+function Name({ value, onChange, label, field }: { value: string; onChange: (v: string) => void; label: string; field?: string }) {
+  return <input className="cat-name" data-field={field} value={value} maxLength={41} placeholder="name" aria-label={label} onChange={(e) => onChange(e.target.value)} />;
 }
 
 const toNumber = (s: string) => Number(s) || 0;
 
 // A number box that may be left empty while typing: an empty box counts as 0 but isn't shown as one,
 // so clearing it to type a new value doesn't leave a 0 in front. A value changed from outside replaces the text.
-function NumberInput({ value, onChange, parse, ...rest }: { value: number; onChange: (v: number) => void; parse: (s: string) => number; className?: string; step?: number; 'aria-label'?: string }) {
+function NumberInput({ value, onChange, parse, ...rest }: { value: number; onChange: (v: number) => void; parse: (s: string) => number; className?: string; step?: number; 'aria-label'?: string; 'data-field'?: string }) {
   const [text, setText] = useState(String(value));
   useEffect(() => {
     setText((t) => (parse(t) === value ? t : String(value)));
@@ -281,15 +280,15 @@ function NumberInput({ value, onChange, parse, ...rest }: { value: number; onCha
   );
 }
 
-function Cell({ value, onChange, label }: { value: number; onChange: (v: number) => void; label: string }) {
-  return <NumberInput className="cat-num" value={value} parse={toInt} aria-label={label} onChange={onChange} />;
+function Cell({ value, onChange, label, field }: { value: number; onChange: (v: number) => void; label: string; field?: string }) {
+  return <NumberInput className="cat-num" data-field={field} value={value} parse={toInt} aria-label={label} onChange={onChange} />;
 }
 
-function Num({ label, value, onChange, step = 1 }: { label: string; value: number; onChange: (v: number) => void; step?: number }) {
+function Num({ label, value, onChange, step = 1, field }: { label: string; value: number; onChange: (v: number) => void; step?: number; field?: string }) {
   return (
     <label className="field">
       <span className="field-label">{label}</span>
-      <NumberInput value={value} step={step} parse={toNumber} onChange={onChange} />
+      <NumberInput data-field={field} value={value} step={step} parse={toNumber} onChange={onChange} />
     </label>
   );
 }

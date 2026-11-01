@@ -262,13 +262,26 @@ button.danger { background: var(--bad); color: #2a0d08; }
 /* NPC workshop */
 .workshop { display: flex; flex-direction: column; gap: 12px; }
 .workshop > .note-box { margin: 0; }
-.wh-top { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 16px; }
-.wh-text { flex: 1 1 320px; min-width: 0; }
-.wh-text h2 { font-size: 18px; color: var(--accent); }
+.wh-top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.wh-text { flex: 1 1 220px; min-width: 0; }
+.wh-text h2 { margin-bottom: 3px; font-size: 20px; color: var(--text); overflow-wrap: anywhere; }
+.workshop-role { color: var(--muted); font-weight: 400; }
+.workshop-status { font-size: 12px; }
+.status-ok { color: var(--ok); }
+.status-bad { color: var(--bad); }
+.text-button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+.text-button.status-bad { color: #f3c4bc; }
 .wh-text p { margin: 0; max-width: 70ch; }
 .wh-text p + p { margin-top: 8px; }
-.wh-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.workshop-file-help { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.wh-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.workshop-intro { margin: 10px 0 0 !important; }
+.workshop-more { position: relative; }
+.workshop-more > summary { padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; color: var(--text); list-style: none; }
+.workshop-more > summary::-webkit-details-marker { display: none; }
+.workshop-more-actions { position: absolute; top: calc(100% + 6px); right: 0; z-index: 10; width: min(270px, calc(100vw - 56px)); padding: 8px; display: flex; flex-direction: column; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px #0006; }
+.workshop-more-actions > button { text-align: left; }
+.workshop-file-help { margin-top: 6px; }
+.workshop-file-help > summary { color: var(--muted); font-size: 12px; font-weight: 400; }
 .workshop-file-help p { margin: 8px 0 0; max-width: 85ch; }
 .status-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; }
 .status-bar .draft-name { overflow-wrap: anywhere; min-width: 0; }
@@ -377,6 +390,11 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .chat-name select { font: inherit; color: inherit; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .catalogue { display: flex; flex-direction: column; gap: 8px; }
+.catalogue-warning { display: flex; align-items: flex-start; gap: 12px; margin: 12px 0 16px; padding: 16px; border: 1px solid var(--accent); border-left: 4px solid var(--accent); border-radius: 8px; background: #44331f; color: var(--text); }
+.catalogue-warning-icon { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border: 2px solid var(--accent); border-radius: 50%; color: var(--accent); font-size: 16px; font-weight: 700; line-height: 1; }
+.catalogue-warning strong { display: block; font-size: 14px; }
+.catalogue-warning p { margin: 5px 0 10px; font-size: 13px; }
+.catalogue-warning .secondary { border-color: var(--accent); }
 .rows { margin: 0 0 6px 24px; }
 .rows-scroll { overflow-x: auto; margin-bottom: 6px; }
 .cat-table th:not(:first-child), .cat-table td:not(:first-child) { width: auto; }
@@ -449,11 +467,42 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 
 .character-advanced { margin-top: 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; }
 .character-advanced[open] > summary { margin-bottom: 12px; }
+.character-abilities { margin: 14px 0; padding: 12px; border-radius: 6px; background: var(--panel-2); }
+.character-abilities p { margin: 4px 0 6px; }
+.character-abilities .text-button { font-size: 12px; }
+.editor-disclosure { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; }
+.editor-disclosure[open] > summary { margin-bottom: 12px; }
+.definition > .advanced { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; }
+.definition > .advanced > summary { margin-bottom: 0; color: var(--text); text-transform: none; letter-spacing: normal; }
+.definition > .advanced[open] > summary { margin-bottom: 12px; }
+.bench-suggestions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.bench-suggestions button { text-align: left; font-size: 12px; font-weight: 400; overflow-wrap: anywhere; }
+.bench-suggestions button > span { display: block; margin-bottom: 4px; color: var(--accent); font-size: 11px; font-weight: 600; }
+.controlled-results { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+@media (max-width: 520px) {
+  .bench-suggestions { grid-template-columns: 1fr; }
+  .wh-actions { width: 100%; }
+  .wh-actions > button { flex: 1; }
+}
 
 .bench-tools { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
 .bench-tools > summary, .bench-details > summary { color: var(--text); }
 .bench-tools[open] > summary, .bench-details[open] > summary { margin-bottom: 8px; }
 .bench-verdict { padding: 8px 10px; background: var(--panel-2); border-radius: 6px; font-size: 13px; }
+.action-check { flex: none; padding: 10px; border: 1px solid var(--line); border-left: 3px solid var(--ok); border-radius: 6px; background: var(--bg); font-size: 12px; overflow-wrap: anywhere; }
+.action-check.rejected { border-left-color: var(--bad); }
+.action-check-source { margin: 0 0 8px; color: var(--accent); font-size: 11px; font-weight: 600; }
+.action-check-flow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto minmax(0, 1.2fr); gap: 8px; margin: 0; }
+.action-check-flow > div + div { border-left: 1px solid var(--line); padding-left: 8px; }
+.action-check-flow dt { margin-bottom: 3px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.action-check-flow dd { margin: 0; }
+.action-check-verdict dd { color: var(--ok); font-weight: 600; white-space: nowrap; }
+.rejected .action-check-verdict dd { color: var(--bad); }
+@media (max-width: 650px) {
+  .action-check-flow { grid-template-columns: minmax(0, 1fr); gap: 7px; }
+  .action-check-flow > div + div { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 7px; }
+  .action-check-flow > div { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 8px; }
+}
 
 /* The handoff is a screen within Workshop; hidden forms/bench stay mounted to retain their state. */
 .workshop[hidden] { display: none !important; }

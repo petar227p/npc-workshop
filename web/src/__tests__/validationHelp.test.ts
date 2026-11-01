@@ -8,6 +8,8 @@ describe('validation help', () => {
     expect(validationHelp('id: Invalid format').target).toBe('character-advanced');
     expect(validationHelp('triggers.0.cue: Too long').target).toBe('world');
     expect(validationHelp('SIGNAL needs the "What it can ask the game for" facts').target).toBe('permissions');
+    expect(validationHelp('art.style: Too long').target).toBe('artwork');
+    expect(validationHelp('sprite: Invalid value').target).toBe('appearance');
   });
   it('preserves an unknown error without guessing a destination', () => {
     expect(validationHelp('Unexpected error')).toEqual({ message: 'Unexpected error', target: null, label: '' });

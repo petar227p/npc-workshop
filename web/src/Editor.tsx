@@ -22,10 +22,11 @@ import {
   type Trigger,
 } from '@blacksmith/shared/src/npc-info';
 import { benchIdeas } from '@blacksmith/shared/src/handoff';
-import { buildSetup, describeAbilities, describeBehaviour, freshNpcId, ROLE_CARDS, SETUP_ROLES, TELLER_INFO, TELLERS, type SetupResult, type SetupRole, type Teller } from '@blacksmith/shared/src/setup';
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { buildSetup, freshNpcId, ROLE_CARDS, SETUP_ROLES, TELLER_INFO, TELLERS, type SetupResult, type SetupRole, type Teller } from '@blacksmith/shared/src/setup';
+import { Fragment, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { clockText, editorApi } from './api';
 import { outcomeText } from './benchVerdict';
+import { controlledExplanations, modelExplanations, type ActionExplanation } from './actionExplanation';
 import { ArtForm } from './ArtForm';
 import { CatalogueForm } from './CatalogueForm';
 import { Questionnaire } from './Questionnaire';
@@ -35,7 +36,8 @@ import { GuidedSetup } from './GuidedSetup';
 import { ContractCard, gaveText, speechFirst } from './Chat';
 import { ImportNpcButton } from './ImportNpcButton';
 import { GameConnection } from './GameConnection';
-import { draftKey, hasModelReply, type HandoffSnapshot } from './gameHandoff';
+import { draftKey, hasCheckedModelAction, type HandoffSnapshot } from './gameHandoff';
+import { editorIdentity } from './editorPresentation';
 
 // The NPC workshop: edit a definition on the left, try it on the test bench on the right.
 // The draft lives in this browser; the server checks it on every preview and bench turn.
@@ -200,15 +202,29 @@ export function Editor() {
   const [testedKey, setTestedKey] = useState<string | null>(null);
   const returnTo = useRef<{ element: HTMLElement | null; scroll: number }>({ element: null, scroll: 0 });
   const [section, setSection] = useState('character');
-  const [overview, setOverview] = useState(false); // the at-a-glance card after a template or the questions
   // The draft as it was started or saved, to tell whether replacing it loses edits. A restored draft's start is
   // unknown, so it counts as edited.
   const baseline = useRef<string | null>(null);
   const latest = useRef(0);
   const advanced = useRef<HTMLDetailsElement>(null);
   const characterAdvanced = useRef<HTMLDetailsElement>(null);
+  const moreMenu = useRef<HTMLDetailsElement>(null);
   const currentDoc = useRef(doc);
   currentDoc.current = doc;
+
+  useEffect(() => {
+    const dismiss = (event: PointerEvent | KeyboardEvent) => {
+      const menu = moreMenu.current;
+      if (!menu?.open) return;
+      if (event instanceof KeyboardEvent && event.key === 'Escape') {
+        menu.open = false;
+        menu.querySelector('summary')?.focus();
+      } else if (event instanceof PointerEvent && !menu.contains(event.target as Node)) menu.open = false;
+    };
+    document.addEventListener('pointerdown', dismiss);
+    document.addEventListener('keydown', dismiss);
+    return () => { document.removeEventListener('pointerdown', dismiss); document.removeEventListener('keydown', dismiss); };
+  }, []);
 
   useEffect(() => {
     editorApi.library().then(
@@ -246,6 +262,7 @@ export function Editor() {
   const valid = status === 'ok';
   const currentKey = draft ? draftKey(draft) : null;
   const tested = currentKey !== null && testedKey === currentKey;
+  const identity = draft ? editorIdentity(draft) : null;
   const ready = fresh && 'result' in fresh && fresh.result.ok ? fresh.result : null;
   // This draft's problems. While a newer edit is being checked the last ones stay, dimmed.
   const problems = check && 'result' in check && !check.result.ok ? check.result.errors : [];
@@ -254,7 +271,7 @@ export function Editor() {
   // Every new starting point (a template, a blank NPC, a file from the library) comes through here. The old
   // conversation belongs to another NPC, so the bench is cleared first and the draft switches only once it's gone; if
   // it can't be cleared, the draft and the conversation stay as they were.
-  const applyDraft = async (next: NpcDraft, what: string, done: string, fromSetup = false, openTest = false) => {
+  const applyDraft = async (next: NpcDraft, what: string, done: string, openTest = false) => {
     // Imports hold the transfer lock while using this same replacement path.
     if (applying || benchBusy) return;
     if (draft && JSON.stringify(draft) !== baseline.current) {
@@ -280,8 +297,8 @@ export function Editor() {
     setDoc((s) => ({ draft: next, rev: s.rev + 1 }));
     setStarted((n) => n + 1);
     setStarting(false);
-    setOverview(fromSetup);
     setNotice(done);
+    setSection(openTest ? 'test' : 'character');
     if (openTest) {
       setSection('test');
       requestAnimationFrame(() => document.getElementById('test-heading')?.focus());
@@ -294,16 +311,14 @@ export function Editor() {
     void applyDraft(
       next,
       `Start from the ${summary.role} template`,
-      `Started ${next.name} from the ${summary.role} template: a new draft in this browser, with example settings. It isn't saved to files or published to the example village.`,
-      true,
+      `Created ${next.name} from the ${summary.role} template. Make the character yours below.`,
     );
   };
   const fromAnswers = (r: SetupResult, openTest = false) =>
     void applyDraft(
       r.draft,
       'Use this setup',
-      `Started ${r.draft.name} (${r.summary.role.toLowerCase()}) from your answers: a new draft in this browser, with example settings. It isn't saved to files or published to the example village.`,
-      true,
+      `Created ${r.draft.name}. ${openTest ? 'Try a conversation below.' : 'Make the character yours below.'}`,
       openTest,
     );
   const blank = () => void applyDraft({ ...BLANK, id: freshNpcId(BLANK.id, BLANK.id, ids) }, 'Start a blank NPC', 'Started a blank NPC in this browser.');
@@ -328,7 +343,7 @@ export function Editor() {
         setTransferError({ title: 'Import paused', errors: ['Your draft changed while the file was being checked. Import it again when your changes are ready.'] });
         return;
       }
-      await applyDraft(imported.draft, `Import ${imported.draft.name}`, `Imported ${imported.draft.name}. A fresh test conversation is ready. This restores the character’s settings, not an earlier conversation or world.`, true, true);
+      await applyDraft(imported.draft, `Import ${imported.draft.name}`, `Imported ${imported.draft.name}. A fresh test conversation is ready.`, true);
     } catch (e) {
       setTransferError({ title: 'Couldn’t import NPC', errors: [e instanceof Error ? e.message : 'Try choosing the file again.'] });
     } finally {
@@ -429,7 +444,7 @@ export function Editor() {
   };
   const edit = (id: string) => {
     setSection(id === 'world' || id === 'advanced' ? 'abilities' : id === 'appearance' ? 'character' : id);
-    requestAnimationFrame(() => document.getElementById(`${id}-h`)?.focus());
+    requestAnimationFrame(() => focusSetting(document.getElementById(`${id}-h`)));
   };
   const openPermissions = () => {
     setSection('abilities');
@@ -437,24 +452,24 @@ export function Editor() {
     requestAnimationFrame(() => document.getElementById('permissions')?.focus());
   };
 
-  const goToProblem = (target: ValidationHelp['target']) => {
+  const goToProblem = (target: ValidationHelp['target'], error: string) => {
     if (!target) return;
-    if (target === 'permissions') return openPermissions();
+    if (target === 'permissions') openPermissions();
     if (target === 'character-advanced') {
       setSection('character');
       if (characterAdvanced.current) characterAdvanced.current.open = true;
-      requestAnimationFrame(() => document.getElementById('character-settings')?.focus());
+      requestAnimationFrame(() => focusSetting(fieldForError(error) ?? document.getElementById('character-settings')));
       return;
     }
-    setSection(target === 'character' || target === 'appearance' ? 'character' : 'abilities');
-    requestAnimationFrame(() => document.getElementById(target === 'catalogue' ? 'catalogue-h' : target === 'character' ? 'character-name' : `${target}-h`)?.focus());
+    setSection(['character', 'appearance', 'artwork'].includes(target) ? 'character' : 'abilities');
+    requestAnimationFrame(() => focusSetting(fieldForError(error) ?? document.getElementById(target === 'permissions' ? 'permissions' : target === 'catalogue' ? 'catalogue-h' : target === 'character' ? 'character-name' : `${target}-h`)));
   };
   const problemList = status === 'invalid' && problems.length > 0 && (
     <div className="errors" role="alert">
       <b>{problems.length === 1 ? 'One setting needs attention' : `${problems.length} settings need attention`}</b>
       <ul>{problems.map((error, index) => {
         const help = validationHelp(error);
-        return <li key={`${error}-${index}`}>{help.message} {help.target && <button type="button" className="secondary small" onClick={() => goToProblem(help.target)}>{help.label}</button>}</li>;
+        return <li key={`${error}-${index}`}>{help.message} {help.target && <button type="button" className="secondary small" onClick={() => goToProblem(help.target, error)}>{help.label}</button>}</li>;
       })}</ul>
     </div>
   );
@@ -465,56 +480,33 @@ export function Editor() {
       <section className="panel workshop-head" aria-labelledby="workshop-h">
         <div className="wh-top">
           <div className="wh-text">
-            <h2 id="workshop-h">NPC Workshop</h2>
-            <p>
-              Create a character, configure its supported abilities and limits, and test conversations and actions.
-            </p>
-            <p className="muted small">
-              Drafts stay in this browser. The server validates your settings; use an isolated test session to try your NPC.
-              Testing does not publish to the example village.
-            </p>
+            <h2 id="workshop-h">{draft ? <>{draft.name || 'Unnamed character'} <span className="workshop-role">· {identity?.role}</span></> : 'NPC Workshop'}</h2>
+            {draft && <div className="workshop-status" role="status">
+              {status === 'checking' && <span className="muted">Checking settings…</span>}
+              {status === 'ok' && <span className="status-ok">✓ {tested ? 'Checked action completed' : 'Ready to test'}</span>}
+              {status === 'invalid' && <button type="button" className="text-button status-bad" onClick={() => goToProblem(validationHelp(problems[0]).target, problems[0])}>✕ {problems.length === 1 ? '1 setting' : `${problems.length} settings`} to fix</button>}
+              {status === 'error' && <button type="button" className="text-button status-bad" onClick={() => setRetry((n) => n + 1)}>Couldn’t check settings · Retry</button>}
+            </div>}
           </div>
           {draft && (
             <div className="wh-actions">
-              <button className="secondary" disabled={locked} aria-expanded={starting} aria-controls="starters" onClick={() => setStarting((s) => !s)}>
-                {starting ? 'Close starting points' : 'New NPC…'}
-              </button>
-              <ImportNpcButton disabled={locked} onImport={(file) => void importNpc(file)} />
-              <button className="secondary" disabled={!valid || locked} onClick={() => void downloadNpc()} title="Download a portable copy of this character’s settings">Download NPC</button>
-              <button type="button" className={tested ? 'handoff-ready' : 'secondary'} disabled={!valid || locked} onClick={() => void openConnection()}>Use in your game</button>
-              {canSave && (
-                <button className="secondary" onClick={save} disabled={!valid || locked} title="Writes npcs/<id>.json and prompts/<id>.md (dev server only)">
-                  Save to files — development only
-                </button>
-              )}
+              <button type="button" disabled={locked || (tested && !valid)} onClick={tested ? () => void openConnection() : test}>{tested ? 'Use in your game' : `Test ${draft.name || 'your NPC'}`} →</button>
+              <details className="workshop-more" ref={moreMenu}>
+                <summary>More…</summary>
+                <div className="workshop-more-actions">
+                  <button type="button" className="secondary" disabled={locked} aria-expanded={starting} aria-controls="starters" onClick={() => { setStarting((s) => !s); if (moreMenu.current) moreMenu.current.open = false; }}>{starting ? 'Close starting points' : 'New NPC…'}</button>
+                  <ImportNpcButton disabled={locked} onImport={(file) => { if (moreMenu.current) moreMenu.current.open = false; void importNpc(file); }} />
+                  <button type="button" className="secondary" disabled={!valid || locked} onClick={() => { if (moreMenu.current) moreMenu.current.open = false; void downloadNpc(); }}>Download NPC</button>
+                  {canSave && <button type="button" className="secondary" onClick={() => { if (moreMenu.current) moreMenu.current.open = false; void save(); }} disabled={!valid || locked}>Save to files — development only</button>}
+                </div>
+              </details>
             </div>
           )}
         </div>
-        {draft && (
-          <div className="status-bar">
-            <span className="draft-name">
-              <b>{draft.name || 'with no name'}</b> <code className="small">{draft.id}</code>
-            </span>
-            <span className="pill">Draft in this browser</span>
-            <span role="status">
-              {status === 'checking' && <span className="pill">Checking…</span>}
-              {status === 'ok' && <span className="pill ok">✓ Valid: ready to test</span>}
-              {status === 'invalid' && <span className="pill bad">✗ {problems.length === 1 ? '1 problem' : `${problems.length} problems`} to fix</span>}
-              {fresh && 'error' in fresh && <span className="pill bad">Couldn&apos;t check it: {fresh.error}</span>}
-            </span>
-            {status === 'error' && (
-              <button className="secondary small" onClick={() => setRetry((n) => n + 1)}>
-                Check again
-              </button>
-            )}
-            <button className="test" disabled={locked} onClick={test}>
-              Test your NPC
-            </button>
-          </div>
-        )}
-        <p className="muted small transfer-help">Download a character’s settings to keep or import later. Reference pictures are embedded; conversations and world progress stay separate. The character’s look uses the bundled sprite sheet.</p>
+        <p className="muted small workshop-intro">Create a character, set its rules, then try a conversation.</p>
         <details className="workshop-file-help">
-          <summary>Development file workflow</summary>
+          <summary>How saving works</summary>
+          <p className="muted small">Your draft stays in this browser. Download its settings from More… or Use in your game to keep a copy you can import later. Reference pictures are embedded; conversations, world progress and generated pictures are not included.</p>
           {!canSave && <p className="muted small">File saving is not enabled on this server.</p>}
           <p className="muted small">
             Save to files writes <code>npcs/&lt;id&gt;.json</code> and <code>prompts/&lt;id&gt;.md</code> on a development server with file saving enabled.
@@ -543,31 +535,43 @@ export function Editor() {
           <section className="panel definition" aria-label="Definition" hidden={section === 'test'}>
             {problemList}
 
-            {overview && <details className="overview-disclosure"><summary>{draft.name} at a glance</summary><Overview draft={draft} onEdit={edit} onTest={test} onHide={() => setOverview(false)} /></details>}
-
-            <Section active={section === 'character'} id="character" title="Character" intro="Who it is and how it talks. The persona goes to the model first, every turn.">
+            <Section active={section === 'character'} id="character" title="Character" intro="Give your character a name and a personality.">
               <div>
                 <Field label="Name">
-                  <input id="character-name" value={draft.name} maxLength={40} onChange={(e) => set('name', e.target.value)} />
+                  <input id="character-name" data-field="name" value={draft.name} maxLength={40} onChange={(e) => set('name', e.target.value)} />
                 </Field>
               </div>
-              <Field label="Personality notes" hint="Add traits or a speaking style. These notes are added to the existing character instructions.">
+              <Field label="Personality" hint="Describe their traits and how they speak.">
                 <textarea rows={3} maxLength={300} value={readPersonality(draft.persona)} placeholder="e.g. Friendly, proud of her work, and wary of strangers." onChange={(e) => {
                   const persona = writePersonality(draft.persona, e.target.value);
                   if (persona.length <= MAX_PERSONA_LENGTH) set('persona', persona);
                 }} />
               </Field>
+              <div className="character-abilities">
+                <span className="field-label">Abilities summary</span>
+                <p>{identity?.abilities}</p>
+                <button type="button" className="text-button" onClick={() => edit('abilities')}>Edit abilities →</button>
+              </div>
+              <details className="editor-disclosure">
+                <summary id="appearance-h">Appearance</summary>
+                <Field label="Character sprite" hint="Used in the example village."><SpritePicker value={draft.sprite} onChange={(s) => set('sprite', s)} /></Field>
+              </details>
+              {(draft.catalogue.in_stock || draft.catalogue.made_to_order || problems.some((problem) => /^art[.:]/.test(problem))) && <details className="editor-disclosure">
+                <summary id="artwork-h">Generated item artwork</summary>
+                <p className="muted small">Set the art direction for pictures of items this character sells or makes.</p>
+                <ArtForm key={started} draft={draft} valid={valid} onChange={(art) => set('art', art)} />
+              </details>}
               <details className="character-advanced" ref={characterAdvanced}>
-                <summary id="character-settings" tabIndex={-1}>Advanced character settings</summary>
+                <summary id="character-settings">Advanced character settings</summary>
                 <Field label="Id" hint="its file name: lowercase, digits, _">
-                  <input value={draft.id} maxLength={41} onChange={(e) => set('id', e.target.value)} />
+                  <input data-field="id" value={draft.id} maxLength={41} onChange={(e) => set('id', e.target.value)} />
                 </Field>
               <Field label="Full persona" hint={`${draft.persona.length} / ${MAX_PERSONA_LENGTH} · sent first, as the system prompt`}>
-                <textarea className="persona" value={draft.persona} maxLength={MAX_PERSONA_LENGTH} onChange={(e) => set('persona', e.target.value)} />
+                <textarea data-field="persona" className="persona" value={draft.persona} maxLength={MAX_PERSONA_LENGTH} onChange={(e) => set('persona', e.target.value)} />
               </Field>
               <div className="row2">
                 <Field label="Voiced by" hint={MODEL_INFO[draft.model].description}>
-                  <select value={draft.model} onChange={(e) => set('model', e.target.value as NpcDraft['model'])}>
+                  <select data-field="model" value={draft.model} onChange={(e) => set('model', e.target.value as NpcDraft['model'])}>
                     {MODEL_CHOICES.map((m) => (
                       <option key={m} value={m}>
                         {MODEL_INFO[m].label}
@@ -576,7 +580,7 @@ export function Editor() {
                   </select>
                 </Field>
                 <Field label="Thinking" hint={EFFORT_INFO[draft.effort].description}>
-                  <select value={draft.effort} onChange={(e) => set('effort', e.target.value as NpcDraft['effort'])}>
+                  <select data-field="effort" value={draft.effort} onChange={(e) => set('effort', e.target.value as NpcDraft['effort'])}>
                     {EFFORT_CHOICES.map((m) => (
                       <option key={m} value={m}>
                         {EFFORT_INFO[m].label}
@@ -588,10 +592,11 @@ export function Editor() {
               <h4>If something goes wrong</h4>
               <div className="row2">
                 <Field label="If the ledger rejects it twice">
-                  <input value={draft.fallbacks.rejected} maxLength={MAX_SAY_LENGTH} onChange={(e) => set('fallbacks', { ...draft.fallbacks, rejected: e.target.value })} />
+                  <input data-field="fallbacks.rejected" value={draft.fallbacks.rejected} maxLength={MAX_SAY_LENGTH} onChange={(e) => set('fallbacks', { ...draft.fallbacks, rejected: e.target.value })} />
                 </Field>
                 <Field label="If the model is down">
                   <input
+                    data-field="fallbacks.unavailable"
                     value={draft.fallbacks.unavailable}
                     maxLength={MAX_SAY_LENGTH}
                     onChange={(e) => set('fallbacks', { ...draft.fallbacks, unavailable: e.target.value })}
@@ -601,41 +606,36 @@ export function Editor() {
               </details>
             </Section>
 
-            <Section active={section === 'abilities'} id="abilities" title="Abilities" intro="What this character can do. The ledger checks actions against the rules you set.">
-              <ul className="abilities">
-                {describeAbilities(draft).map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-              <p className="muted small">
-                Change the actions available to this character under Advanced.{' '}
-                <button type="button" className="secondary small" onClick={openPermissions}>
-                  Show permissions
-                </button>
-              </p>
+            <Section active={section === 'abilities'} id="abilities" title="Abilities & rules" intro={identity?.abilities ?? 'Set the actions and limits for this character.'}>
               <h4 id="catalogue-h" tabIndex={-1}>What it sells or makes</h4>
               <p className="muted small">Set up goods for sale or items made to order. Leave both options off for a character that only talks.</p>
               {(draft.catalogue.in_stock || draft.catalogue.made_to_order) && !draft.model_verbs.includes('OFFER') && (
-                <p className="note bad small left">This character has items listed but cannot offer them yet. Enable OFFER under Advanced, or turn off both options below.</p>
+                <div className="catalogue-warning" role="alert">
+                  <span className="catalogue-warning-icon" aria-hidden="true">!</span>
+                  <div>
+                    <strong>This character cannot offer its listed items</strong>
+                    <p>Enable OFFER under Advanced, or turn off both catalogue options below.</p>
+                    <button type="button" className="secondary small" onClick={openPermissions}>Review OFFER permissions →</button>
+                  </div>
+                </div>
               )}
               <CatalogueForm value={draft} onChange={({ catalogue, start }) => setDraft((d) => ({ ...d, catalogue, start }))} />
-              <h4>What it can ask the game for</h4>
-              {draft.verbs.includes('SIGNAL') ? (
+              {draft.verbs.includes('SIGNAL') && <>
+                <h4 id="signals-h" tabIndex={-1}>What it can ask the game for</h4>
                 <Signals value={draft.signals} onChange={(signals) => set('signals', signals)} />
-              ) : (
-                <p className="muted small">
-                  A character can request an action, such as opening a gate. Your game decides whether to carry it out. Enable SIGNAL under Advanced to add requests.
-                </p>
-              )}
+              </>}
             </Section>
 
-            <Section active={section === 'abilities'} id="world" title="Example village settings" intro="Location, schedule and perception currently use the bundled village map. Configure this example context and when the NPC acts.">
+            <details className="editor-disclosure" hidden={section !== 'abilities'}>
+              <summary id="world-h">Example village settings</summary>
+              <p className="muted small">Location, schedule and perception use the bundled village map.</p>
               <div className="row2">
                 <Field label="Default location" hint="Place on the bundled village map when no other stop is scheduled.">
-                  <PlacePicker places={places} value={draft.location} onChange={(p) => set('location', p)} />
+                  <PlacePicker field="location" places={places} value={draft.location} onChange={(p) => set('location', p)} />
                 </Field>
                 <Field label="Perception radius" hint="Distance in tiles on the bundled village map.">
                   <input
+                    data-field="perception_radius"
                     type="number"
                     min={0}
                     max={20}
@@ -648,21 +648,9 @@ export function Editor() {
               <h4>When it acts</h4>
               <Triggers triggers={draft.triggers} onChange={(triggers) => set('triggers', triggers)} />
               <Field label="Instruction when spoken to" hint="Tells the character how to respond to a conversation.">
-                <input value={draft.cue} maxLength={300} onChange={(e) => set('cue', e.target.value)} />
+                <input data-field="cue" value={draft.cue} maxLength={300} onChange={(e) => set('cue', e.target.value)} />
               </Field>
-            </Section>
-
-            <Section active={section === 'character'} id="appearance" title="Appearance" intro="Set the NPC's example-village sprite separately from generated item artwork.">
-              <Field label="Example village sprite" hint="Used by the bundled village renderer. Item artwork is configured below.">
-                <SpritePicker value={draft.sprite} onChange={(s) => set('sprite', s)} />
-              </Field>
-              <h4>Generated item artwork</h4>
-              <p className="muted small">
-                For NPCs that sell or make items: Muse Image draws the item from the accepted offer&apos;s terms. Art direction and reference pictures
-                affect item pictures and item sprites, independently of the NPC&apos;s village sprite. An NPC that only talks doesn&apos;t need item artwork.
-              </p>
-              <ArtForm key={started} draft={draft} valid={valid} onChange={(art) => set('art', art)} />
-            </Section>
+            </details>
 
             <details className="ed-section advanced" ref={advanced} hidden={section !== 'abilities'}>
               <summary>
@@ -683,6 +671,7 @@ export function Editor() {
                   <label key={b} className="check">
                     <input
                       type="checkbox"
+                      data-field={`facts.${draft.facts.indexOf(b)}`}
                       checked={draft.facts.includes(b)}
                       onChange={(e) => set('facts', e.target.checked ? [...draft.facts, b] : draft.facts.filter((f) => f !== b))}
                     />
@@ -711,8 +700,8 @@ export function Editor() {
               )}
             </details>
             <div className="editor-next">
-              {section === 'character' && <button type="button" onClick={() => edit('abilities')}>Continue to abilities</button>}
-              {section === 'abilities' && <button type="button" onClick={test}>Try your NPC</button>}
+              {section === 'character' && <button type="button" onClick={() => edit('abilities')}>Continue to abilities →</button>}
+              {section === 'abilities' && <button type="button" onClick={test}>Test {draft.name || 'your NPC'} →</button>}
             </div>
           </section>
 
@@ -721,7 +710,7 @@ export function Editor() {
             {status === 'checking' && <p className="note-box" role="status">Checking your draft before testing…</p>}
             {status === 'invalid' && problemList}
             {status === 'error' && <div className="note-box" role="alert">Couldn’t check this draft. <button type="button" className="secondary small" onClick={() => setRetry(n => n + 1)}>Check again</button></div>}
-            <Bench key={started} draft={draft} valid={valid} onBusy={setBenchBusy} tested={tested} onModelReply={(npc) => setTestedKey(draftKey(npc))} onReset={() => setTestedKey(null)} onUseInGame={() => void openConnection()} />
+            <Bench key={started} draft={draft} valid={valid} onBusy={setBenchBusy} tested={tested} onCheckedAction={(npc) => setTestedKey(draftKey(npc))} onReset={() => setTestedKey(null)} onUseInGame={() => void openConnection()} onEditCharacter={() => edit('character')} />
           </aside>
         </fieldset>
       )}
@@ -821,56 +810,18 @@ function Starters({
   );
 }
 
-// The draft at a glance after a template or the questions. Read from the draft itself, so it follows every edit; the
-// sections below are where things change.
-function Overview({ draft, onEdit, onTest, onHide }: { draft: NpcDraft; onEdit: (section: string) => void; onTest: () => void; onHide: () => void }) {
-  return (
-    <section className="overview" aria-labelledby="overview-h">
-      <div className="ov-top">
-        <h3 id="overview-h">{draft.name || 'Your NPC'} at a glance</h3>
-        <button type="button" className="secondary small" onClick={onHide}>
-          Hide
-        </button>
-      </div>
-      <p className="muted small">This is the draft itself: change anything below and this follows. The stock, prices and signals are examples to change.</p>
-      <div className="ov-grid">
-        <div>
-          <h4>What it can do</h4>
-          <ul className="abilities">
-            {describeAbilities(draft).map((l) => (
-              <li key={l}>{l}</li>
-            ))}
-          </ul>
-          <button type="button" className="secondary small" onClick={() => onEdit('abilities')}>
-            Change abilities
-          </button>
-        </div>
-        <div>
-          <h4>When it acts</h4>
-          <ul className="abilities">
-            {describeBehaviour(draft).map((l) => (
-              <li key={l}>{l}</li>
-            ))}
-          </ul>
-          <button type="button" className="secondary small" onClick={() => onEdit('world')}>
-            Change when and where
-          </button>{' '}
-          <button type="button" className="secondary small" onClick={() => onEdit('character')}>
-            Change name or persona
-          </button>
-        </div>
-      </div>
-      <div className="ov-next">
-        <span>
-          <b>Next: test it.</b>{' '}
-          <span className="muted small">In an isolated session, try a normal request, then a challenge. Use the controlled rejection test to check a rule without calling the model.</span>
-        </span>
-        <button type="button" onClick={onTest}>
-          Test your NPC
-        </button>
-      </div>
-    </section>
-  );
+// Open any collapsed settings around a validation target before moving keyboard focus.
+function fieldForError(error: string): HTMLElement | null {
+  const path = CSS.escape(error.split(':', 1)[0]);
+  return document.querySelector<HTMLElement>(`[data-field="${path}"]`) ?? document.querySelector<HTMLElement>(`[data-field^="${path}."]`);
+}
+
+function focusSetting(element: HTMLElement | null) {
+  if (!element) return;
+  for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+    if (parent instanceof HTMLDetailsElement) parent.open = true;
+  }
+  element.focus();
 }
 
 function Section({ id, title, intro, children, active }: { id: string; title: string; intro: string; children: ReactNode; active: boolean }) {
@@ -900,10 +851,10 @@ const placeLabel = (p: string) => p.replace(/_/g, ' ');
 
 // The named places on the village map. A value that isn't one (a hand-edited draft) stays listed, and the
 // server's check says what's wrong with it.
-function PlacePicker({ places, value, onChange }: { places: string[]; value: string; onChange: (p: string) => void }) {
+function PlacePicker({ places, value, onChange, field }: { places: string[]; value: string; onChange: (p: string) => void; field?: string }) {
   const options = places.includes(value) ? places : [value, ...places];
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)}>
+    <select data-field={field} value={value} onChange={(e) => onChange(e.target.value)}>
       {options.map((p) => (
         <option key={p} value={p}>
           {placeLabel(p)}
@@ -918,7 +869,7 @@ export const spriteStyle = (frame: number) => ({ backgroundPosition: `-${(frame 
 
 function SpritePicker({ value, onChange }: { value: number; onChange: (s: number) => void }) {
   return (
-    <div className="sprites" role="radiogroup" aria-label="Example village sprite">
+    <div data-field="sprite" tabIndex={-1} className="sprites" role="radiogroup" aria-label="Example village sprite">
       {NPC_SPRITES.map((f) => (
         <button
           key={f}
@@ -952,7 +903,7 @@ function Schedule({ places, home, value, onChange }: { places: string[]; home: s
       {sorted.map((e, i) => (
         <div key={i} className="inline">
           <span className="muted small">from</span>
-          <select value={e.from} onChange={(ev) => replace(i, { ...e, from: Number(ev.target.value) })} aria-label="From hour">
+          <select data-field={`schedule.${value.indexOf(e)}.from`} value={e.from} onChange={(ev) => replace(i, { ...e, from: Number(ev.target.value) })} aria-label="From hour">
             {HOURS.filter((h) => h === e.from || !value.some((x) => x.from === h)).map((h) => (
               <option key={h} value={h}>
                 {hourText(h)}
@@ -960,7 +911,7 @@ function Schedule({ places, home, value, onChange }: { places: string[]; home: s
             ))}
           </select>
           <span className="muted small">at the</span>
-          <PlacePicker places={places} value={e.place} onChange={(p) => replace(i, { ...e, place: p })} />
+          <PlacePicker field={`schedule.${value.indexOf(e)}.place`} places={places} value={e.place} onChange={(p) => replace(i, { ...e, place: p })} />
           <button type="button" className="secondary small" onClick={() => onChange(sorted.filter((_, j) => j !== i))}>
             Remove
           </button>
@@ -1005,7 +956,7 @@ function Labels({ draft, onChange }: { draft: NpcDraft; onChange: (labels: Recor
       {names.map((n) => (
         <div key={n} className="inline">
           <code className="small">{n}</code>
-          <input value={labels[n] ?? ''} placeholder={n} maxLength={MAX_LABEL_LENGTH} onChange={(e) => put(n, e.target.value)} aria-label={`What it calls ${n}`} />
+          <input data-field={`labels.${n}`} value={labels[n] ?? ''} placeholder={n} maxLength={MAX_LABEL_LENGTH} onChange={(e) => put(n, e.target.value)} aria-label={`What it calls ${n}`} />
         </div>
       ))}
       <div className="inline">
@@ -1034,6 +985,7 @@ function Signals({ value, onChange }: { value: Record<string, string>; onChange:
         <div key={n} className="inline">
           <code className="small">{n}</code>
           <input
+            data-field={`signals.${n}`}
             value={meaning}
             placeholder="what it means, as the NPC is told"
             maxLength={MAX_SIGNAL_TEXT}
@@ -1100,7 +1052,7 @@ function Triggers({ triggers, onChange }: { triggers: Trigger[]; onChange: (t: T
       </label>
       {t && (
         <Field label={`Instruction ${kind === 'on_meet' ? 'when meeting someone' : 'when hearing news'}`} hint="What the character should do.">
-          <input value={t.cue} maxLength={300} onChange={(e) => emit(set({ ...t, cue: e.target.value }))} />
+          <input data-field={`triggers.${triggers.indexOf(t)}.cue`} value={t.cue} maxLength={300} onChange={(e) => emit(set({ ...t, cue: e.target.value }))} />
         </Field>
       )}
     </>
@@ -1124,6 +1076,7 @@ function Triggers({ triggers, onChange }: { triggers: Trigger[]; onChange: (t: T
           <Field label="Every" hint={`hours, 1–${MAX_TRIGGER_HOURS}`}>
             <input
               type="number"
+              data-field={`triggers.${triggers.indexOf(timer)}.hours`}
               min={1}
               max={MAX_TRIGGER_HOURS}
               value={hoursText ?? timer.hours}
@@ -1132,7 +1085,7 @@ function Triggers({ triggers, onChange }: { triggers: Trigger[]; onChange: (t: T
             />
           </Field>
           <Field label="Instruction on the timer" hint="What the character should do on its own.">
-            <input value={timer.cue} maxLength={300} onChange={(e) => emit({ ...now, timer: { ...timer, cue: e.target.value } })} />
+            <input data-field={`triggers.${triggers.indexOf(timer)}.cue`} value={timer.cue} maxLength={300} onChange={(e) => emit({ ...now, timer: { ...timer, cue: e.target.value } })} />
           </Field>
         </div>
       )}
@@ -1206,9 +1159,9 @@ function VerbTable({ draft, onChange }: { draft: NpcDraft; onChange: (verbs: Led
   );
 }
 
-function Bench({ draft, valid, onBusy, tested, onModelReply, onReset, onUseInGame }: {
+function Bench({ draft, valid, onBusy, tested, onCheckedAction, onReset, onUseInGame, onEditCharacter }: {
   draft: NpcDraft; valid: boolean; onBusy: (busy: boolean) => void; tested: boolean;
-  onModelReply: (draft: NpcDraft) => void; onReset: () => void; onUseInGame: () => void;
+  onCheckedAction: (draft: NpcDraft) => void; onReset: () => void; onUseInGame: () => void; onEditCharacter: () => void;
 }) {
   const [view, setView] = useState<StateView | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -1219,10 +1172,14 @@ function Bench({ draft, valid, onBusy, tested, onModelReply, onReset, onUseInGam
   const [error, setError] = useState<string | null>(null);
   const [unsent, setUnsent] = useState<string | null>(null); // a line that didn't get through, to send again
   const [controlled, setControlled] = useState<Set<string>>(() => new Set()); // ids of events the workshop proposed, not the model
+  const [explanations, setExplanations] = useState<Record<string, ActionExplanation>>({});
   const box = useRef<HTMLDivElement>(null);
   const viewKey = useRef<string | null>(null);
   const key = JSON.stringify([draft.id, draft.start]);
-  const showView = (next: StateView) => {
+  const showView = (next: StateView, checks: ActionExplanation[] = []) => {
+    const sameWorld = viewKey.current === key;
+    if (!sameWorld) setControlled(new Set());
+    setExplanations((previous) => ({ ...(sameWorld ? previous : {}), ...Object.fromEntries(checks.map((check) => [check.eventId, check])) }));
     viewKey.current = key;
     setView(next);
   };
@@ -1244,11 +1201,11 @@ function Bench({ draft, valid, onBusy, tested, onModelReply, onReset, onUseInGam
     setPending(line);
     try {
       const r = await editorApi.say(draft, line);
-      showView(r.view);
+      showView(r.view, modelExplanations(draft, r));
       if (!r.ok) setError(r.errors.join('; '));
       else {
         setTurns((t) => [...t, { kind: 'model', text: line, attempts: r.attempts, outcome: r.outcome }]);
-        if (hasModelReply(r, draft.id)) onModelReply(draft);
+        if (hasCheckedModelAction(r, draft.id)) onCheckedAction(draft);
       }
     } catch (e) {
       setError((e as Error).message);
@@ -1273,9 +1230,12 @@ function Bench({ draft, valid, onBusy, tested, onModelReply, onReset, onUseInGam
     setPassing(true);
     try {
       const r = await editorApi.tick(draft, ticks);
-      showView(r.view);
+      showView(r.view, modelExplanations(draft, r));
       if (!r.ok) setError(r.errors.join('; '));
-      else if (r.attempts.length) setTurns((t) => [...t, { kind: 'model', text: `(${ticks} h passed)`, attempts: r.attempts, outcome: r.outcome }]);
+      else if (r.attempts.length) {
+        setTurns((t) => [...t, { kind: 'model', text: `(${ticks} h passed)`, attempts: r.attempts, outcome: r.outcome }]);
+        if (hasCheckedModelAction(r, draft.id)) onCheckedAction(draft);
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -1290,7 +1250,7 @@ function Bench({ draft, valid, onBusy, tested, onModelReply, onReset, onUseInGam
     setTesting(true);
     try {
       const r = await editorApi.controlled(draft);
-      showView(r.view);
+      showView(r.view, controlledExplanations(draft, r));
       if (!r.ok) setError(r.errors.join('; '));
       else {
         setControlled((ids) => new Set([...ids, ...r.events.map((e) => e.id)]));
@@ -1312,6 +1272,7 @@ function Bench({ draft, valid, onBusy, tested, onModelReply, onReset, onUseInGam
       setView(null);
       setTurns([]);
       setControlled(new Set());
+      setExplanations({});
       onReset();
     } catch (e) {
       setError((e as Error).message);
@@ -1320,25 +1281,26 @@ function Bench({ draft, valid, onBusy, tested, onModelReply, onReset, onUseInGam
 
   const last = turns.at(-1);
   const short = (line: string) => (line.length > 34 ? `${line.slice(0, 32)}…` : line);
+  const isControlled = (event: EngineEvent) => controlled.has(event.id) || event.type === 'ACTION_REJECTED' && event.data.source === 'workshop-controlled';
+  const conversation = speechFirst(view?.events.filter((event) => !isControlled(event)) ?? []);
 
   return (
     <>
       <section className="panel bench">
         <div className="def-top">
-          <h2>Isolated test session</h2>
-          <span className="tag">same action checks as the demo</span>
+          <h2>Talk to {draft.name || 'your NPC'}</h2>
           <button className="secondary small" onClick={reset} disabled={busy}>
             Reset test session
           </button>
         </div>
-        <p className="muted small">
-          Try this draft in its own test world. A valid draft passes configuration checks; actions are checked again during tests.
-          This session does not publish changes to the example village.
-        </p>
+        <p className="muted small">Try a normal request, then challenge a rule. Each proposed action is checked in this isolated session.</p>
         <div className="messages bench-messages" ref={box}>
-          {(view?.events.length ?? 0) === 0 && pending === null && <div className="note">Say something to {draft.name || 'the NPC'}.</div>}
+          {conversation.length === 0 && pending === null && <div className="note">Say something to {draft.name || 'the NPC'}.</div>}
           {view &&
-            speechFirst(view.events).map((e) => <BenchEntry key={e.id} event={e} view={view} npcName={draft.name} controlled={controlled.has(e.id) || (e.type === 'ACTION_REJECTED' && e.data.source === 'workshop-controlled')} />)}
+            conversation.map((e) => <Fragment key={e.id}>
+              {!(explanations[e.id] && e.type === 'ACTION_REJECTED') && <BenchEntry event={e} view={view} npcName={draft.name} controlled={controlled.has(e.id) || (e.type === 'ACTION_REJECTED' && e.data.source === 'workshop-controlled')} />}
+              {explanations[e.id] && <ActionCheck check={explanations[e.id]} />}
+            </Fragment>)}
           {pending !== null && (
             <>
               <div className="msg you">{pending}</div>
@@ -1365,20 +1327,27 @@ function Bench({ draft, valid, onBusy, tested, onModelReply, onReset, onUseInGam
           />
           <button disabled={busy || !valid || !text.trim()}>Send</button>
         </form>
-        <div className="attacks">
-          <span className="muted small">Try a normal request:</span>
-          <button className="secondary small" disabled={busy || !valid} onClick={() => void send(ideas.normal)}>
-            {ideas.normal}
-          </button>
+        <div className="bench-suggestions" aria-label="Suggested messages">
+          <button type="button" className="secondary" disabled={busy || !valid} onClick={() => void send(ideas.normal)}><span>Normal request</span>{ideas.normal}</button>
+          <button type="button" className="secondary" disabled={busy || !valid} onClick={() => void send(ideas.challenges[0])}><span>Rule challenge</span>{ideas.challenges[0]}</button>
         </div>
-        {last && <p className="bench-verdict" role="status">{last.kind === 'model' ? outcomeText(last) : `Controlled test · no model. ${last.accepted ? 'Ledger accepted' : 'Ledger rejected'} the test proposal.${last.reason ? ` ${last.reason}` : ''}`}</p>}
+        {last?.kind === 'model' && <p className="bench-verdict" role="status">{outcomeText(last)}</p>}
         <div className={`bench-handoff${tested ? ' ready' : ''}`}>
-          <p>{tested ? `${draft.name} replied in this test conversation. Try this character from your own game next.` : valid ? 'Use this character from your own game when you’re ready. You can test it here first.' : 'Make this draft valid before using it in your game.'}</p>
-          <button type="button" className={tested ? undefined : 'secondary'} disabled={busy || !valid} onClick={onUseInGame}>Use in your game</button>
+          {tested ? <p role="status"><b>{draft.name} completed a checked action.</b></p>
+            : <p>{valid ? 'You can use this character in your game before running a model test.' : 'Fix the character’s settings before using it in your game.'}</p>}
+          <div className="actions"><button type="button" className={tested ? undefined : 'secondary'} disabled={busy || !valid} onClick={onUseInGame}>Use {draft.name || 'this NPC'} in your game →</button>
+          <button type="button" className="text-button" disabled={busy} onClick={onEditCharacter}>Edit character</button></div>
         </div>
         <details className="bench-tools">
-          <summary>Test the rules</summary>
-          <p className="muted small">Try challenging the character or advance time to see how it behaves.</p>
+          <summary>Controlled tests · no model</summary>
+          <p className="muted small">The workshop sends a rule-breaking proposal straight to the ledger. This checks the rule without asking the model.</p>
+          <button type="button" className="secondary small" disabled={busy || !valid} onClick={() => void test()}>{ideas.controlled.label}</button>
+          <div className="controlled-results">{view?.events.filter(isControlled).map((event) => explanations[event.id]
+            ? <ActionCheck key={event.id} check={explanations[event.id]} />
+            : <BenchEntry key={event.id} event={event} view={view} npcName={draft.name} controlled />)}</div>
+        </details>
+        <details className="bench-tools">
+          <summary>More test options</summary>
         <div className="attacks">
           <span className="muted small">
             {view ? clockText(view.tick) : clockText(0)}
@@ -1392,22 +1361,14 @@ function Bench({ draft, valid, onBusy, tested, onModelReply, onReset, onUseInGam
         </div>
         <div className="attacks">
           <span className="muted small">Try to cheat it:</span>
-          {ideas.challenges.map((a) => (
+          {ideas.challenges.slice(1).map((a) => (
             <button key={a} className="secondary small" disabled={busy || !valid} onClick={() => void send(a)} title={a}>
               {short(a)}
             </button>
           ))}
         </div>
-        <div className="attacks">
-          <span className="muted small">Show a rejection without the model:</span>
-          <button className="secondary small" disabled={busy || !valid} onClick={() => void test()}>
-            {ideas.controlled.label}
-          </button>
-        </div>
         <p className="muted small bench-hint">
-          Lines go to the model, which decides what to do: it may refuse in words or propose something, and the ledger checks any proposal. A
-          cheat line won&apos;t always end in a rejection. The rejection button skips the model: the workshop sends a rule-breaking proposal
-          straight to the ledger.
+          The model may refuse in words or propose an action. A rule challenge won&apos;t always produce a rejected proposal.
         </p>
         </details>
         {error && (
@@ -1471,6 +1432,18 @@ function pretty(content: string): string {
   } catch {
     return content;
   }
+}
+
+function ActionCheck({ check }: { check: ActionExplanation }) {
+  return <section className={`action-check ${check.accepted ? 'accepted' : 'rejected'}`} aria-label={check.source}>
+    <p className="action-check-source">{check.source}</p>
+    <dl className="action-check-flow">
+      <div><dt>Proposal</dt><dd>{check.proposal}</dd></div>
+      <div><dt>Applicable rule</dt><dd>{check.rule}</dd></div>
+      <div className="action-check-verdict"><dt>Verdict</dt><dd>{check.accepted ? '✓ Accepted' : '✕ Rejected'}</dd></div>
+      <div><dt>Resulting state</dt><dd>{check.state}</dd></div>
+    </dl>
+  </section>;
 }
 
 function BenchEntry({ event: e, view, npcName, controlled }: { event: EngineEvent; view: StateView; npcName: string; controlled: boolean }) {

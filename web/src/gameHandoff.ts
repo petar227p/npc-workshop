@@ -11,6 +11,13 @@ export function hasModelReply(result: BenchResponse, npcId: string): boolean {
     && result.events.some((event) => event.type === 'SAID' && event.actor === npcId && event.target === 'player');
 }
 
+// A checked action can be nonverbal. Controlled tests, fallback speech and provider failures never count.
+export function hasCheckedModelAction(result: BenchResponse, npcId: string): boolean {
+  return result.ok && result.outcome === 'acted' && result.attempts.some((attempt) => attempt.ok)
+    && result.events.some((event) => event.actor === npcId && !['ACTION_REJECTED', 'TRIGGER_FIRED'].includes(event.type)
+      || event.type === 'GIFT_REFUSED' && event.target === npcId);
+}
+
 // Commands are copied into a terminal. Quote every argument as data, including user-entered paths.
 const quote = (text: string) => `'${text.replace(/'/g, `'\\''`)}'`;
 export function gameExampleCommand(server: string, file: string): { ok: true; command: string } | { ok: false; error: string } {

@@ -1,4 +1,4 @@
-export type ValidationHelp = { message: string; target: 'catalogue' | 'abilities' | 'permissions' | 'character' | 'character-advanced' | 'world' | 'appearance' | null; label: string };
+export type ValidationHelp = { message: string; target: 'catalogue' | 'abilities' | 'permissions' | 'character' | 'character-advanced' | 'world' | 'appearance' | 'artwork' | null; label: string };
 
 export function validationHelp(error: string): ValidationHelp {
   if (/need(?:s)? a catalogue with something to sell/i.test(error)) return { message: 'This character can make offers but has nothing in its catalogue. Add an item or change its permissions.', target: 'catalogue', label: 'Go to catalogue' };
@@ -10,7 +10,8 @@ export function validationHelp(error: string): ValidationHelp {
   if (/^(id|model|effort|fallbacks)(\.|$)/.test(path) || /^npc id /.test(error)) return { message: error, target: 'character-advanced', label: 'Go to character settings' };
   if (/^(name|persona)(\.|$)/.test(path)) return { message: error, target: 'character', label: 'Go to character' };
   if (/^(schedule|location|perception_radius|triggers|cue)(\.|$)/.test(path)) return { message: error, target: 'world', label: 'Go to behaviour' };
-  if (/^(art|sprite)(\.|$)/.test(path)) return { message: error, target: 'appearance', label: 'Go to appearance' };
+  if (/^art(\.|$)/.test(path)) return { message: error, target: 'artwork', label: 'Go to item artwork' };
+  if (/^sprite(\.|$)/.test(path)) return { message: error, target: 'appearance', label: 'Go to appearance' };
   if (/^(verbs|model_verbs|facts|labels|signals)(\.|$)/.test(path)) return { message: error, target: 'permissions', label: 'Go to permissions' };
   return { message: error, target: null, label: '' };
 }
