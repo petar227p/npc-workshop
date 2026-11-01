@@ -1332,11 +1332,12 @@ function Bench({ draft, valid, onBusy, tested, onCheckedAction, onReset, onUseIn
           <button type="button" className="secondary" disabled={busy || !valid} onClick={() => void send(ideas.challenges[0])}><span>Rule challenge</span>{ideas.challenges[0]}</button>
         </div>
         {last?.kind === 'model' && <p className="bench-verdict" role="status">{outcomeText(last)}</p>}
-        {tested && <div className="bench-handoff ready">
-          <p role="status"><b>{draft.name} completed a checked action.</b></p>
-          <div className="actions"><button type="button" disabled={busy || !valid} onClick={onUseInGame}>Use {draft.name || 'this NPC'} in your game →</button>
+        <div className={`bench-handoff${tested ? ' ready' : ''}`}>
+          {tested ? <p role="status"><b>{draft.name} completed a checked action.</b></p>
+            : <p>{valid ? 'You can use this character in your game before running a model test.' : 'Fix the character’s settings before using it in your game.'}</p>}
+          <div className="actions"><button type="button" className={tested ? undefined : 'secondary'} disabled={busy || !valid} onClick={onUseInGame}>Use {draft.name || 'this NPC'} in your game →</button>
           <button type="button" className="text-button" disabled={busy} onClick={onEditCharacter}>Edit character</button></div>
-        </div>}
+        </div>
         <details className="bench-tools">
           <summary>Controlled tests · no model</summary>
           <p className="muted small">The workshop sends a rule-breaking proposal straight to the ledger. This checks the rule without asking the model.</p>
