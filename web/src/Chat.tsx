@@ -5,6 +5,7 @@ import { MODEL_INFO } from '@blacksmith/shared/src/npc-info';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
 import { api, clockText } from './api';
 import { withRole } from './roles';
+import { ConversationLog } from './ConversationLog';
 import { canRecord, record, type Recording } from './voice';
 
 export type Pending = { text: string; npc: string }; // the player's line while that NPC is thinking
@@ -80,10 +81,12 @@ export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRe
         {headExtra && <div className="chat-head-extra">{headExtra}</div>}
       </div>
       <div className="messages" ref={box}>
-        <div className="msg npc">{talkTo === 'smith' ? 'Brann looks up from the anvil.' : `${name} looks up.`} "What'll it be?"</div>
-        {lines.map((e) => (
-          <Entry key={e.id} event={e} view={view} disabled={thinking} onAccept={onAccept} />
-        ))}
+        <ConversationLog key={`${view.world_id}:${talkTo}`} name={name}>
+          <div className="msg npc">{talkTo === 'smith' ? 'Brann looks up from the anvil.' : `${name} looks up.`} "What'll it be?"</div>
+          {lines.map((e) => (
+            <Entry key={e.id} event={e} view={view} disabled={thinking} onAccept={onAccept} />
+          ))}
+        </ConversationLog>
         {pending?.npc === talkTo && (
           <>
             <div className="msg you">{pending.text}</div>
@@ -226,7 +229,7 @@ export function speechFirst(events: EngineEvent[]): EngineEvent[] {
 function Entry({ event: e, view, disabled, onAccept }: { event: EngineEvent; view: StateView; disabled: boolean; onAccept: (id: string) => void }) {
   switch (e.type) {
     case 'SAID':
-      if (e.actor === 'player') return <div className="msg you">{e.data.text}</div>;
+      if (e.actor === 'player') return <div className="msg you"><span className="sr-only">You: </span>{e.data.text}</div>;
       return (
         <div className="msg npc">
           <span className="who">{nameOf(view, e.actor)}</span>

@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "web/src/style.css"
+        ],
+        "createdAt": "2026-11-01T10:38:07.319Z",
+        "reason": "Agent review: the six existing matches distinguish ledger event categories (97), contextual hints (190), illustrative rejected code check (237), accepted/rejected attempts (364), catalogue validation warning (394), and accepted/rejected action checks (493). They carry semantic status or guidance in the incumbent design; preserved during the narrowly scoped empty-test layout fix."
+      }
+    ]
+  }
+}

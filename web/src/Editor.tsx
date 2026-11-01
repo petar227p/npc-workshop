@@ -38,11 +38,11 @@ import { ImportNpcButton } from './ImportNpcButton';
 import { GameConnection } from './GameConnection';
 import { draftKey, hasCheckedModelAction, type HandoffSnapshot } from './gameHandoff';
 import { editorIdentity } from './editorPresentation';
+import { ConversationLog } from './ConversationLog';
+import { BROWSER_DRAFT_KEY, saveBrowserDraft } from './browserDraft';
 
 // The NPC workshop: edit a definition on the left, try it on the test bench on the right.
 // The draft lives in this browser; the server checks it on every preview and bench turn.
-
-const STORAGE_KEY = 'bs_npc_draft';
 
 const BLANK: NpcDraft = {
   id: 'new_npc',
@@ -108,7 +108,7 @@ const SHAPE = {
 function loadStored(): NpcDraft | null {
   let raw: unknown;
   try {
-    raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
+    raw = JSON.parse(localStorage.getItem(BROWSER_DRAFT_KEY) ?? 'null');
   } catch {
     return null;
   }
@@ -162,14 +162,6 @@ function readArt(x: unknown): NpcDraft['art'] {
   return { style: typeof a.style === 'string' ? a.style : '', references: references.slice(0, MAX_REFERENCES) };
 }
 
-function store(draft: NpcDraft) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
-  } catch {
-    // private window or storage off: the draft just isn't remembered
-  }
-}
-
 // A bench turn: the model's answers to a line, or a proposal the workshop sent the ledger itself.
 type Turn =
   | { kind: 'model'; text: string; attempts: BenchAttempt[]; outcome: BenchResponse['outcome'] }
@@ -186,10 +178,13 @@ export function Editor() {
   const [places, setPlaces] = useState<string[]>([]);
   // A draft from an earlier visit opens as it was. A first visit picks a starting point instead.
   const [doc, setDoc] = useState<Doc>(() => ({ draft: loadStored(), rev: 0 }));
+  const [browserSave, setBrowserSave] = useState<{ rev: number; ok: boolean } | null>(null);
+  const [storageRetry, setStorageRetry] = useState(0);
   const [check, setCheck] = useState<Check | null>(null);
   const [retry, setRetry] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
-  const [starting, setStarting] = useState(false); // the starting points, opened over a draft
+  const [starting, setStarting] = useState(false); // a focused creation view; the existing editor stays mounted
+  const creationScroll = useRef(0);
   const [started, setStarted] = useState(0); // drafts started here; each gets a fresh bench and forms
   const [applying, setApplying] = useState(false);
   const [benchBusy, setBenchBusy] = useState(false);
@@ -237,13 +232,17 @@ export function Editor() {
     );
   }, []);
 
+  // Browser persistence is independent of server validation, including when validation is unavailable.
+  useEffect(() => {
+    if (doc.draft) setBrowserSave({ rev: doc.rev, ok: saveBrowserDraft(doc.draft) });
+  }, [doc, storageRetry]);
+
   // Check the draft on the server shortly after each edit. An answer counts only for the revision it checked, so a slow
   // one for an older draft is never shown as this one's.
   useEffect(() => {
     latest.current = doc.rev;
     const { draft, rev } = doc;
     if (!draft) return;
-    store(draft);
     const t = setTimeout(() => {
       editorApi.preview(draft).then(
         (result) => rev === latest.current && setCheck({ rev, result }),
@@ -254,6 +253,7 @@ export function Editor() {
   }, [doc, retry]);
 
   const draft = doc.draft;
+  const browserSaveState = browserSave?.rev !== doc.rev ? 'saving' : browserSave.ok ? 'saved' : 'error';
   const setDraft = (update: (d: NpcDraft) => NpcDraft) => setDoc((s) => (s.draft ? { draft: update(s.draft), rev: s.rev + 1 } : s));
   const set = <K extends keyof NpcDraft>(key: K, value: NpcDraft[K]) => setDraft((d) => ({ ...d, [key]: value }));
 
@@ -299,10 +299,7 @@ export function Editor() {
     setStarting(false);
     setNotice(done);
     setSection(openTest ? 'test' : 'character');
-    if (openTest) {
-      setSection('test');
-      requestAnimationFrame(() => document.getElementById('test-heading')?.focus());
-    }
+    requestAnimationFrame(() => document.getElementById(openTest ? 'test-heading' : 'character-h')?.focus());
   };
 
   const ids = library.map((n) => n.id);
@@ -442,6 +439,21 @@ export function Editor() {
     setSection('test');
     requestAnimationFrame(() => document.getElementById('test-heading')?.focus());
   };
+  const startNpc = () => {
+    creationScroll.current = scrollY;
+    if (moreMenu.current) moreMenu.current.open = false;
+    setNotice(null);
+    setTransferError(null);
+    setStarting(true);
+    scrollTo(0, 0);
+  };
+  const cancelStarting = () => {
+    setStarting(false);
+    requestAnimationFrame(() => {
+      moreMenu.current?.querySelector('summary')?.focus({ preventScroll: true });
+      scrollTo(0, creationScroll.current);
+    });
+  };
   const edit = (id: string) => {
     setSection(id === 'world' || id === 'advanced' ? 'abilities' : id === 'appearance' ? 'character' : id);
     requestAnimationFrame(() => focusSetting(document.getElementById(`${id}-h`)));
@@ -477,7 +489,7 @@ export function Editor() {
   return (
     <>
     <div className="workshop" hidden={connectionOpen}>
-      <section className="panel workshop-head" aria-labelledby="workshop-h">
+      <section className="panel workshop-head" aria-labelledby="workshop-h" hidden={starting}>
         <div className="wh-top">
           <div className="wh-text">
             <h2 id="workshop-h">{draft ? <>{draft.name || 'Unnamed character'} <span className="workshop-role">· {identity?.role}</span></> : 'NPC Workshop'}</h2>
@@ -487,6 +499,15 @@ export function Editor() {
               {status === 'invalid' && <button type="button" className="text-button status-bad" onClick={() => goToProblem(validationHelp(problems[0]).target, problems[0])}>✕ {problems.length === 1 ? '1 setting' : `${problems.length} settings`} to fix</button>}
               {status === 'error' && <button type="button" className="text-button status-bad" onClick={() => setRetry((n) => n + 1)}>Couldn’t check settings · Retry</button>}
             </div>}
+            {draft && <div className="draft-storage small" role="status">
+              {browserSaveState === 'saving' && <span className="muted">Saving draft in this browser…</span>}
+              {browserSaveState === 'saved' && <span className="muted">Draft saved in this browser</span>}
+              {browserSaveState === 'error' && <>
+                <span className="status-bad">Couldn’t save the latest draft in this browser.</span>
+                <p>{valid ? 'Keep this tab open. Retry saving, or choose Download NPC in the More… menu.' : 'Keep this tab open and retry saving. Download NPC in the More… menu is also available once the settings pass validation.'}</p>
+                <button type="button" className="text-button" onClick={() => setStorageRetry((n) => n + 1)}>Retry browser save</button>
+              </>}
+            </div>}
           </div>
           {draft && (
             <div className="wh-actions">
@@ -494,10 +515,16 @@ export function Editor() {
               <details className="workshop-more" ref={moreMenu}>
                 <summary>More…</summary>
                 <div className="workshop-more-actions">
-                  <button type="button" className="secondary" disabled={locked} aria-expanded={starting} aria-controls="starters" onClick={() => { setStarting((s) => !s); if (moreMenu.current) moreMenu.current.open = false; }}>{starting ? 'Close starting points' : 'New NPC…'}</button>
+                  <button type="button" className="secondary" disabled={locked} aria-expanded={starting} aria-controls="starters" onClick={startNpc}>New NPC…</button>
                   <ImportNpcButton disabled={locked} onImport={(file) => { if (moreMenu.current) moreMenu.current.open = false; void importNpc(file); }} />
-                  <button type="button" className="secondary" disabled={!valid || locked} onClick={() => { if (moreMenu.current) moreMenu.current.open = false; void downloadNpc(); }}>Download NPC</button>
-                  {canSave && <button type="button" className="secondary" onClick={() => { if (moreMenu.current) moreMenu.current.open = false; void save(); }} disabled={!valid || locked}>Save to files — development only</button>}
+                  <div className="workshop-menu-action">
+                    <button type="button" className="secondary" aria-describedby="download-npc-help" disabled={!valid || locked} onClick={() => { if (moreMenu.current) moreMenu.current.open = false; void downloadNpc(); }}>Download NPC</button>
+                    <p id="download-npc-help" className="muted small">Portable settings and reference pictures you can import later. Excludes conversations, world progress and generated pictures.</p>
+                  </div>
+                  {canSave && <div className="workshop-menu-action">
+                    <button type="button" className="secondary" aria-describedby="development-save-help" onClick={() => { if (moreMenu.current) moreMenu.current.open = false; void save(); }} disabled={!valid || locked}>Save to files — development only</button>
+                    <p id="development-save-help" className="muted small">Writes <code>npcs/&lt;id&gt;.json</code> and <code>prompts/&lt;id&gt;.md</code> on this server, with confirmation before overwriting. Restart the server to load them into the example village. Running worlds keep their current settings.</p>
+                  </div>}
                 </div>
               </details>
             </div>
@@ -506,13 +533,7 @@ export function Editor() {
         <p className="muted small workshop-intro">Create a character, set its rules, then try a conversation.</p>
         <details className="workshop-file-help">
           <summary>How saving works</summary>
-          <p className="muted small">Your draft stays in this browser. Download its settings from More… or Use in your game to keep a copy you can import later. Reference pictures are embedded; conversations, world progress and generated pictures are not included.</p>
-          {!canSave && <p className="muted small">File saving is not enabled on this server.</p>}
-          <p className="muted small">
-            Save to files writes <code>npcs/&lt;id&gt;.json</code> and <code>prompts/&lt;id&gt;.md</code> on a development server with file saving enabled.
-            Existing files require overwrite confirmation. Restart that server to load the saved definitions into the example village.
-          </p>
-          <p className="muted small">Browser drafts and test sessions are separate from these files. Saving a draft does not update a running village.</p>
+          <p className="muted small">Browser saving keeps your latest character settings on this browser and device. Clearing this site’s browser data removes them. Download NPC in More… keeps a portable copy you can import later; test conversations and game progress are separate.</p>
         </details>
       </section>
 
@@ -523,10 +544,10 @@ export function Editor() {
       )}
       {transferBusy && <div className="note-box" role="status">Preparing the NPC file…</div>}
       {transferError && <div className="errors" role="alert"><b>{transferError.title}</b><ul>{transferError.errors.map((error, i) => <li key={i}>{error}</li>)}</ul><p>Your current draft and test conversation have been kept.</p></div>}
-      {(!draft || starting) && <Starters first={!draft} library={library} locked={locked} onTemplate={fromTemplate} onAnswers={fromAnswers} onBlank={blank} onLoad={load} onImport={(file) => void importNpc(file)} />}
+      {(!draft || starting) && <Starters first={!draft} library={library} locked={locked} onTemplate={fromTemplate} onAnswers={fromAnswers} onBlank={blank} onLoad={load} onImport={(file) => void importNpc(file)} onCancel={draft ? cancelStarting : undefined} cancelLabel={draft ? `Cancel and return to ${draft.name || 'your NPC'}` : undefined} />}
 
       {draft && (
-        <fieldset className="workshop-editor" aria-label="NPC editor and test session" disabled={applying || transferBusy}>
+        <fieldset className="workshop-editor" aria-label="NPC editor and test session" hidden={starting} disabled={applying || transferBusy}>
           <nav className="editor-nav" aria-label="Workshop sections">
             {([['character', 'Character'], ['abilities', 'Abilities & rules'], ['test', 'Test']] as const).map(([id, label]) => (
               <button key={id} type="button" className="secondary" aria-current={section === id ? 'page' : undefined} onClick={() => setSection(id)}>{label}</button>
@@ -731,6 +752,8 @@ function Starters({
   onBlank,
   onLoad,
   onImport,
+  onCancel,
+  cancelLabel = 'Cancel',
 }: {
   first: boolean;
   library: NpcDraft[];
@@ -740,16 +763,20 @@ function Starters({
   onBlank: () => void;
   onLoad: (n: NpcDraft) => void;
   onImport: (file: File) => void;
+  onCancel?: () => void;
+  cancelLabel?: string;
 }) {
   const [pick, setPick] = useState('');
   const [asking, setAsking] = useState(false);
   const [guiding, setGuiding] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { heading.current?.focus(); }, [guiding, asking]);
   const chosen = library.find((n) => n.id === pick);
-  if (guiding) return <GuidedSetup taken={library.map((n) => n.id)} locked={locked} onUse={(result) => onAnswers(result, true)} onCancel={() => setGuiding(false)} />;
-  if (asking) return <Questionnaire taken={library.map((n) => n.id)} locked={locked} onUse={onAnswers} onCancel={() => setAsking(false)} />;
+  if (guiding) return <GuidedSetup taken={library.map((n) => n.id)} locked={locked} onUse={(result) => onAnswers(result, true)} onCancel={onCancel ?? (() => setGuiding(false))} cancelLabel={cancelLabel} />;
+  if (asking) return <Questionnaire taken={library.map((n) => n.id)} locked={locked} onUse={onAnswers} onCancel={onCancel ?? (() => setAsking(false))} cancelLabel={cancelLabel} />;
   return (
     <section className="panel starters" id="starters" aria-labelledby="starters-h">
-      <h3 id="starters-h">{first ? 'Create your first NPC' : 'Start a new NPC'}</h3>
+      <h3 id="starters-h" ref={heading} tabIndex={-1}>{first ? 'Create your first NPC' : 'Start a new NPC'}</h3>
       <p>Choose a role, give your character a personality, and try a conversation.</p>
       <div className="starter-transfer"><button type="button" disabled={locked} onClick={() => setGuiding(true)}>Create your NPC</button><ImportNpcButton disabled={locked} onImport={onImport} /></div>
       <details className="starter-alternatives"><summary>Other starting points</summary>
@@ -805,6 +832,7 @@ function Starters({
         </span>
       </div>
       </details>
+      {onCancel && <div className="actions"><button type="button" className="secondary" disabled={locked} onClick={onCancel}>{cancelLabel}</button></div>}
       {locked && <p className="muted small">Waiting for the test session to finish…</p>}
     </section>
   );
@@ -867,19 +895,55 @@ function PlacePicker({ places, value, onChange, field }: { places: string[]; val
 // Tiny Dungeon character frames, drawn from the sheet at 2x.
 export const spriteStyle = (frame: number) => ({ backgroundPosition: `-${(frame % 12) * 32}px -${Math.floor(frame / 12) * 32}px` });
 
+const SPRITE_NAMES: Record<(typeof NPC_SPRITES)[number], string> = {
+  84: 'Purple hat and robe',
+  86: 'Brown hair and beard',
+  87: 'Horned helmet and beard',
+  88: 'Brown hair, tan clothes',
+  96: 'Closed steel helmet',
+  97: 'Open steel helmet',
+  98: 'Brown hair, steel armor',
+  99: 'Red hair, purple clothes',
+  100: 'Gray hair, brown clothes',
+  108: 'Green ghost',
+  109: 'One-eyed tan creature',
+  110: 'Red hood and robe',
+  111: 'Brown hood and robe',
+  112: 'Green headband and clothes',
+};
+
 function SpritePicker({ value, onChange }: { value: number; onChange: (s: number) => void }) {
+  const selectedIndex = Math.max(0, NPC_SPRITES.findIndex((f) => f === value));
   return (
     <div data-field="sprite" tabIndex={-1} className="sprites" role="radiogroup" aria-label="Example village sprite">
-      {NPC_SPRITES.map((f) => (
+      {NPC_SPRITES.map((f, index) => (
         <button
           key={f}
           type="button"
           role="radio"
           aria-checked={value === f}
-          aria-label={`Character ${f}`}
+          aria-label={SPRITE_NAMES[f]}
+          title={SPRITE_NAMES[f]}
+          tabIndex={index === selectedIndex ? 0 : -1}
           className={`sprite${value === f ? ' on' : ''}`}
           style={spriteStyle(f)}
           onClick={() => onChange(f)}
+          onKeyDown={(event) => {
+            if (event.altKey || event.ctrlKey || event.metaKey) return;
+            let next: number;
+            switch (event.key) {
+              case 'ArrowRight':
+              case 'ArrowDown': next = (index + 1) % NPC_SPRITES.length; break;
+              case 'ArrowLeft':
+              case 'ArrowUp': next = (index + NPC_SPRITES.length - 1) % NPC_SPRITES.length; break;
+              case 'Home': next = 0; break;
+              case 'End': next = NPC_SPRITES.length - 1; break;
+              default: return;
+            }
+            event.preventDefault();
+            onChange(NPC_SPRITES[next]);
+            event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]?.focus();
+          }}
         />
       ))}
     </div>
@@ -1168,6 +1232,12 @@ function Bench({ draft, valid, onBusy, tested, onCheckedAction, onReset, onUseIn
   const [pending, setPending] = useState<string | null>(null);
   const [passing, setPassing] = useState(false); // the bench clock is moving
   const [testing, setTesting] = useState(false); // a controlled proposal is on its way
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const resetInFlight = useRef(false);
+  const focusAfterReset = useRef(false);
+  const resetDialog = useRef<HTMLDialogElement>(null);
+  const resetButton = useRef<HTMLButtonElement>(null);
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [unsent, setUnsent] = useState<string | null>(null); // a line that didn't get through, to send again
@@ -1183,7 +1253,13 @@ function Bench({ draft, valid, onBusy, tested, onCheckedAction, onReset, onUseIn
     viewKey.current = key;
     setView(next);
   };
-  const busy = pending !== null || passing || testing;
+  const busy = pending !== null || passing || testing || resetting;
+  useEffect(() => {
+    if (!resetting && focusAfterReset.current) {
+      focusAfterReset.current = false;
+      resetButton.current?.focus();
+    }
+  }, [resetting]);
   // While anything is under way the editor won't swap the draft: the answer belongs to this one.
   useEffect(() => onBusy(busy), [busy, onBusy]);
 
@@ -1264,43 +1340,80 @@ function Bench({ draft, valid, onBusy, tested, onCheckedAction, onReset, onUseIn
   };
 
   const reset = async () => {
+    if (busy || resetInFlight.current) return;
+    resetInFlight.current = true;
+    setResetting(true);
+    setResetError(null);
     setError(null);
-    setUnsent(null);
     try {
-      await editorApi.reset();
+      const result = await editorApi.reset();
+      if (!result.ok) throw new Error(result.errors.join('; ') || 'Couldn’t reset the test session. Try again.');
       viewKey.current = null;
       setView(null);
       setTurns([]);
       setControlled(new Set());
       setExplanations({});
+      setUnsent(null);
       onReset();
+      resetDialog.current?.close();
     } catch (e) {
-      setError((e as Error).message);
+      const message = `Couldn’t reset the test session. Your conversation and results have been kept. ${(e as Error).message}`;
+      if (resetDialog.current?.open) setResetError(message);
+      else setError(message);
+    } finally {
+      resetInFlight.current = false;
+      focusAfterReset.current = !resetDialog.current?.open;
+      setResetting(false);
     }
+  };
+
+  const requestReset = () => {
+    if (busy || resetInFlight.current) return;
+    if (view !== null || turns.length > 0 || tested || unsent !== null) {
+      setResetError(null);
+      resetDialog.current?.showModal();
+    } else void reset();
   };
 
   const last = turns.at(-1);
   const short = (line: string) => (line.length > 34 ? `${line.slice(0, 32)}…` : line);
   const isControlled = (event: EngineEvent) => controlled.has(event.id) || event.type === 'ACTION_REJECTED' && event.data.source === 'workshop-controlled';
   const conversation = speechFirst(view?.events.filter((event) => !isControlled(event)) ?? []);
+  const emptyConversation = conversation.length === 0 && pending === null && !passing;
 
   return (
     <>
+      <dialog className="reset-dialog" ref={resetDialog} aria-labelledby="reset-test-heading" aria-describedby="reset-test-description"
+        onCancel={(event) => {
+          event.preventDefault();
+          if (!resetInFlight.current) resetDialog.current?.close();
+        }}
+        onClose={() => { if (!resetInFlight.current) resetButton.current?.focus(); }}>
+        <h2 id="reset-test-heading">Reset {draft.name || 'your NPC'}’s test session?</h2>
+        <p id="reset-test-description">This clears the test conversation, results and session progress. This can’t be undone. Your character settings and message draft stay.</p>
+        {resetError && <p className="error" role="alert">{resetError}</p>}
+        <div className="actions">
+          <button type="button" className="secondary" autoFocus disabled={resetting} onClick={() => resetDialog.current?.close()}>Keep test session</button>
+          <button type="button" className="danger" disabled={resetting} onClick={() => void reset()}>{resetting ? 'Resetting…' : 'Reset test session'}</button>
+        </div>
+      </dialog>
       <section className="panel bench">
         <div className="def-top">
           <h2>Talk to {draft.name || 'your NPC'}</h2>
-          <button className="secondary small" onClick={reset} disabled={busy}>
-            Reset test session
+          <button className="secondary small" ref={resetButton} onClick={requestReset} disabled={busy}>
+            {resetting ? 'Resetting…' : 'Reset test session'}
           </button>
         </div>
         <p className="muted small">Try a normal request, then challenge a rule. Each proposed action is checked in this isolated session.</p>
-        <div className="messages bench-messages" ref={box}>
-          {conversation.length === 0 && pending === null && <div className="note">Say something to {draft.name || 'the NPC'}.</div>}
-          {view &&
-            conversation.map((e) => <Fragment key={e.id}>
-              {!(explanations[e.id] && e.type === 'ACTION_REJECTED') && <BenchEntry event={e} view={view} npcName={draft.name} controlled={controlled.has(e.id) || (e.type === 'ACTION_REJECTED' && e.data.source === 'workshop-controlled')} />}
-              {explanations[e.id] && <ActionCheck check={explanations[e.id]} />}
-            </Fragment>)}
+        <div className={`messages bench-messages${emptyConversation ? ' empty' : ''}`} ref={box}>
+          <ConversationLog name={draft.name || 'your NPC'}>
+            {emptyConversation && <div className="note">Choose a suggested request below, or write your own.</div>}
+            {view &&
+              conversation.map((e) => <Fragment key={e.id}>
+                {!(explanations[e.id] && e.type === 'ACTION_REJECTED') && <BenchEntry event={e} view={view} npcName={draft.name} controlled={controlled.has(e.id) || (e.type === 'ACTION_REJECTED' && e.data.source === 'workshop-controlled')} />}
+                {explanations[e.id] && <ActionCheck check={explanations[e.id]} />}
+              </Fragment>)}
+          </ConversationLog>
           {pending !== null && (
             <>
               <div className="msg you">{pending}</div>
@@ -1449,7 +1562,7 @@ function ActionCheck({ check }: { check: ActionExplanation }) {
 function BenchEntry({ event: e, view, npcName, controlled }: { event: EngineEvent; view: StateView; npcName: string; controlled: boolean }) {
   switch (e.type) {
     case 'SAID':
-      return <div className={`msg ${e.actor === 'player' ? 'you' : 'npc'}`}>{e.data.text}</div>;
+      return <div className={`msg ${e.actor === 'player' ? 'you' : 'npc'}`}><span className="sr-only">{e.actor === 'player' ? 'You' : npcName}: </span>{e.data.text}</div>;
     case 'CONTRACT_PROPOSED': {
       const c = view.contracts.find((x) => x.contract_id === e.data.contract.contract_id);
       return c ? <ContractCard c={c} gold={view.gold} disabled /> : null;
