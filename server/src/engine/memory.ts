@@ -47,6 +47,17 @@ export function memoriesOf(world: World, npcId: string): Memory[] {
   return [...best.values()];
 }
 
+// Whether it would know the player by sight as the stranger in a piece of news. An eyewitness is sure; each retelling
+// blurs the description with the confidence, until the stranger in the tale is just some stranger.
+export type Recognition = 'sure' | 'likely' | 'unsure' | 'none';
+export const LIKELY = 0.6;
+export const UNSURE = 0.4;
+export const recognition = (m: Memory): Recognition =>
+  m.how_learned === 'witnessed' ? 'sure' : m.confidence >= LIKELY ? 'likely' : m.confidence >= UNSURE ? 'unsure' : 'none';
+
+// Whether `id` took part in an event: did it, had it done to them, or, for a reported one, was listed as involved.
+export const involves = (e: EngineEvent, id: string) => (e.type === 'HAPPENED' ? e.data.involved.includes(id) : e.actor === id || e.target === id);
+
 export const memoryOf = (world: World, npcId: string, eventId: string) => memoriesOf(world, npcId).find((m) => m.event_id === eventId) ?? null;
 
 // Big news: a reported world event marked notable (a boss slain, a death). It stays in mind however much happens after it.

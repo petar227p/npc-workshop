@@ -1,5 +1,5 @@
 import { clockText, type EngineEvent, type Gift } from '@blacksmith/shared';
-import { inMind, notableIds, type World } from '../engine';
+import { inMind, involves, notableIds, recognition, type Recognition, type World } from '../engine';
 
 // Events as news: what really happened, in words an NPC (or the who-knows panel) can read. Names come from the NPC
 // files; npcs/index.ts registers them at start, so this module imports none of them.
@@ -82,9 +82,18 @@ export function summarize(world: World, e: EngineEvent, vocabulary: Vocabulary =
 
 const pct = (c: number) => `${Math.round(c * 100)}%`;
 
+// Talking to the player, whether it takes them for the stranger in a piece of news (engine/memory.ts recognition).
+// Said outright either way, so the word "stranger" alone can't make it guess.
+const KNOWS_YOU: Record<Recognition, string> = {
+  sure: 'The stranger in it is the customer in front of you: you saw them.',
+  likely: 'From how the stranger in it was described, it is likely the customer in front of you.',
+  unsure: "You half-suspect the stranger in it is the customer in front of you, though the telling was too vague to be sure. You may wonder aloud, but don't claim it.",
+  none: "You wouldn't know the stranger in it by sight: nothing tells you it was the customer in front of you.",
+};
+
 // The memories fact block: what it has in mind, newest first (engine/memory.ts inMind). What it saw reads as what
 // happened; what it was told reads as the words it was told in, since that is all it has.
-export function memoriesText(world: World, npcId: string, vocabulary: Vocabulary = villageVocabulary): string {
+export function memoriesText(world: World, npcId: string, vocabulary: Vocabulary = villageVocabulary, customer: string | null = null): string {
   const { nameOf } = vocabulary;
   const known = inMind(world, npcId);
   if (known.length === 0) return 'News you know: none yet. You have nothing to pass on, so never claim you have.';
@@ -92,10 +101,11 @@ export function memoriesText(world: World, npcId: string, vocabulary: Vocabulary
   const big = notableIds(world);
   // Only what it saw itself is marked big news: told it, all it has is the teller's words.
   const lines = known.map((m) => {
-    if (m.how_learned === 'witnessed') {
-      return `- ${m.event_id}: you saw it (sure${big.has(m.event_id) ? ', big news' : ''}). ${summarize(world, byId.get(m.event_id)!, vocabulary) ?? ''}`;
-    }
-    return `- ${m.event_id}: ${nameOf(m.told_by ?? '')} told you (${pct(m.confidence)} sure): ${JSON.stringify(m.claim)}`;
+    const line =
+      m.how_learned === 'witnessed'
+        ? `- ${m.event_id}: you saw it (sure${big.has(m.event_id) ? ', big news' : ''}). ${summarize(world, byId.get(m.event_id)!, vocabulary) ?? ''}`
+        : `- ${m.event_id}: ${nameOf(m.told_by ?? '')} told you (${pct(m.confidence)} sure): ${JSON.stringify(m.claim)}`;
+    return customer === 'player' && involves(byId.get(m.event_id)!, 'player') ? `${line} ${KNOWS_YOU[recognition(m)]}` : line;
   });
   return `News you know. To pass one on, give its id in event_id; the ledger checks you really know it:\n${lines.join('\n')}`;
 }
