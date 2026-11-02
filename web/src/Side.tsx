@@ -1,8 +1,8 @@
-import type { ContractView, EngineEvent, Gift, ItemArt, KnowerView, MadeToOrderView, StateView, Trigger } from '@blacksmith/shared';
+import type { ContractView, EngineEvent, Gift, ItemArt, KnowerView, MadeToOrderView, StateView } from '@blacksmith/shared';
 import { useCallback, useId, useState, type ReactNode } from 'react';
 import { Popover } from './Drawer';
 import { sourceChain } from './knowledge';
-import { Help, Tip } from './Tip';
+import { Tip } from './Tip';
 import { clockText } from './api';
 import { gaveText, giftText, goodName, nameOf } from './Chat';
 
@@ -247,58 +247,77 @@ function ItemPicture({ name, art }: { name: string; art: ItemArt | undefined }) 
 // Gossip: for the latest events anyone knows about, who knows and how. Seen with their own eyes, or heard from
 // someone, in that person's words. The words drift as news passes on; the event each telling cites can't. How sure
 // they are, and the ids, are in each telling's details.
+// Each story going around as a card: who saw it, how it travelled from them to everyone who heard it (in each one's
+// own words, beside what really happened), and who hasn't heard yet.
 export function News({ view }: { view: StateView }) {
-  const example = view.news.flatMap((n) => n.knowers.filter((k) => k.how !== 'witnessed').map((k) => ({ n, k })))[0];
   return (
     <section className="panel news">
-      <h2>Who knows what</h2>
-      {view.news.length === 0 && <div className="muted">Nobody has seen anything worth talking about yet.</div>}
-      {view.news.length > 0 && (
-        <p className="muted small news-intro">
-          Villagers remember what they see, and may pass it on in their own words when they meet.
-          {example && ` Here, ${example.k.name} didn't see it happen: ${example.k.told_by ?? 'someone'} told them.`}
-        </p>
+      <h2>Rumours</h2>
+      {view.news.length === 0 ? (
+        <div className="muted">Nothing is going around yet. Report something in Sandbox tools, or press +1 hour and see who talks.</div>
+      ) : (
+        <p className="muted small news-intro">What each villager knows, and how it reached them. Stories change as they’re retold.</p>
       )}
       {view.news.map((n) => {
         const saw = n.knowers.filter((k) => k.how === 'witnessed');
         const heard = n.knowers.filter((k) => k.how !== 'witnessed');
+        const knows = new Set(n.knowers.map((k) => k.id));
+        const notYet = view.people.filter((p) => !knows.has(p.id));
         return (
-          <div key={n.event_id} id={`news-${n.event_id}`} tabIndex={-1} className="story">
-            <div className="story-head">{n.text}</div>
-            {saw.length > 0 && (
-              <div className="witnessed">
-                <span className="know-label">Witnessed</span> {saw.map((k) => k.name).join(', ')}
+          <article key={n.event_id} id={`news-${n.event_id}`} tabIndex={-1} className="story">
+            <p className="story-head">{n.text}</p>
+            <div className="story-row">
+              <span className="story-label saw">Saw it</span>
+              <span>{saw.length ? saw.map((k) => k.name).join(', ') : 'Nobody'}</span>
+            </div>
+            {heard.length > 0 && (
+              <div className="story-row">
+                <span className="story-label">Heard it</span>
+                <ul className="heard">
+                  {heard.map((k) => (
+                    <li key={k.id}>
+                      <details id={`know-${n.event_id}-${k.id}`}>
+                        <summary>
+                          <span className="who">{k.name}</span> <span className="muted">from {k.told_by ?? 'someone'} · {certainty(view, n.event_id, k)}</span>
+                          {k.claim && <q className="claim">{k.claim}</q>}
+                        </summary>
+                        <HowTheyKnow view={view} eventId={n.event_id} knower={k} />
+                      </details>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
-            {heard.length > 0 && (
-              <ul className="heard">
-                {heard.map((k) => (
-                  <li key={k.id}>
-                    <details id={`know-${n.event_id}-${k.id}`}>
-                      <summary>
-                        <span className="who">{k.name}</span> <span className="know-label">Heard from {k.told_by ?? 'someone'}</span>
-                      </summary>
-                      <HowTheyKnow view={view} eventId={n.event_id} knower={k} />
-                    </details>
-                  </li>
-                ))}
-              </ul>
+            {notYet.length > 0 && (
+              <div className="story-row not-yet">
+                <span className="story-label">Hasn’t heard</span>
+                <span>{notYet.map((p) => p.name).join(', ')}</span>
+              </div>
             )}
-            <div className="tag story-id">Event {n.event_id}</div>
-          </div>
+          </article>
         );
       })}
     </section>
   );
 }
 
-export const CONFIDENCE_TEXT = 'A simulation value that decreases with each retelling. It is not a measured probability that the story is true.';
+// How close a knower is to someone who saw it, in words: counted along the recorded tellings, not read off the
+// simulation's confidence number.
+function certainty(view: StateView, eventId: string, knower: KnowerView): string {
+  const chain = sourceChain(view, eventId, knower);
+  const hops = chain.steps.filter((s) => s.kind === 'told').length;
+  if (!chain.whole) return 'heard it secondhand';
+  if (hops <= 1) return 'straight from a witness';
+  if (hops === 2) return 'secondhand';
+  return `${hops} tellings from a witness, getting fuzzy`;
+}
 
-// The way the news reached them, oldest step first, as far as the log the view carries records it.
+// The way the news reached them, from whoever saw it, as far as the log the view carries records it.
 function HowTheyKnow({ view, eventId, knower }: { view: StateView; eventId: string; knower: KnowerView }) {
   const chain = sourceChain(view, eventId, knower);
   const steps = [...chain.steps].reverse();
   const first = steps[0];
+  const truth = view.news.find((n) => n.event_id === eventId)?.text;
   return (
     <div className="chain">
       <ol>
@@ -310,7 +329,8 @@ function HowTheyKnow({ view, eventId, knower }: { view: StateView; eventId: stri
             <li key={i}>
               {s.by} told {s.who}
               {s.tick === null ? '' : ` at ${clockText(s.tick)}`}
-              {s.words ? `: “${s.words}”` : '.'}
+              {/* The knower's own words are on the card already. */}
+              {s.words && !(i === steps.length - 1 && s.words === knower.claim) ? `: “${s.words}”` : '.'}
               {s.others.length > 0 && (
                 <span className="muted">
                   {' '}
@@ -321,60 +341,152 @@ function HowTheyKnow({ view, eventId, knower }: { view: StateView; eventId: stri
           ),
         )}
       </ol>
-      <div className="muted small chain-confidence">
-        Confidence {knower.confidence.toFixed(2)} <Help about="confidence" text={CONFIDENCE_TEXT} />
-      </div>
+      {truth && (
+        <p className="muted small chain-truth">
+          What really happened: {truth}
+        </p>
+      )}
     </div>
   );
 }
 
-// Every event, newest first. Rejections are where the "model proposes, code decides" story shows.
-export function Ledger({ view }: { view: StateView }) {
-  const rows = view.events.filter((e) => e.type !== 'SAID').reverse();
+// Everything that happened, newest first, in plain words: the hour as a heading over what happened in it, and a
+// filter for the kind of thing. Rule checks are cards: what a model tried, and why the code blocked it.
+type LogFilter = 'all' | 'deals' | 'rumours' | 'rules';
+const FILTERS: [LogFilter, string][] = [
+  ['all', 'All'],
+  ['deals', 'Deals'],
+  ['rumours', 'Rumours'],
+  ['rules', 'Rule checks'],
+];
+const KIND: Partial<Record<EngineEvent['type'], Exclude<LogFilter, 'all'>>> = {
+  CONTRACT_PROPOSED: 'deals',
+  CONTRACT_REFUSED: 'deals',
+  CONTRACT_ACCEPTED: 'deals',
+  WORK_STARTED: 'deals',
+  ITEM_DELIVERED: 'deals',
+  GOODS_DELIVERED: 'deals',
+  GIVEN: 'deals',
+  GIFT_REFUSED: 'deals',
+  SYNCED: 'deals',
+  TOLD: 'rumours',
+  RETOLD: 'rumours',
+  ANNOUNCED: 'rumours',
+  HAPPENED: 'rumours',
+  ACTION_REJECTED: 'rules',
+  SIGNALED: 'rules',
+};
+// Not lines of their own: the passing hours are the headings, a line said is in the chat, and an NPC acting on its
+// own shows as what it did.
+const UNLOGGED = new Set<EngineEvent['type']>(['SAID', 'CLOCK_ADVANCED', 'TRIGGER_FIRED']);
+
+export function VillageLog({ view }: { view: StateView }) {
+  const [filter, setFilter] = useState<LogFilter>('all');
+  const rows = view.events.filter((e) => !UNLOGGED.has(e.type) && (filter === 'all' || KIND[e.type] === filter)).reverse();
+  const hours: { tick: number; events: EngineEvent[] }[] = [];
+  for (const e of rows) {
+    const last = hours[hours.length - 1];
+    if (last && last.tick === e.tick) last.events.push(e);
+    else hours.push({ tick: e.tick, events: [e] });
+  }
   return (
     <section className="panel ledger">
-      <h2>Ledger</h2>
-      {rows.length === 0 && <div className="muted">Nothing recorded yet.</div>}
-      <ol>
-        {rows.map((e) => (
-          <li key={e.id} className={kind(e)}>
-            <time>{clockText(e.tick).split(' · ')[1]}</time>
-            <span>{describe(e, view)}</span>
-            {e.type === 'ACTION_REJECTED' && <RejectedProposal e={e} view={view} />}
-          </li>
+      <h2>Village log</h2>
+      <div className="log-filters" role="group" aria-label="Show">
+        {FILTERS.map(([f, label]) => (
+          <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)}>
+            {label}
+          </button>
         ))}
-      </ol>
+      </div>
+      {hours.length === 0 && (
+        <div className="muted">
+          {filter === 'all'
+            ? 'Nothing has happened yet. Talk to someone, or press +1 hour.'
+            : filter === 'rules'
+              ? 'Nothing has been blocked yet. When a villager tries something the rules don’t allow, it shows here.'
+              : `No ${filter} yet.`}
+        </div>
+      )}
+      {hours.map((h) => (
+        <div key={h.tick} className="log-hour">
+          <h3 className="log-time">{clockText(h.tick)}</h3>
+          <ol>
+            {h.events.map((e) => (
+              <li key={e.id} className={kind(e)}>
+                {e.type === 'ACTION_REJECTED' ? <RuleCheck e={e} view={view} /> : plain(e, view)}
+              </li>
+            ))}
+          </ol>
+        </div>
+      ))}
     </section>
   );
 }
 
-// A reason can quote whatever was proposed, so a rejection's ledger line keeps to a few lines; the whole reason, as
-// stored, is under "View rejected proposal".
-// The verb is whatever "action" the proposal named, so it is capped too.
+// A reason can quote whatever was proposed, so the card keeps it to a few lines; the whole reason, as stored, is under
+// Technical details.
 const REASON_CHARS = 180;
-const VERB_CHARS = 40;
 const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
-const reasonText = (r: string) => (r.length > REASON_CHARS ? `${cut(r, REASON_CHARS)} (${r.length} characters; the full reason is below)` : r);
 
-// What was proposed, exactly as the ledger stored it, beside why it was refused. Plain text, never markup; a proposal
-// too long to keep whole is stored as a clipped string and shown as it is.
-function RejectedProposal({ e, view }: { e: Extract<EngineEvent, { type: 'ACTION_REJECTED' }>; view: StateView }) {
+// What each verb a model can propose is, as something someone tries to do.
+const TRIED: Record<string, string> = {
+  SAY: 'say something',
+  EMOTE: 'act something out',
+  OFFER: 'make an offer',
+  COUNTER_OFFER: 'change an offer',
+  REFUSE: 'turn down a deal',
+  ACCEPT: 'accept a deal',
+  START_WORK: 'start work on an order',
+  DELIVER: 'hand over an order',
+  GIVE: 'give something away',
+  TELL: 'pass on news',
+  RETELL: 'spread news',
+  ANNOUNCE: 'announce news',
+  SIGNAL: 'ask the game for something',
+};
+
+// An offer's terms, when the proposal had some: what, and for how much.
+function termsOf(proposed: unknown): string {
+  const t = (proposed as { terms?: { item_name?: unknown; good?: unknown; qty?: unknown; price?: unknown } } | null)?.terms;
+  if (!t || typeof t.price !== 'number') return '';
+  const what = typeof t.item_name === 'string' ? t.item_name : typeof t.good === 'string' ? `${t.qty ?? ''} × ${goodName(t.good)}` : null;
+  return what ? ` (${what} for ${t.price} gold)` : ` (for ${t.price} gold)`;
+}
+
+// What was tried and why it was blocked, up front; what was proposed, exactly as the ledger stored it, under Technical
+// details. Plain text, never markup; a proposal too long to keep whole is stored as a clipped string and shown as it is.
+function RuleCheck({ e, view }: { e: Extract<EngineEvent, { type: 'ACTION_REJECTED' }>; view: StateView }) {
   const proposed = e.data.proposed;
   const text = typeof proposed === 'string' ? proposed : (JSON.stringify(proposed, null, 2) ?? String(proposed));
-  const who = e.actor === 'player' ? 'you (player)' : `${nameOf(view, e.actor)} (${e.actor})`;
+  const who = e.actor === 'player' ? 'You' : nameOf(view, e.actor);
+  const verb = e.data.verb ? TRIED[e.data.verb] : null;
+  const tried = verb
+    ? `tried to ${verb}${termsOf(proposed)}`
+    : e.data.verb
+      ? `tried something the rules don’t know (${cut(e.data.verb, 40)})`
+      : 'answered in a way the rules couldn’t read';
   return (
-    <details className="rejected">
-      <summary>View rejected proposal</summary>
-      <dl>
-        <dt>Event</dt>
-        <dd>{e.id}</dd>
-        <dt>Actor</dt>
-        <dd>{who}</dd>
-        <dt>Reason</dt>
-        <dd className="full-reason">{e.data.reason}</dd>
-      </dl>
-      <pre className="code">{text}</pre>
-    </details>
+    <div className="rule-check">
+      <p className="rule-tried">
+        {who} {tried}
+      </p>
+      <p className="rule-blocked">
+        <b>Blocked by the rules</b> {cut(e.data.reason, REASON_CHARS)}
+      </p>
+      <details className="rejected">
+        <summary>Technical details</summary>
+        <dl>
+          <dt>Event</dt>
+          <dd>{e.id}</dd>
+          <dt>Actor</dt>
+          <dd>{e.actor}</dd>
+          <dt>Reason</dt>
+          <dd className="full-reason">{e.data.reason}</dd>
+        </dl>
+        <pre className="code">{text}</pre>
+      </details>
+    </div>
   );
 }
 
@@ -388,61 +500,63 @@ function kind(e: EngineEvent) {
 const offered = (c: ContractView | Extract<EngineEvent, { type: 'CONTRACT_PROPOSED' }>['data']['contract']) =>
   c.kind === 'made_to_order' ? `${c.item_name}, ${c.price} gold, ${c.delivery_ticks} h` : `${c.qty} × ${goodName(c.good)}, ${c.price} gold`;
 
-function why(t: Trigger): string {
-  if (t.kind === 'every_hours') return `every ${t.hours} h`;
-  if (t.kind === 'on_meet') return 'met someone with news';
-  if (t.kind === 'on_new_memory') return 'heard news';
-  return 'spoken to';
-}
-
 // Who a reported world event reached: everyone who sees anything, or the ones named.
 function seenBy(e: Extract<EngineEvent, { type: 'HAPPENED' }>, view: StateView): string {
-  if (e.data.seen_by === 'everyone') return 'the whole village saw it';
+  if (e.data.seen_by === 'everyone') return 'The whole village saw it';
   const npcs = e.witnesses.filter((id) => id !== 'player');
-  return npcs.length ? `seen by ${npcs.map((id) => nameOf(view, id)).join(', ')}` : 'nobody saw it';
+  return npcs.length ? `Seen by ${npcs.map((id) => nameOf(view, id)).join(', ')}` : 'Nobody saw it';
 }
 
-function describe(e: EngineEvent, view: StateView): string {
-  const who = nameOf(view, e.actor);
+// A deal by what it's for, not its id: the item, or the goods and how many.
+function dealName(view: StateView, id: string | null): string {
+  const c = id ? view.contracts.find((x) => x.contract_id === id) : undefined;
+  if (!c) return 'the order';
+  return c.kind === 'made_to_order' ? `the ${c.item_name}` : `${c.qty} × ${goodName(c.good)}`;
+}
+
+// One line of the log, as a sentence.
+function plain(e: EngineEvent, view: StateView): string {
+  const name = (id: string | null) => (id === 'player' ? 'you' : nameOf(view, id ?? ''));
+  const Who = e.actor === 'player' ? 'You' : nameOf(view, e.actor);
   switch (e.type) {
     case 'CONTRACT_PROPOSED':
-      return `${who} offered ${e.data.contract.contract_id}: ${offered(e.data.contract)}${e.data.replaces ? ` (replaces ${e.data.replaces})` : ''}`;
+      return `${Who} ${e.data.replaces ? 'changed the offer to' : 'offered'} ${name(e.data.customer)}: ${offered(e.data.contract)}`;
     case 'CONTRACT_REFUSED':
-      return e.data.contract_id ? `${who} withdrew ${e.data.contract_id}` : `${who} refused the order`;
+      return e.data.contract_id ? `${Who} withdrew the offer for ${dealName(view, e.data.contract_id)}` : `${Who} turned down the order`;
     case 'CONTRACT_ACCEPTED':
-      return `${e.data.contract_id} accepted: ${e.data.price} gold paid to ${nameOf(view, e.target ?? '')}`;
+      return `${Who} accepted the deal for ${dealName(view, e.data.contract_id)} and paid ${name(e.target)} ${e.data.price} gold`;
     case 'GOODS_DELIVERED':
-      return `${e.data.contract_id} handed over by ${who}: ${e.data.qty} × ${goodName(e.data.good)}`;
+      return `${Who} handed over ${e.data.qty} × ${goodName(e.data.good)}`;
     case 'WORK_STARTED':
-      return `${e.data.contract_id} work started, due ${clockText(e.data.due_tick)}`;
+      return `${Who} started work on ${dealName(view, e.data.contract_id)}, ready ${clockText(e.data.due_tick)}`;
     case 'ITEM_DELIVERED':
-      return `${e.data.contract_id} delivered by the clock: ${e.data.item.item_name}`;
-    case 'ACTION_REJECTED':
-      return `Rejected ${e.actor} ${cut(e.data.verb ?? 'output', VERB_CHARS)}: ${reasonText(e.data.reason)}`;
-    case 'CLOCK_ADVANCED':
-      return `Time passes (${e.tick - e.data.from} h)`;
+      return `The ${e.data.item.item_name} is finished and handed to ${name(e.data.item.owner)}`;
     case 'GIVEN':
       return gaveText(e, view);
     case 'GIFT_REFUSED':
-      return `${who} refused ${giftText(e.data)} from ${e.target === 'player' ? 'you' : nameOf(view, e.target ?? '')} (${e.data.reason})`;
-    case 'TRIGGER_FIRED':
-      return `${who} acts on their own (${why(e.data.trigger)})`;
+      return `${Who} refused ${giftText(e.data)} from ${name(e.target)}`;
     case 'TOLD':
-      return `${who} told ${nameOf(view, e.target ?? '')} about ${e.data.event_id} (confidence ${e.data.confidence.toFixed(2)}): "${e.data.summary}"`;
+      return `${Who} told ${name(e.target)}: “${e.data.summary}”`;
     case 'RETOLD':
-      return `${who} retold ${e.data.event_id} to everyone around (confidence ${e.data.confidence.toFixed(2)}): "${e.data.summary}"`;
+      return `${Who} told everyone nearby: “${e.data.summary}”`;
     case 'ANNOUNCED':
-      return `${who} announced ${e.data.event_id} (confidence ${e.data.confidence.toFixed(2)}): "${e.data.summary}"`;
+      return `${Who} announced: “${e.data.summary}”`;
     case 'EMOTED':
-      return `${who} ${e.data.text}`;
+      return `${Who} ${e.data.text}`;
     case 'HAPPENED': {
-      const late = e.data.reported_tick > e.tick ? `, reported ${e.data.reported_tick - e.tick} h later` : '';
-      return `${e.data.notable ? 'Big news' : 'Happened'} at the ${e.location.replace(/_/g, ' ')}: ${e.data.text} (${seenBy(e, view)}${late})`;
+      const late = e.data.reported_tick > e.tick ? ` Reported ${e.data.reported_tick - e.tick} h later.` : '';
+      return `${e.data.notable ? 'Big news' : 'Something happened'} at the ${e.location.replace(/_/g, ' ')}: ${e.data.text} ${seenBy(e, view)}.${late}`;
     }
     case 'SIGNALED':
-      return `${who} asks the game to ${e.data.signal.replace(/_/g, ' ')}${e.target ? ` (for ${e.target === 'player' ? 'you' : nameOf(view, e.target)})` : ''}; the game's own code decides`;
+      return `${Who} asked the game to ${e.data.signal.replace(/_/g, ' ')}${e.target ? ` for ${name(e.target)}` : ''}. The game’s own code decides.`;
     case 'SYNCED':
-      return `The game changed ${nameOf(view, e.target ?? '')}'s things: ${e.data.changes.map((c) => `${c.what === 'gold' ? 'gold' : goodName(c.what)} ${c.from} → ${c.to}`).join(', ')} (${e.data.reason})`;
+      return `The game updated ${name(e.target)}’s things: ${e.data.changes.map((c) => `${c.what === 'gold' ? 'gold' : goodName(c.what)} ${c.from} → ${c.to}`).join(', ')} (${e.data.reason})`;
+    case 'TRIGGER_FIRED':
+      return `${Who} acts on their own`;
+    case 'ACTION_REJECTED':
+      return `${Who} was blocked by the rules: ${cut(e.data.reason, REASON_CHARS)}`;
+    case 'CLOCK_ADVANCED':
+      return 'Time passes';
     case 'SAID':
       return e.data.text;
   }

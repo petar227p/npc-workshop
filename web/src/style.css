@@ -112,34 +112,45 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 @keyframes drawing { 50% { opacity: 0.45; } }
 @media (prefers-reduced-motion: reduce) { .item-art.drawing { animation: none; opacity: 0.6; } }
 .item-sprite { width: 64px; height: 64px; /* the 32 px sprite at exactly 2x */ flex-shrink: 0; border-radius: 6px; background: var(--panel-2); image-rendering: pixelated; }
-.ledger ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; max-height: 320px; overflow-y: auto; }
-.ledger li { border-left: 3px solid var(--line); padding-left: 7px; overflow-wrap: anywhere; }
+.ledger ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.45; }
+.ledger li { border-left: 3px solid var(--line); padding-left: 9px; overflow-wrap: anywhere; }
 .ledger li.event { border-color: var(--accent); }
-.ledger li.reject { border-color: var(--bad); color: #f6c7c4; }
-.ledger li.clock { color: var(--muted); }
 .ledger li.happened { border-color: var(--god); }
-.ledger time { color: var(--muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
-.ledger details.rejected { margin-top: 3px; color: var(--text); }
+.ledger li.reject { border-left: 0; padding-left: 0; }
+/* The village log: filter chips, the hour as a small heading over what happened in it, and rule checks as cards in the
+   style of the home page's code check. */
+.log-filters { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0 10px; background: inherit; }
+.log-filters button { min-height: 30px; padding: 0 11px; border-radius: 999px; background: transparent; border: 1px solid #383838; color: #c8c8c8; font-size: 12px; font-weight: 500; }
+.log-filters button:hover { border-color: var(--muted); color: var(--text); }
+.log-filters button[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: #181818; font-weight: 600; }
+.log-hour + .log-hour { margin-top: 14px; }
+.log-time { margin: 0 0 6px; font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #9a9a9a; }
+.rule-check { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border: 1px solid #4a2b2b; border-left: 3px solid var(--bad); border-radius: 6px; background: #241818; }
+.rule-check p { margin: 0; }
+.rule-blocked { color: var(--muted); }
+.rule-blocked b { display: block; color: var(--bad); font-weight: 600; }
+.ledger details.rejected { margin-top: 4px; color: var(--text); font-size: 12px; }
 .ledger details.rejected summary { font-size: 11.5px; color: var(--muted); }
 .ledger details.rejected dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1px 8px; margin: 4px 0 0; }
 .ledger details.rejected dt { color: var(--muted); }
 .ledger details.rejected dd { margin: 0; min-width: 0; }
 .ledger details.rejected dd.full-reason { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 9em; overflow-y: auto; }
-.story + .story { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
-.story-head { font-size: 13px; overflow-wrap: anywhere; }
-.story ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+/* Rumours: one card per story. Who saw it, who heard it (each in their own words), who hasn't heard. */
+.story { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: #191919; font-size: 13px; overflow-wrap: anywhere; }
+.story + .story { margin-top: 10px; }
+.story-head { margin: 0; font-weight: 600; line-height: 1.4; }
+.story-row { display: grid; grid-template-columns: 6.5em minmax(0, 1fr); gap: 2px 8px; align-items: start; }
+.story-label { padding-top: 2px; font: 600 10.5px/1.4 Inter, system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #9a9a9a; }
+.story-label.saw { color: var(--ok); }
 .story .who { color: var(--accent); font-weight: 600; }
-.story .muted { overflow-wrap: anywhere; }
+.not-yet > span:last-child { color: #8a8a8a; }
 .news-intro { margin: 0 0 12px; }
-.witnessed { margin-top: 6px; font-size: 13px; }
-.know-label { color: var(--muted); }
-.witnessed .know-label { display: inline-block; min-width: 6.5em; font-weight: 600; color: var(--ok); }
-.heard summary { font-size: 13px; font-weight: 400; padding: 2px 0; border-radius: 4px; }
-.heard summary .know-label { font-weight: 600; color: var(--text); }
+.heard { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.heard summary { padding: 2px 0; border-radius: 4px; font-weight: 400; cursor: pointer; }
+.heard .claim { display: block; margin: 2px 0 0 14px; color: #d0d0d0; font-style: italic; }
 .heard details[open] { background: var(--bg); border-radius: 6px; padding: 4px 8px 8px; }
 .chain ol { margin: 6px 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
-.chain-confidence { display: flex; align-items: center; gap: 6px; }
-.story-id { margin-top: 6px; }
+.chain-truth { margin: 4px 0 0; }
 
 /* Page tabs */
 .tabs { display: flex; gap: 4px; margin-left: auto; }
@@ -414,26 +425,28 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .cat-table .range > span { display: flex; align-items: center; gap: 3px; justify-content: center; }
 .definition { min-width: 0; }
 
-/* The demo: the studio shell, like the workshop. The village and the conversation fill the page; the rail on the right
-   holds the forge, the gear and the tools as flat sections. Time and gold are in the bar, which stays in view. */
+/* The demo: the studio shell, like the workshop. A wide screen has the village large on the left with the village
+   tools in three columns under it, and the conversation on the right (with the forge and the gear), held in view while
+   the page scrolls. Time and gold are in the bar, which stays in view too. */
 .demo-page { display: flex; flex-direction: column; min-width: 0; }
 .demo-build { display: inline-block; color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; border-radius: 3px; }
 .demo-build:hover { text-decoration-color: var(--accent); }
 .studio-actions .hud + .demo-build { padding-left: 16px; border-left: 1px solid var(--rule); border-radius: 0; }
 .demo-build:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.demo-page > .cols { gap: 0; grid-template-columns: minmax(0, 1fr) 360px; align-items: stretch; }
-.demo-page .village-col, .demo-page .side-col { gap: 0; }
+.demo-layout { display: grid; grid-template-columns: minmax(0, 1fr) 400px; grid-template-rows: auto 1fr; grid-template-areas: 'stage talk' 'tools talk'; }
+.stage { grid-area: stage; display: flex; flex-direction: column; min-width: 0; }
+.talk-col { grid-area: talk; display: flex; flex-direction: column; min-width: 0; background: var(--pane); border-left: 1px solid var(--rule); }
+.demo-layout > .tools { grid-area: tools; min-width: 0; padding: 16px 0 32px; border-top: 1px solid var(--rule); }
 .game { overflow: hidden; background: #5a9e4b; }
 .game canvas { display: block; }
 .demo-page .hint { border-width: 0 0 1px 3px; border-color: var(--rule) var(--rule) var(--rule) var(--accent); border-radius: 0; background: var(--panel); padding: 8px 16px 8px 13px; }
-.demo-page .village-col .chat-panel { padding: 12px 16px; border-top: 1px solid var(--rule); }
-.demo-page .village-col > .error { border-radius: 0; border-width: 1px 0 0; padding: 10px 16px; }
-.demo-page .side-col { background: var(--pane); border-left: 1px solid var(--rule); }
-.demo-page .side-col > .panel { padding: 16px; border-bottom: 1px solid var(--rule); }
+.demo-page .talk-col .chat-panel { padding: 12px 16px; }
+.talk-col > .error { border-radius: 0; border-width: 1px 0 0; padding: 10px 16px; }
+.demo-page .talk-col > .forge, .demo-page .talk-col > .inventory { padding: 12px 16px; border-top: 1px solid var(--rule); }
 .demo-page .forge > h2, .demo-page .inventory .panel-toggle .title { font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9a9a9a; }
 .demo-page .forge > h2 { margin: 0 0 10px; }
-.demo-page .side-col > .tools { padding: 16px 0; }
-.tools .rail-label { padding: 0 16px 6px; }
+.talk-col .inventory-body { max-height: 40vh; overflow-y: auto; }
+.tools .rail-label { padding: 0 16px 8px; }
 .tool > button { display: flex; flex-direction: column; align-items: stretch; gap: 1px; width: 100%; min-height: 48px; padding: 8px 16px 8px 14px; background: none; border: 0; border-left: 2px solid transparent; border-radius: 0; color: #c8c8c8; font-weight: 500; text-align: left; }
 .tool > button:hover { background: #1b1b1b; color: var(--text); }
 .tool > button[aria-expanded='true'] { color: var(--accent); font-weight: 600; }
@@ -451,23 +464,33 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .tool-body .panel { background: none; border: 0; padding: 0; border-radius: 0; }
 .tool-body .news > h2, .tool-body .ledger > h2, .tool-body .god > h2 { display: none; }
 .tool-body .god > h2 + p { margin-top: 0; }
+.tool-body .ledger { max-height: 560px; overflow-y: auto; background: inherit; }
+.tool.open .tool-body { background: inherit; }
 .tool-hint { font-size: 12px; font-weight: 400; color: var(--muted); }
 @media (min-width: 861px) {
   .demo-page > .top { position: sticky; top: 0; z-index: 15; }
-  .demo-page > .cols { height: calc(100vh - var(--top-h, 57px)); min-height: 640px; }
-  .demo-page .village-col { min-height: 0; }
-  /* A fixed share of the column, so the hint coming and going resizes the chat, not the village. */
-  .game { flex: 0 0 45%; min-height: 220px; }
-  .demo-page .village-col .chat-panel { flex: 1 1 0; min-height: 300px; height: auto; }
-  .demo-page .side-col { overflow-y: auto; }
+  /* The village fills most of the window; the hint and the tools' headings show under it, a scroll away. */
+  .game { height: calc(100vh - var(--top-h, 57px) - 150px); min-height: 420px; flex-shrink: 0; }
+  .talk-col { position: sticky; top: var(--top-h, 57px); align-self: start; height: calc(100vh - var(--top-h, 57px)); }
+  .demo-page .talk-col .chat-panel { flex: 1 1 0; min-height: 240px; height: auto; }
+}
+/* Room for three: the tools side by side, each opening in its own column, split by rules. */
+@media (min-width: 1100px) {
+  .demo-layout > .tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto 1fr; padding-top: 16px; }
+  .demo-layout > .tools > .rail-label { grid-column: 1 / -1; }
+  .tool { border-right: 1px solid var(--rule); }
+  .tool:last-child { border-right: 0; }
+  .tool.open { margin: 0; border-left: 0; border-block: 0; border-top: 3px solid var(--accent); }
+  .tool.open > button { padding-left: 16px; }
+  .tool.open .tool-body { padding-left: 16px; }
 }
 @media (max-width: 860px) {
   .demo-page > .top .tabs { width: auto; margin-left: auto; }
   .demo-page .studio-actions { flex-basis: 100%; justify-content: flex-start; }
-  .demo-page > .cols { grid-template-columns: minmax(0, 1fr); }
-  .game { height: 50vh; min-height: 200px; }
-  .demo-page .village-col .chat-panel { height: 60vh; }
-  .demo-page .side-col { border-left: 0; border-top: 1px solid var(--rule); }
+  .demo-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: 'stage' 'talk' 'tools'; }
+  .game { height: 55vh; min-height: 220px; }
+  .talk-col { border-left: 0; border-top: 1px solid var(--rule); }
+  .demo-page .talk-col .chat-panel { height: 60vh; }
 }
 /* A phone has the Workshop tab right beside it, and no room for both on the bar's second row. */
 @media (max-width: 640px) {

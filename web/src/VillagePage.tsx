@@ -4,7 +4,7 @@ import { api } from './api';
 import { Chat, nameOf, type Pending } from './Chat';
 import { Drawer } from './Drawer';
 import { God } from './God';
-import { Forge, Hud, Inventory, Ledger, News, Stock } from './Side';
+import { Forge, Hud, Inventory, News, Stock, VillageLog } from './Side';
 import { HelpMenu, HintBar, useHints } from './HintBar';
 import { SiteHeader } from './SiteHeader';
 import type { HintLink } from './hints';
@@ -30,7 +30,7 @@ const heardKeys = (view: StateView) => new Set(view.news.flatMap((n) => n.knower
 function useArrivals(view: StateView | null) {
   const last = useRef<StateView | null>(null);
   const [gear, setGear] = useState(0); // counts up when something new is in the player's hands
-  const [heard, setHeard] = useState(false); // someone learned of an event secondhand since Who knows what was last opened
+  const [heard, setHeard] = useState(false); // someone learned of an event secondhand since Rumours was last opened
   useEffect(() => {
     if (!view) return;
     const prev = last.current;
@@ -256,8 +256,10 @@ export function VillagePage() {
           {buildLink}
         </div>
       </SiteHeader>
-      <div className="cols">
-        <div className="main-col village-col">
+      {/* A wide screen: the village large on the left with the tools in three columns under it, and the conversation
+          on the right, in view while the tools scroll. A narrow one stacks them: village, conversation, tools. */}
+      <div className="demo-layout">
+        <div className="stage">
           <Suspense fallback={<div className="game" />}>
             <Village view={view} onTalk={talk} />
           </Suspense>
@@ -268,6 +270,8 @@ export function VillagePage() {
             onLink={follow}
             onTurnOff={() => hints.setEnabled(false)}
           />
+        </div>
+        <div className="talk-col">
           <Chat
             view={view}
             talkTo={talkTo}
@@ -299,22 +303,21 @@ export function VillagePage() {
               {error}
             </div>
           )}
-        </div>
-        <aside className="side-col" aria-label="Your things and village tools">
           <Forge view={view} disabled={busy} onSkip={(n) => run(api.tick(n))} />
           <Inventory view={view} disabled={busy} onGive={give} open={gearOpen} onToggle={() => setGearOpen((o) => !o)} />
-          <nav className="panel tools" aria-labelledby="tools-label">
+        </div>
+          <nav className="tools" aria-labelledby="tools-label">
             <h2 id="tools-label" className="rail-label">Village tools</h2>
             {tool(
               'knowledge',
               <>
-                Who knows what
+                Rumours
                 {arrivals.heard && !tools.has('knowledge') && <span className="cue">new</span>}
               </>,
-              'Who saw each event, and who heard it from whom',
+              'What’s going around, and who heard it from whom',
               <News view={view} />,
             )}
-            {tool('events', 'Inspect events', 'Recorded actions, newest first, and the rules that accepted or rejected them', <Ledger view={view} />)}
+            {tool('events', 'Village log', 'Everything that happened, and what the rules allowed', <VillageLog view={view} />)}
             {tool(
               'sandbox',
               'Sandbox tools',
@@ -322,7 +325,6 @@ export function VillagePage() {
               <God view={view} disabled={busy} onRead={readNote} onReport={(r) => run(api.report(r))} />,
             )}
           </nav>
-        </aside>
         {seller && stockOpen && (
           <Drawer title={`${nameOf(view, talkTo)}'s stock`} onClose={closeStock} opener={opener.current}>
             <p className="muted small">
