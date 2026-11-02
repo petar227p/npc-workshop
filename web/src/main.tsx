@@ -2,11 +2,11 @@ import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Editor } from './Editor';
 import { Entrance } from './Entrance';
-import { SiteHeader, type Page } from './SiteHeader';
+import type { Page } from './SiteHeader';
 import { VillagePage } from './VillagePage';
 import './style.css';
 
-const ROUTES: Record<string, Page> = { '': 'home', '#': 'home', '#/': 'home', '#/village': 'village', '#/workshop': 'workshop' };
+const ROUTES: Record<string, Page> = { '': 'home', '#': 'home', '#/': 'home', '#/village': 'village', '#/workshop': 'workshop', '#/workshop/new': 'workshop' };
 const TITLES: Record<Page, string> = { home: 'NPC Workshop', village: 'Blacksmith demo · NPC Workshop', workshop: 'Workshop · NPC Workshop' };
 // An unknown hash goes to the entrance, and the address says so (replaced, so Back doesn't land on it again).
 const pageFromHash = (): Page => {
@@ -34,8 +34,7 @@ function App() {
   }, [page]);
 
   return (
-    <main className={page === 'workshop' ? 'app app-wide' : 'app'}>
-      {page === 'village' && <SiteHeader page={page} />}
+    <main className={page === 'home' ? 'app' : 'app app-wide'}>
       <div ref={content} tabIndex={-1} className="page">
         {page === 'home' ? <Entrance /> : page === 'workshop' ? <Editor /> : <VillagePage />}
       </div>

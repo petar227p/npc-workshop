@@ -256,7 +256,7 @@ function Entry({ event: e, view, disabled, onAccept }: { event: EngineEvent; vie
     case 'TOLD':
       return (
         <div className="note">
-          {nameOf(view, e.actor)} passes on news ({e.data.event_id}). Who knows what shows how it spread.
+          {nameOf(view, e.actor)} passes on news. Rumours shows how it spread.
         </div>
       );
     case 'GIFT_REFUSED':

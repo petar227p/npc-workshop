@@ -22,7 +22,7 @@ import {
   type Trigger,
 } from '@blacksmith/shared/src/npc-info';
 import { benchIdeas } from '@blacksmith/shared/src/handoff';
-import { buildSetup, freshNpcId, ROLE_CARDS, SETUP_ROLES, TELLER_INFO, TELLERS, type SetupResult, type SetupRole, type Teller } from '@blacksmith/shared/src/setup';
+import { freshNpcId, type SetupResult } from '@blacksmith/shared/src/setup';
 import { Fragment, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { clockText, editorApi } from './api';
 import { outcomeText } from './benchVerdict';
@@ -41,9 +41,12 @@ import { editorIdentity } from './editorPresentation';
 import { ConversationLog } from './ConversationLog';
 import { BROWSER_DRAFT_KEY, readDrafts, saveBrowserDraft, saveDrafts, shelveDraft, type ShelvedDraft } from './browserDraft';
 import { SiteHeader } from './SiteHeader';
+import { RoleLogo, roleLogoForDraft, ROLE_OPTIONS, type RoleOption } from './RoleLogo';
 
 // The NPC workshop: edit a definition on the left, try it on the test bench on the right.
 // The draft lives in this browser; the server checks it on every preview and bench turn.
+
+const NEW_HASH = '#/workshop/new';
 
 const BLANK: NpcDraft = {
   id: 'new_npc',
@@ -230,8 +233,11 @@ export function Editor() {
   const [check, setCheck] = useState<Check | null>(null);
   const [retry, setRetry] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
-  const [starting, setStarting] = useState(false); // a focused creation view; the existing editor stays mounted
-  const creationScroll = useRef(0);
+  // The New NPC page, at #/workshop/new so Back and refresh work. The existing editor stays mounted, hidden.
+  const [starting, setStarting] = useState(() => location.hash === NEW_HASH);
+  const startingNow = useRef(starting);
+  startingNow.current = starting;
+  const creationScroll = useRef(-1); // where the editor was scrolled when + New NPC was chosen; -1 if not from there
   const [started, setStarted] = useState(0); // drafts started here; each gets a fresh bench and forms
   const [applying, setApplying] = useState(false);
   const [benchBusy, setBenchBusy] = useState(false);
@@ -359,6 +365,7 @@ export function Editor() {
     setDoc((s) => ({ draft: next, rev: s.rev + 1 }));
     setStarted((n) => n + 1);
     setStarting(false);
+    if (location.hash === NEW_HASH) history.replaceState(null, '', '#/workshop');
     setNotice(kept && draft ? `${done} ${draft.name || 'Your previous NPC'} is in Your NPCs.` : done);
     lastDefinition.current = 'character';
     setSection(openTest ? 'test' : 'character');
@@ -366,14 +373,6 @@ export function Editor() {
   };
 
   const ids = library.map((n) => n.id);
-  const fromTemplate = (role: SetupRole, teller?: Teller) => {
-    const { draft: next, summary } = buildSetup({ role, teller }, ids);
-    void applyDraft(
-      next,
-      `Start from the ${summary.role} template`,
-      `Created ${next.name} from the ${summary.role} template. Make the character yours below.`,
-    );
-  };
   const fromAnswers = (r: SetupResult, openTest = false) =>
     void applyDraft(
       r.draft,
@@ -512,18 +511,36 @@ export function Editor() {
   const startNpc = () => {
     creationScroll.current = scrollY;
     if (moreMenu.current) moreMenu.current.open = false;
-    setNotice(null);
-    setTransferError(null);
-    setStarting(true);
-    scrollTo(0, 0);
+    location.hash = NEW_HASH;
   };
+  // Back leaves the New NPC page the way it came when the workshop pushed it; a page opened at its address goes to
+  // the editor without leaving the site.
   const cancelStarting = () => {
-    setStarting(false);
-    requestAnimationFrame(() => {
-      newNpcButton.current?.focus({ preventScroll: true });
-      scrollTo(0, creationScroll.current);
-    });
+    if (creationScroll.current >= 0) history.back();
+    else location.hash = '#/workshop';
   };
+  useEffect(() => {
+    const onHash = () => {
+      const next = location.hash === NEW_HASH;
+      if (next === startingNow.current) return;
+      startingNow.current = next;
+      setStarting(next);
+      if (next) {
+        setNotice(null);
+        setTransferError(null);
+        scrollTo(0, 0);
+        return;
+      }
+      const y = Math.max(0, creationScroll.current);
+      creationScroll.current = -1;
+      requestAnimationFrame(() => {
+        newNpcButton.current?.focus({ preventScroll: true });
+        scrollTo(0, y);
+      });
+    };
+    addEventListener('hashchange', onHash);
+    return () => removeEventListener('hashchange', onHash);
+  }, []);
   const edit = (id: string) => {
     setSection(id);
     requestAnimationFrame(() => focusSetting(document.getElementById(`${id}-h`)));
@@ -605,7 +622,7 @@ export function Editor() {
       )}
       {transferBusy && <div className="note-box" role="status">Preparing the NPC file…</div>}
       {transferError && <div className="errors" role="alert"><b>{transferError.title}</b><ul>{transferError.errors.map((error, i) => <li key={i}>{error}</li>)}</ul><p>Your current draft and test conversation have been kept.</p></div>}
-      {(!draft || starting) && <Starters first={!draft} library={library} locked={locked} onTemplate={fromTemplate} onAnswers={fromAnswers} onBlank={blank} onLoad={load} onImport={(file) => void importNpc(file)} onCancel={draft ? cancelStarting : undefined} cancelLabel={draft ? `Cancel and return to ${draft.name || 'your NPC'}` : undefined} />}
+      {(!draft || starting) && <Starters first={!draft} library={library} locked={locked} onAnswers={fromAnswers} onBlank={blank} onLoad={load} onImport={(file) => void importNpc(file)} onCancel={draft ? cancelStarting : undefined} cancelLabel={draft ? `Back to ${draft.name || 'your NPC'}` : undefined} />}
 
       {draft && (
         <fieldset className={`workshop-editor${docked ? ' docked' : ''}`} aria-label="NPC editor and test session" hidden={starting} disabled={applying || transferBusy}>
@@ -615,13 +632,13 @@ export function Editor() {
                 <h2 id="npc-list-h" className="rail-label">Your NPCs</h2>
                 <ul>
                   <li className="npc-row current" aria-current="true">
-                    <span className="npc-sprite" style={spriteStyle(draft.sprite)} aria-hidden="true" />
+                    <RoleLogo role={roleLogoForDraft(draft)} className="npc-role-logo" />
                     <span className="npc-text"><b>{draft.name || 'Unnamed character'}</b><span>{identity?.role} · editing</span></span>
                   </li>
                   {drafts.map((d) => (
                     <li key={d.key} className="npc-row">
                       <button type="button" className="npc-open" disabled={locked} onClick={() => openDraft(d)}>
-                        <span className="npc-sprite" style={spriteStyle(d.draft.sprite)} aria-hidden="true" />
+                        <RoleLogo role={roleLogoForDraft(d.draft)} className="npc-role-logo" />
                         <span className="npc-text"><b>{d.draft.name || 'Unnamed character'}</b><span>{editorIdentity(d.draft).role} · draft</span></span>
                       </button>
                       <button type="button" className="npc-delete" disabled={locked} aria-label={`Delete draft ${d.draft.name || 'Unnamed character'}`} title="Delete draft" onClick={() => deleteDraft(d)}>×</button>
@@ -630,7 +647,10 @@ export function Editor() {
                 </ul>
                 <button type="button" className="new-npc" ref={newNpcButton} disabled={locked} aria-expanded={starting} aria-controls="starters" onClick={startNpc}>+ New NPC</button>
               </section>
-              <h2 id="workshop-h" className="rail-label">{draft.name || 'Unnamed character'}</h2>
+              <h2 id="workshop-h" className="rail-current">
+                <RoleLogo role={roleLogoForDraft(draft)} className="rail-current-logo" />
+                <span><small>Now editing</small>{draft.name || 'Unnamed character'}</span>
+              </h2>
               <nav className="editor-nav" aria-label="Workshop pages">
                 {PAGE_GROUPS.map(([group, entries]) => (
                   <Fragment key={group}>
@@ -815,10 +835,9 @@ export function Editor() {
           <aside className="side-col bench-col" aria-label="Isolated test session" hidden={!docked && section !== 'test'}>
             <div className="bench-sticky">
               <h2 id="test-heading" className="sr-only" tabIndex={-1}>Test your NPC</h2>
-              {status === 'checking' && <p className="note-box" role="status">Checking your draft before testing…</p>}
               {status === 'invalid' && !docked && problemList}
               {status === 'error' && <div className="note-box" role="alert">Couldn’t check this draft. <button type="button" className="secondary small" onClick={() => setRetry(n => n + 1)}>Check again</button></div>}
-              <Bench key={started} draft={draft} valid={valid} onBusy={setBenchBusy} tested={tested} onCheckedAction={(npc) => setTestedKey(draftKey(npc))} onReset={() => setTestedKey(null)} onUseInGame={() => void openConnection()} onEditCharacter={() => edit('character')} />
+              <Bench key={started} draft={draft} valid={valid} checking={status === 'checking'} onBusy={setBenchBusy} tested={tested} onCheckedAction={(npc) => setTestedKey(draftKey(npc))} onReset={() => setTestedKey(null)} onUseInGame={() => void openConnection()} />
             </div>
           </aside>
         </fieldset>
@@ -829,13 +848,12 @@ export function Editor() {
   );
 }
 
-// A starting point: a template (a new draft with example settings), the answers to a few questions, a blank NPC, or a
-// copy of one from the village.
+// A starting point: a role (the guided steps; left empty they give the role's example character), the answers to a
+// few questions, a copy of a named NPC from the example village, a blank NPC, or an imported file.
 function Starters({
   first,
   library,
   locked,
-  onTemplate,
   onAnswers,
   onBlank,
   onLoad,
@@ -846,7 +864,6 @@ function Starters({
   first: boolean;
   library: NpcDraft[];
   locked: boolean;
-  onTemplate: (role: SetupRole, teller?: Teller) => void;
   onAnswers: (r: SetupResult, openTest?: boolean) => void;
   onBlank: () => void;
   onLoad: (n: NpcDraft) => void;
@@ -854,75 +871,66 @@ function Starters({
   onCancel?: () => void;
   cancelLabel?: string;
 }) {
-  const [pick, setPick] = useState('');
-  const [asking, setAsking] = useState(false);
-  const [guiding, setGuiding] = useState(false);
+  const [view, setView] = useState<'roles' | 'asking' | 'examples'>('roles');
+  const [guiding, setGuiding] = useState<RoleOption | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => { heading.current?.focus(); }, [guiding, asking]);
-  const chosen = library.find((n) => n.id === pick);
-  if (guiding) return <GuidedSetup taken={library.map((n) => n.id)} locked={locked} onUse={(result) => onAnswers(result, true)} onCancel={onCancel ?? (() => setGuiding(false))} cancelLabel={cancelLabel} />;
-  if (asking) return <Questionnaire taken={library.map((n) => n.id)} locked={locked} onUse={onAnswers} onCancel={onCancel ?? (() => setAsking(false))} cancelLabel={cancelLabel} />;
-  return (
+  useEffect(() => { heading.current?.focus(); }, [guiding, view]);
+  const back = onCancel && <button type="button" className="text-button starters-back" disabled={locked} onClick={onCancel}>← {cancelLabel}</button>;
+  // The guided steps, the questions and the examples go back to these starting points; the back link leaves the page.
+  const toRoles = () => { setGuiding(null); setView('roles'); };
+  if (guiding) return <>{back}<GuidedSetup key={guiding.logo} initial={guiding} taken={library.map((n) => n.id)} locked={locked} onUse={(result) => onAnswers(result, true)} onCancel={toRoles} /></>;
+  if (view === 'asking') return <>{back}<Questionnaire taken={library.map((n) => n.id)} locked={locked} onUse={onAnswers} onCancel={toRoles} /></>;
+  if (view === 'examples') return (
+    <>
+    {back}
     <section className="panel starters" id="starters" aria-labelledby="starters-h">
-      <h3 id="starters-h" ref={heading} tabIndex={-1}>{first ? 'Create your first NPC' : 'Start a new NPC'}</h3>
-      <p>Choose a role, give your character a personality, and try a conversation.</p>
-      <div className="starter-transfer"><button type="button" disabled={locked} onClick={() => setGuiding(true)}>Create your NPC</button><ImportNpcButton disabled={locked} onImport={onImport} /></div>
-      <details className="starter-alternatives"><summary>Other starting points</summary>
-      <p className="muted small">A template is a new draft with example settings, ready to test and change. It doesn&apos;t touch the village or its NPCs.</p>
-      <div className="starter-ask">
-        <button type="button" className="secondary" disabled={locked} onClick={() => setAsking(true)}>
-          Help me choose
-        </button>
-        <span className="muted small">Not sure which? Answer up to four questions, then check the proposal before it replaces anything.</span>
-      </div>
-      <h4>Role templates</h4>
-      <ul className="cards">
-        {SETUP_ROLES.map((role) => (
-          <li key={role} className="card">
-            <b className="card-title">{ROLE_CARDS[role].label}</b>
-            <p className="muted small">{ROLE_CARDS[role].blurb}</p>
-            <div className="card-actions">
-              {role === 'storyteller' ? (
-                TELLERS.map((t) => (
-                  <button key={t} type="button" disabled={locked} title={TELLER_INFO[t].description} aria-label={`Use the ${TELLER_INFO[t].label} template`} onClick={() => onTemplate(role, t)}>
-                    {TELLER_INFO[t].label}
-                  </button>
-                ))
-              ) : (
-                <button type="button" disabled={locked} aria-label={`Use the ${ROLE_CARDS[role].label} template`} onClick={() => onTemplate(role)}>
-                  Use template
-                </button>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
-      <div className="starter-other">
-        <button type="button" className="secondary" disabled={locked} onClick={onBlank}>
-          Blank NPC
-        </button>
-      </div>
-      <div className="starter-library">
-        <h4>Example NPCs</h4>
-        <p className="muted small">Load an editable draft copy of a named NPC from the example village. Role templates above start independent characters.</p>
-        <span className="inline">
-          <select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Example NPC from the library" disabled={locked}>
-            <option value="">Choose…</option>
-            {library.map((n) => (
-              <option key={n.id} value={n.id}>
-                {n.name} ({n.id}) · example
-              </option>
-            ))}
-          </select>
-          <button type="button" className="secondary" disabled={locked || !chosen} onClick={() => chosen && onLoad(chosen)}>
-            Load example
+      <h3 id="starters-h" ref={heading} tabIndex={-1}>Copy an example NPC</h3>
+      <p>Start from a named character in the demo village. You edit a copy; the village keeps its own.</p>
+      {library.length === 0 ? <p className="muted small">The example NPCs are still loading…</p> : <ul className="example-list">
+        {library.map((n) => <li key={n.id}>
+          <button type="button" className="example-choice" disabled={locked} onClick={() => onLoad(n)}>
+            <RoleLogo role={roleLogoForDraft(n)} />
+            <span><b>{n.name}</b><span>{editorIdentity(n).role}</span></span>
           </button>
-        </span>
-      </div>
-      </details>
-      {onCancel && <div className="actions"><button type="button" className="secondary" disabled={locked} onClick={onCancel}>{cancelLabel}</button></div>}
+        </li>)}
+      </ul>}
+      <div className="actions"><button type="button" className="secondary" disabled={locked} onClick={toRoles}>Back to starting points</button></div>
       {locked && <p className="muted small">Waiting for the test session to finish…</p>}
     </section>
+    </>
+  );
+  return (
+    <>
+    {back}
+    <section className="panel starters" id="starters" aria-labelledby="starters-h">
+      <h3 id="starters-h" ref={heading} tabIndex={-1}>{first ? 'Create your first NPC' : 'New NPC'}</h3>
+      <p>Choose a role, give your character a personality, and try a conversation.</p>
+      <ul className="role-choices role-starts">
+        {ROLE_OPTIONS.map((option) => <li key={option.logo}>
+          <button type="button" className="role-choice" disabled={locked} onClick={() => setGuiding(option)}>
+            <RoleLogo role={option.logo} />
+            <span className="role-choice-copy"><b>{option.label}</b><span>{option.description}</span></span>
+          </button>
+        </li>)}
+      </ul>
+      <h4 className="starter-other-h">Other ways to start</h4>
+      <ul className="starter-options">
+        <li><button type="button" className="starter-option" disabled={locked} onClick={() => setView('asking')}>
+          <span className="starter-option-icon" aria-hidden="true">?</span><span><b>Help me choose</b><span>Answer up to four questions and get a suggested setup.</span></span>
+        </button></li>
+        <li><button type="button" className="starter-option" disabled={locked} onClick={() => setView('examples')}>
+          <span className="starter-option-icon" aria-hidden="true">⧉</span><span><b>Copy an example</b><span>Start from a named NPC in the demo village.</span></span>
+        </button></li>
+        <li><button type="button" className="starter-option" disabled={locked} onClick={onBlank}>
+          <span className="starter-option-icon" aria-hidden="true">+</span><span><b>Blank NPC</b><span>Only speech switched on. Set up everything yourself.</span></span>
+        </button></li>
+        <li><ImportNpcButton className="starter-option" disabled={locked} onImport={onImport}>
+          <span className="starter-option-icon" aria-hidden="true">↥</span><span><b>Import NPC</b><span>Open a file you downloaded from the workshop.</span></span>
+        </ImportNpcButton></li>
+      </ul>
+      {locked && <p className="muted small">Waiting for the test session to finish…</p>}
+    </section>
+    </>
   );
 }
 
@@ -1312,9 +1320,10 @@ function VerbTable({ draft, onChange }: { draft: NpcDraft; onChange: (verbs: Led
   );
 }
 
-function Bench({ draft, valid, onBusy, tested, onCheckedAction, onReset, onUseInGame, onEditCharacter }: {
-  draft: NpcDraft; valid: boolean; onBusy: (busy: boolean) => void; tested: boolean;
-  onCheckedAction: (draft: NpcDraft) => void; onReset: () => void; onUseInGame: () => void; onEditCharacter: () => void;
+// `checking`: the server is checking the latest edit; it shows in the message box, so the pane doesn't move.
+function Bench({ draft, valid, checking, onBusy, tested, onCheckedAction, onReset, onUseInGame }: {
+  draft: NpcDraft; valid: boolean; checking: boolean; onBusy: (busy: boolean) => void; tested: boolean;
+  onCheckedAction: (draft: NpcDraft) => void; onReset: () => void; onUseInGame: () => void;
 }) {
   const [view, setView] = useState<StateView | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -1467,8 +1476,8 @@ function Bench({ draft, valid, onBusy, tested, onCheckedAction, onReset, onUseIn
   const last = turns.at(-1);
   const short = (line: string) => (line.length > 34 ? `${line.slice(0, 32)}…` : line);
   const isControlled = (event: EngineEvent) => controlled.has(event.id) || event.type === 'ACTION_REJECTED' && event.data.source === 'workshop-controlled';
-  const conversation = speechFirst(view?.events.filter((event) => !isControlled(event)) ?? []);
-  const emptyConversation = conversation.length === 0 && pending === null && !passing;
+  const timeline = speechFirst(view?.events ?? []);
+  const emptyConversation = timeline.length === 0 && pending === null && !passing;
 
   return (
     <>
@@ -1500,10 +1509,16 @@ function Bench({ draft, valid, onBusy, tested, onCheckedAction, onReset, onUseIn
           <ConversationLog name={draft.name || 'your NPC'}>
             {emptyConversation && <div className="note">Try a normal request, then challenge a rule. Each proposed action is checked in this isolated session.</div>}
             {view &&
-              conversation.map((e) => <Fragment key={e.id}>
-                {!(explanations[e.id] && e.type === 'ACTION_REJECTED') && <BenchEntry event={e} view={view} npcName={draft.name} controlled={controlled.has(e.id) || (e.type === 'ACTION_REJECTED' && e.data.source === 'workshop-controlled')} />}
-                {explanations[e.id] && <ActionCheck check={explanations[e.id]} />}
-              </Fragment>)}
+              timeline.map((e, i) => isControlled(e)
+                // Controlled tests sit where they happened, so the newest message is always at the bottom.
+                ? <Fragment key={e.id}>
+                  {(i === 0 || !isControlled(timeline[i - 1])) && <p className="muted small controlled-label">Controlled test · sent by the workshop, no model asked</p>}
+                  {explanations[e.id] ? <ActionCheck check={explanations[e.id]} /> : <BenchEntry event={e} view={view} npcName={draft.name} controlled />}
+                </Fragment>
+                : <Fragment key={e.id}>
+                  {!(explanations[e.id] && e.type === 'ACTION_REJECTED') && <BenchEntry event={e} view={view} npcName={draft.name} controlled={false} />}
+                  {explanations[e.id] && <ActionCheck check={explanations[e.id]} />}
+                </Fragment>)}
           </ConversationLog>
           {pending !== null && (
             <>
@@ -1518,12 +1533,6 @@ function Bench({ draft, valid, onBusy, tested, onCheckedAction, onReset, onUseIn
               Time passes<span className="dots" />
             </div>
           )}
-          {view && view.events.some(isControlled) && <div className="controlled-results" aria-label="Controlled tests">
-            <p className="muted small">Controlled tests · sent by the workshop, no model asked</p>
-            {view.events.filter(isControlled).map((event) => explanations[event.id]
-              ? <ActionCheck key={event.id} check={explanations[event.id]} />
-              : <BenchEntry key={event.id} event={event} view={view} npcName={draft.name} controlled />)}
-          </div>}
         </div>
         {last?.kind === 'model' && <p className="bench-verdict" role="status">{outcomeText(last)}</p>}
         <div className="bench-suggestions" aria-label="Suggested messages">
@@ -1532,22 +1541,24 @@ function Bench({ draft, valid, onBusy, tested, onCheckedAction, onReset, onUseIn
           <button type="button" className="secondary" disabled={busy || !valid} title={`${ideas.controlled.label}. The workshop sends this straight to the ledger; no model is asked.`} onClick={() => void test()}>Controlled rejection test</button>
         </div>
         <form className="chat-form" onSubmit={submit}>
-          <input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            maxLength={MAX_SAY_LENGTH}
-            id="bench-input"
-            placeholder={valid ? 'Talk to the draft…' : 'Waiting for a valid draft'}
-            aria-label="Message to the draft NPC"
-            disabled={!valid}
-          />
+          <span className={`chat-input${checking ? ' checking' : ''}`}>
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              maxLength={MAX_SAY_LENGTH}
+              id="bench-input"
+              placeholder={checking ? '' : valid ? 'Talk to the draft…' : 'Waiting for a valid draft'}
+              aria-label="Message to the draft NPC"
+              disabled={!valid}
+            />
+            <span className="input-status" role="status">{checking && <><span className="spinner" aria-hidden="true" />Checking your draft…</>}</span>
+          </span>
           <button disabled={busy || !valid || !text.trim()}>Send</button>
         </form>
         <div className={`bench-handoff${tested ? ' ready' : ''}`}>
           {tested ? <p role="status"><b>✓ {draft.name} completed a checked action.</b></p>
-            : <p className="muted small">{valid ? 'You can use this character in your game before running a model test.' : 'Fix the character’s settings before using it in your game.'}</p>}
-          <div className="actions"><button type="button" className="text-button" disabled={busy || !valid} onClick={onUseInGame}>Use {draft.name || 'this NPC'} in your game →</button>
-          <button type="button" className="text-button" disabled={busy} onClick={onEditCharacter}>Edit character</button></div>
+            : <p className="muted small">{valid || checking ? 'You can use this character in your game before running a model test.' : 'Fix the character’s settings before using it in your game.'}</p>}
+          <div className="actions"><button type="button" className="text-button" disabled={busy || !valid} onClick={onUseInGame}>Use {draft.name || 'this NPC'} in your game →</button></div>
         </div>
         <details className="bench-tools">
           <summary>More test options</summary>

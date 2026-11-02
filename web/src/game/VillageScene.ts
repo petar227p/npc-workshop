@@ -17,6 +17,7 @@ const ITEM_FALLBACK = 104; // a Tiny Dungeon weapon tile, until Muse Image has d
 export type SceneHooks = { onTalk: (npcId: string) => void; label: (npcId: string) => string };
 
 const px = (t: number) => t * TILE + TILE / 2;
+const FOLLOW = 0.15; // the share of the way the camera closes on the player each 60th of a second
 const tileOf = (x: number, y: number): Tile => ({ x: Math.floor(x / TILE), y: Math.floor(y / TILE) });
 
 type Bubble = { text: Phaser.GameObjects.Text; until: number };
@@ -87,8 +88,18 @@ export class VillageScene extends Phaser.Scene {
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, w, h);
-    cam.startFollow(this.player, true, 0.15, 0.15);
-    cam.setRoundPixels(true);
+    cam.centerOn(this.player.x, this.player.y);
+    // Phaser's own rounding (on with pixelArt, and in startFollow) floors the camera to whole village pixels, so the
+    // ground stepped 4 screen pixels at a time under a player moving smoothly. Off: after physics has moved the player,
+    // settle puts the camera on the nearest screen pixel instead, and everything else is placed with snap. The player
+    // keeps its fractional physics position; the renderer rounds sprite corners to keep it and the walking bob sharp.
+    cam.setRoundPixels(false);
+    const preRender = cam.preRender.bind(cam);
+    cam.preRender = () => {
+      preRender();
+      Object.assign(cam, { renderRoundPixels: true });
+    };
+    this.events.on(Phaser.Scenes.Events.POST_UPDATE, this.settle, this);
     this.scale.on('resize', () => this.fitZoom());
     this.fitZoom();
 
@@ -121,11 +132,20 @@ export class VillageScene extends Phaser.Scene {
     if (this.view) this.setView(this.view);
   }
 
-  // Zoom so the village fills the canvas without showing past its edges.
+  // Zoom so the village fills the canvas without showing past its edges. The canvas has a pixel for each screen
+  // pixel (see Village.tsx), so the zoom counts those: at least 2 village pixels per CSS pixel.
   private fitZoom() {
     const { width, height } = this.scale.gameSize;
+    const dpr = Math.round(1 / this.scale.zoom);
     const minZoom = Math.max(width / (this.village.width * TILE), height / (this.village.height * TILE));
-    this.cameras.main.setZoom(Math.max(2, Math.ceil(minZoom)));
+    this.cameras.main.setZoom(Math.max(2 * dpr, Math.ceil(minZoom)));
+  }
+
+  // To the nearest screen pixel, not the nearest village pixel: whole village pixels are 4 screen pixels apart on a
+  // Retina screen, and moving in jumps that size is what looked jagged.
+  private snap(v: number) {
+    const z = this.cameras.main.zoom;
+    return Math.round(v * z) / z;
   }
 
   // Called with every view the server sends. The first one only places people; later ones play what's new.
@@ -251,7 +271,7 @@ export class VillageScene extends Phaser.Scene {
     const [x, y] = [(place.x + place.w / 2) * TILE, (place.y + place.h / 2) * TILE];
     const ring = this.add.circle(x, y, TILE, 0xb48ce0, 0.25).setStrokeStyle(1, 0xb48ce0).setDepth(2);
     this.tweens.add({ targets: ring, radius: TILE * 5, alpha: 0, duration: 2200, repeat: 1, onComplete: () => ring.destroy() });
-    const label = this.makeText(text.length > 80 ? `${text.slice(0, 78)}…` : text, '#f6ecd8', '#4a2f6b').setPosition(Math.round(x), Math.round(y - 6));
+    const label = this.makeText(text.length > 80 ? `${text.slice(0, 78)}…` : text, '#f6ecd8', '#4a2f6b').setPosition(this.snap(x), this.snap(y - 6));
     this.tweens.add({ targets: label, alpha: 0, delay: 6000, duration: 1000, onComplete: () => label.destroy() });
   }
 
@@ -327,6 +347,17 @@ export class VillageScene extends Phaser.Scene {
     return best;
   }
 
+  // Snap only the camera: rounding the player would discard fractional movement when physics reads it next frame.
+  // The camera closes on the player by a share of the way scaled to the frame's length.
+  private settle(_time: number, delta: number) {
+    if (!this.ready) return;
+    const cam = this.cameras.main;
+    const follow = 1 - Math.pow(1 - FOLLOW, delta / (1000 / 60));
+    const x = cam.scrollX + (this.player.x - cam.width / 2 - cam.scrollX) * follow;
+    const y = cam.scrollY + (this.player.y - cam.height / 2 - cam.scrollY) * follow;
+    cam.setScroll(this.snap(cam.clampX(x)), this.snap(cam.clampY(y)));
+  }
+
   update(time: number, delta: number) {
     if (!this.ready) return;
 
@@ -369,7 +400,7 @@ export class VillageScene extends Phaser.Scene {
         p.sprite.setFlipX(this.player.x < p.x);
       }
       const bob = walking ? -Math.abs(Math.sin(time / 110)) * 1.5 : 0;
-      p.sprite.setPosition(Math.round(p.x), Math.round(p.y + bob)).setDepth(p.y);
+      p.sprite.setPosition(this.snap(p.x), this.snap(p.y + bob)).setDepth(p.y);
     }
 
     // Work on the anvil: the maker clangs now and then until it's done.
@@ -387,7 +418,7 @@ export class VillageScene extends Phaser.Scene {
         b.text.destroy();
         return undefined;
       }
-      b.text.setPosition(Math.round(x), Math.round(y - 10));
+      b.text.setPosition(this.snap(x), this.snap(y - 10));
       return b;
     };
     for (const p of this.people.values()) p.bubble = place(p.bubble, p.x, p.y);
@@ -396,11 +427,11 @@ export class VillageScene extends Phaser.Scene {
     if (this.hovered) {
       const p = this.people.get(this.hovered.id);
       if (!p || time > this.hovered.until) this.unhover(this.hovered.id);
-      else this.hovered.text.setPosition(Math.round(p.x), Math.round(p.y + TILE / 2 + 1));
+      else this.hovered.text.setPosition(this.snap(p.x), this.snap(p.y + TILE / 2 + 1));
     }
 
     const near = this.nearest();
     this.prompt.setVisible(!!near && !typing() && !near.bubble);
-    if (near) this.prompt.setPosition(Math.round(near.x), Math.round(near.y - 10));
+    if (near) this.prompt.setPosition(this.snap(near.x), this.snap(near.y - 10));
   }
 }

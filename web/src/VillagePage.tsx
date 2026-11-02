@@ -1,30 +1,26 @@
 import type { ActionResponse, Gift, StateView } from '@blacksmith/shared';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from './api';
 import { Chat, nameOf, type Pending } from './Chat';
 import { Drawer } from './Drawer';
 import { God } from './God';
-import { Forge, Hud, Inventory, Ledger, News, Stock } from './Side';
+import { Forge, Hud, Inventory, News, Stock, VillageLog } from './Side';
 import { HelpMenu, HintBar, useHints } from './HintBar';
+import { SiteHeader } from './SiteHeader';
 import type { HintLink } from './hints';
-import { Help, Tip } from './Tip';
+import { Help } from './Tip';
 
 // Phaser is most of the bundle, so the village loads on its own and the workshop doesn't wait for it.
 const Village = lazy(() => import('./game/Village').then((m) => ({ default: m.Village })));
 
-type Panel = 'knowledge' | 'events' | 'sandbox' | 'stock';
+type Tool = 'knowledge' | 'events' | 'sandbox';
 
-function DemoIntro() {
-  return (
-    <section className="demo-intro" aria-labelledby="demo-heading">
-      <div className="demo-intro-copy">
-        <h2 id="demo-heading">Blacksmith demo — built with NPC Workshop</h2>
-        <p>Meet Brann in the example village. Negotiate an order, accept a checked offer, and collect the finished item.</p>
-      </div>
-      <a className="demo-build" href="#/workshop">Build your own NPC <span aria-hidden="true">→</span></a>
-    </section>
-  );
-}
+// What the demo is built with, and the way back to building one: on the right of the bar, after the village controls.
+const buildLink = (
+  <a className="demo-build" href="#/workshop">
+    Build your own NPC <span aria-hidden="true">→</span>
+  </a>
+);
 
 // Someone heard of an event from someone else: one key per (event, listener), so a retelling to a new person is new.
 const heardKeys = (view: StateView) => new Set(view.news.flatMap((n) => n.knowers.filter((k) => k.how === 'told_by').map((k) => `${n.event_id}:${k.id}`)));
@@ -34,7 +30,7 @@ const heardKeys = (view: StateView) => new Set(view.news.flatMap((n) => n.knower
 function useArrivals(view: StateView | null) {
   const last = useRef<StateView | null>(null);
   const [gear, setGear] = useState(0); // counts up when something new is in the player's hands
-  const [heard, setHeard] = useState(false); // someone learned of an event secondhand since the panel was last opened
+  const [heard, setHeard] = useState(false); // someone learned of an event secondhand since Rumours was last opened
   useEffect(() => {
     if (!view) return;
     const prev = last.current;
@@ -87,7 +83,8 @@ export function VillagePage() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [talkTo, setTalkTo] = useState('smith');
-  const [panel, setPanel] = useState<Panel | null>(null);
+  const [tools, setTools] = useState<ReadonlySet<Tool>>(new Set());
+  const [stockOpen, setStockOpen] = useState(false);
   const [gearOpen, setGearOpen] = useState(false);
   const chatInput = useRef<HTMLInputElement>(null);
   const arrivals = useArrivals(view);
@@ -183,16 +180,20 @@ export function VillagePage() {
     setTalkTo(to);
     run(api.give(to, gift));
   };
-  const opener = useRef<HTMLElement | null>(null);
-  const toggle = (p: Panel, e: React.MouseEvent<HTMLElement>) => {
-    opener.current = e.currentTarget;
-    if (p === 'knowledge') arrivals.seenHeard();
-    setPanel((open) => (open === p ? null : p));
+  // The village tools fold open in the rail, each on its own, so the village and the chat stay in view beside them.
+  const openTool = (t: Tool, open: boolean) => {
+    if (t === 'knowledge' && open) arrivals.seenHeard();
+    setTools((ts) => {
+      const next = new Set(ts);
+      if (open) next.add(t);
+      else next.delete(t);
+      return next;
+    });
   };
-  const closePanel = useCallback(() => setPanel(null), []);
-  const knowledgeButton = useRef<HTMLButtonElement>(null);
-  // What a hint's link shows, once the panel it's in has rendered and settled: a task later, after the drawer has taken
-  // focus as it opens (in development StrictMode runs that twice), so the target has it last.
+  const opener = useRef<HTMLElement | null>(null);
+  const closeStock = useCallback(() => setStockOpen(false), []);
+  // What a hint's link shows, once the section it's in has rendered and settled: a task later, so the target gets
+  // focus after anything that took it while opening.
   const [revealing, setRevealing] = useState<string | null>(null);
   useEffect(() => {
     if (!revealing) return;
@@ -206,44 +207,62 @@ export function VillagePage() {
   const follow = (to: HintLink, h: Parameters<typeof hints.dismiss>[0]) => {
     hints.dismiss(h);
     if (to.kind === 'news') {
-      opener.current = knowledgeButton.current;
-      arrivals.seenHeard();
-      setPanel('knowledge');
+      openTool('knowledge', true);
       setRevealing(`know-${to.event_id}-${to.knower}`);
     } else {
       setGearOpen(true);
       setRevealing(to.kind === 'item' ? `item-${to.id}` : 'gear');
     }
   };
-  // Another seller's stock, or none: the stock panel belongs to whoever the chat is with.
-  useEffect(() => setPanel((p) => (p === 'stock' ? null : p)), [talkTo]);
+  // Another seller's stock, or none: the stock drawer belongs to whoever the chat is with.
+  useEffect(() => setStockOpen(false), [talkTo]);
 
-  if (!view) return <div className="demo-page"><DemoIntro /><div className="loading">{error ?? 'Waking the village…'}</div></div>;
+  if (!view)
+    return (
+      <div className="demo-page">
+        <SiteHeader page="village">
+          <div className="studio-actions">{buildLink}</div>
+        </SiteHeader>
+        <div className="loading">{error ?? 'Waking the village…'}</div>
+      </div>
+    );
   const busy = pending !== null || waiting;
   const seller = view.shops.some((s) => s.id === talkTo);
-  const shown = panel === 'stock' && !seller ? null : panel;
-  // Time and gold, always in view: beside the village on a wide screen, between it and the chat on a narrow one (CSS
-  // shows one), where the side column would put them below the conversation.
-  const hud = (where: string) => (
-    <Hud
-      className={where}
-      view={view}
-      disabled={busy}
-      onSkip={(n) => run(api.tick(n))}
-      onReset={() => run(api.reset())}
-      help={<HelpMenu enabled={hints.enabled} onEnabled={hints.setEnabled} canClick />}
-    />
+  const tool = (t: Tool, name: ReactNode, hint: string, body: ReactNode) => (
+    <div className={tools.has(t) ? 'tool open' : 'tool'}>
+      <button aria-expanded={tools.has(t)} aria-controls={`tool-${t}`} onClick={() => openTool(t, !tools.has(t))}>
+        <span className="tool-name">{name}</span>
+        <span className="tool-hint">{hint}</span>
+      </button>
+      {/* Kept while folded, so a half-typed report is still there when it opens again. */}
+      <div id={`tool-${t}`} className="tool-body" hidden={!tools.has(t)}>
+        {body}
+      </div>
+    </div>
   );
 
   return (
     <div className="demo-page">
-      <DemoIntro />
-      <div className="cols">
-        <div className="main-col village-col">
+      {/* Time and gold in the bar, where the workshop keeps its draft's state: always in view, at every width. */}
+      <SiteHeader page="village">
+        <div className="studio-actions">
+          <Hud
+            view={view}
+            disabled={busy}
+            onSkip={(n) => run(api.tick(n))}
+            onReset={() => run(api.reset())}
+            help={<HelpMenu enabled={hints.enabled} onEnabled={hints.setEnabled} canClick />}
+          />
+          {buildLink}
+        </div>
+      </SiteHeader>
+      {/* A wide screen: the village large on the left with the tools in three columns under it, and the conversation
+          on the right, in view while the tools scroll. A narrow one stacks them: village, conversation, tools. */}
+      <div className="demo-layout">
+        <div className="stage">
           <Suspense fallback={<div className="game" />}>
             <Village view={view} onTalk={talk} />
           </Suspense>
-          {hud('hud-top')}
           <HintBar
             hint={hints.hint}
             onDismiss={hints.dismiss}
@@ -251,6 +270,8 @@ export function VillagePage() {
             onLink={follow}
             onTurnOff={() => hints.setEnabled(false)}
           />
+        </div>
+        <div className="talk-col">
           <Chat
             view={view}
             talkTo={talkTo}
@@ -264,7 +285,14 @@ export function VillagePage() {
             onError={setError}
             headExtra={
               seller && (
-                <button className="secondary small" aria-expanded={shown === 'stock'} onClick={(e) => toggle('stock', e)}>
+                <button
+                  className="secondary small"
+                  aria-expanded={stockOpen}
+                  onClick={(e) => {
+                    opener.current = e.currentTarget;
+                    setStockOpen((o) => !o);
+                  }}
+                >
                   {nameOf(view, talkTo)}'s stock
                 </button>
               )
@@ -275,44 +303,30 @@ export function VillagePage() {
               {error}
             </div>
           )}
-        </div>
-        <aside className="side-col" aria-label="Your things and village tools">
-          {hud('hud-side')}
           <Forge view={view} disabled={busy} onSkip={(n) => run(api.tick(n))} />
           <Inventory view={view} disabled={busy} onGive={give} open={gearOpen} onToggle={() => setGearOpen((o) => !o)} />
-          <nav className="panel tools" aria-label="Village tools">
-            <button ref={knowledgeButton} className="secondary" aria-expanded={shown === 'knowledge'} onClick={(e) => toggle('knowledge', e)}>
-              Who knows what
-              {arrivals.heard && shown !== 'knowledge' && <span className="cue">new</span>}
-            </button>
-            <Tip text="See the recorded actions and the rules that accepted or rejected them.">
-              <button className="secondary" aria-expanded={shown === 'events'} onClick={(e) => toggle('events', e)}>
-                Inspect events
-              </button>
-            </Tip>
-            <button className="secondary" aria-expanded={shown === 'sandbox'} onClick={(e) => toggle('sandbox', e)}>
-              Sandbox tools
-            </button>
+        </div>
+          <nav className="tools" aria-labelledby="tools-label">
+            <h2 id="tools-label" className="rail-label">Village tools</h2>
+            {tool(
+              'knowledge',
+              <>
+                Rumours
+                {arrivals.heard && !tools.has('knowledge') && <span className="cue">new</span>}
+              </>,
+              'What’s going around, and who heard it from whom',
+              <News view={view} />,
+            )}
+            {tool('events', 'Village log', 'Everything that happened, and what the rules allowed', <VillageLog view={view} />)}
+            {tool(
+              'sandbox',
+              'Sandbox tools',
+              'Tell the village something happened that no action covers',
+              <God view={view} disabled={busy} onRead={readNote} onReport={(r) => run(api.report(r))} />,
+            )}
           </nav>
-        </aside>
-        {shown === 'knowledge' && (
-          <Drawer title="Who knows what" onClose={closePanel} opener={opener.current}>
-            <News view={view} />
-          </Drawer>
-        )}
-        {shown === 'events' && (
-          <Drawer title="Inspect events" onClose={closePanel} opener={opener.current}>
-            <p className="muted small">Every recorded action, newest first, and the rules that accepted or rejected it.</p>
-            <Ledger view={view} />
-          </Drawer>
-        )}
-        {shown === 'sandbox' && (
-          <Drawer title="Sandbox tools" onClose={closePanel} opener={opener.current}>
-            <God view={view} disabled={busy} onRead={readNote} onReport={(r) => run(api.report(r))} />
-          </Drawer>
-        )}
-        {shown === 'stock' && (
-          <Drawer title={`${nameOf(view, talkTo)}'s stock`} onClose={closePanel} opener={opener.current}>
+        {seller && stockOpen && (
+          <Drawer title={`${nameOf(view, talkTo)}'s stock`} onClose={closeStock} opener={opener.current}>
             <p className="muted small">
               What {nameOf(view, talkTo)} has on hand right now, not counting reserved materials{' '}
               <Help about="reserved materials" text="These materials are set aside for accepted orders." />

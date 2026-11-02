@@ -65,6 +65,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .note.ok { color: var(--ok); }
 .chat-form { display: flex; gap: 8px; margin-top: 10px; }
 .chat-form input { flex: 1; min-width: 0; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font: inherit; }
+.chat-input { position: relative; flex: 1; min-width: 0; display: flex; }
+.chat-input input { width: 100%; }
+.input-status { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 6px; background: var(--input); color: var(--muted); font-size: 12px; pointer-events: none; white-space: nowrap; }
+.input-status:empty { display: none; }
+.chat-input.checking input { padding-left: 168px; } /* typed text stays readable beside the status */
+.spinner { width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } }
 .chat-form .mic { min-width: 44px; font-variant-numeric: tabular-nums; }
 .chat-form .mic.on { background: #302020; border-color: var(--bad); color: #f6c7c4; }
 .error { background: #302020; border: 1px solid var(--bad); color: #f6c7c4; border-radius: 8px; padding: 8px 12px; font-size: 13px; overflow-wrap: anywhere; max-height: 12em; overflow-y: auto; }
@@ -84,8 +92,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .status { margin-top: 8px; }
 
 /* Side panels */
-.hud-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-.hud-row button { margin-left: auto; }
 .gold { color: var(--accent); }
 .job { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
 .job-body { flex: 1; min-width: 0; }
@@ -106,34 +112,45 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 @keyframes drawing { 50% { opacity: 0.45; } }
 @media (prefers-reduced-motion: reduce) { .item-art.drawing { animation: none; opacity: 0.6; } }
 .item-sprite { width: 64px; height: 64px; /* the 32 px sprite at exactly 2x */ flex-shrink: 0; border-radius: 6px; background: var(--panel-2); image-rendering: pixelated; }
-.ledger ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; max-height: 320px; overflow-y: auto; }
-.ledger li { border-left: 3px solid var(--line); padding-left: 7px; overflow-wrap: anywhere; }
+.ledger ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.45; }
+.ledger li { border-left: 3px solid var(--line); padding-left: 9px; overflow-wrap: anywhere; }
 .ledger li.event { border-color: var(--accent); }
-.ledger li.reject { border-color: var(--bad); color: #f6c7c4; }
-.ledger li.clock { color: var(--muted); }
 .ledger li.happened { border-color: var(--god); }
-.ledger time { color: var(--muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
-.ledger details.rejected { margin-top: 3px; color: var(--text); }
+.ledger li.reject { border-left: 0; padding-left: 0; }
+/* The village log: filter chips, the hour as a small heading over what happened in it, and rule checks as cards in the
+   style of the home page's code check. */
+.log-filters { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0 10px; background: inherit; }
+.log-filters button { min-height: 30px; padding: 0 11px; border-radius: 999px; background: transparent; border: 1px solid #383838; color: #c8c8c8; font-size: 12px; font-weight: 500; }
+.log-filters button:hover { border-color: var(--muted); color: var(--text); }
+.log-filters button[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: #181818; font-weight: 600; }
+.log-hour + .log-hour { margin-top: 14px; }
+.log-time { margin: 0 0 6px; font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #9a9a9a; }
+.rule-check { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border: 1px solid #4a2b2b; border-left: 3px solid var(--bad); border-radius: 6px; background: #241818; }
+.rule-check p { margin: 0; }
+.rule-blocked { color: var(--muted); }
+.rule-blocked b { display: block; color: var(--bad); font-weight: 600; }
+.ledger details.rejected { margin-top: 4px; color: var(--text); font-size: 12px; }
 .ledger details.rejected summary { font-size: 11.5px; color: var(--muted); }
 .ledger details.rejected dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1px 8px; margin: 4px 0 0; }
 .ledger details.rejected dt { color: var(--muted); }
 .ledger details.rejected dd { margin: 0; min-width: 0; }
 .ledger details.rejected dd.full-reason { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 9em; overflow-y: auto; }
-.story + .story { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
-.story-head { font-size: 13px; overflow-wrap: anywhere; }
-.story ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+/* Rumours: one card per story. Who saw it, who heard it (each in their own words), who hasn't heard. */
+.story { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: #191919; font-size: 13px; overflow-wrap: anywhere; }
+.story + .story { margin-top: 10px; }
+.story-head { margin: 0; font-weight: 600; line-height: 1.4; }
+.story-row { display: grid; grid-template-columns: 6.5em minmax(0, 1fr); gap: 2px 8px; align-items: start; }
+.story-label { padding-top: 2px; font: 600 10.5px/1.4 Inter, system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #9a9a9a; }
+.story-label.saw { color: var(--ok); }
 .story .who { color: var(--accent); font-weight: 600; }
-.story .muted { overflow-wrap: anywhere; }
+.not-yet > span:last-child { color: #8a8a8a; }
 .news-intro { margin: 0 0 12px; }
-.witnessed { margin-top: 6px; font-size: 13px; }
-.know-label { color: var(--muted); }
-.witnessed .know-label { display: inline-block; min-width: 6.5em; font-weight: 600; color: var(--ok); }
-.heard summary { font-size: 13px; font-weight: 400; padding: 2px 0; border-radius: 4px; }
-.heard summary .know-label { font-weight: 600; color: var(--text); }
+.heard { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.heard summary { padding: 2px 0; border-radius: 4px; font-weight: 400; cursor: pointer; }
+.heard .claim { display: block; margin: 2px 0 0 14px; color: #d0d0d0; font-style: italic; }
 .heard details[open] { background: var(--bg); border-radius: 6px; padding: 4px 8px 8px; }
 .chain ol { margin: 6px 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
-.chain-confidence { display: flex; align-items: center; gap: 6px; }
-.story-id { margin-top: 6px; }
+.chain-truth { margin: 4px 0 0; }
 
 /* Page tabs */
 .tabs { display: flex; gap: 4px; margin-left: auto; }
@@ -143,11 +160,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Village shell: time and gold, folded gear, tools, drawers */
-.hud .hud-row { margin-bottom: 8px; }
-.hud .help-menu { margin-left: auto; }
-.hud-menu { margin-left: auto; }
-.hud .help-menu + .hud-menu { margin-left: 0; }
-.hud-time { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.hud { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.hud .clock, .hud .gold { font-size: 15px; white-space: nowrap; }
 .popover-wrap { position: relative; }
 .popover { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: max-content; max-width: min(280px, calc(100vw - 32px)); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px; box-shadow: 0 8px 24px #0008; }
 .popover p { margin: 0; font-size: 13px; }
@@ -162,8 +176,6 @@ button.danger { background: var(--bad); color: #2b1219; }
 .panel-toggle .title { font-size: 15px; font-weight: 600; flex: 1; }
 .panel-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .inventory-body { margin-top: 10px; }
-.tools { display: flex; flex-direction: column; gap: 6px; }
-.tools button { text-align: left; display: flex; align-items: center; gap: 8px; }
 .cue { margin-left: auto; font-size: 11px; font-weight: 600; background: var(--accent); color: #181818; border-radius: 999px; padding: 0 7px; }
 .chat-head-extra { margin-left: auto; }
 /* Names now carry roles, so a narrow chat head wraps rather than push past the screen. */
@@ -190,13 +202,6 @@ button.danger { background: var(--bad); color: #2b1219; }
 /* With a mouse, hovering the control is enough; the ? is for touch screens, which can't hover. */
 .tip-wrap > .tip-help { display: none; }
 @media (hover: none) { .tip-wrap > .tip-help { display: inline-grid; width: 24px; height: 24px; } .tip-wrap > .help { width: 24px; height: 24px; } }
-.tools .tip-wrap { display: flex; }
-.tools .tip-wrap > button:first-child { flex: 1; }
-.tools .tip-wrap > .tip-help, .tools .tip-wrap > .help { padding: 0; }
-
-/* Time and gold: one copy beside the village on wide screens, one above the chat on narrow ones. */
-.hud-top { display: none; }
-@media (max-width: 860px) { .hud-top { display: block; } .hud-side { display: none; } }
 
 /* Hints and help */
 .hint-slot:empty { display: none; }
@@ -311,18 +316,8 @@ button.danger { background: var(--bad); color: #2b1219; }
 .pill.ok { color: var(--ok); border-color: var(--ok); }
 .pill.bad { color: #f6c7c4; border-color: var(--bad); }
 .starters h3 { margin: 0 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); }
-.cards { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
-.card { display: flex; flex-direction: column; gap: 6px; padding: 10px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; }
-.card-title { font-family: 'Pixelify Sans', monospace; font-size: 16px; font-weight: 400; color: var(--text); }
-.card p.small { margin: 0; flex: 1; }
-.card-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.starter-other { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 12px; }
-.starter-library { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
-.starter-library select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font: inherit; min-width: 0; max-width: 100%; }
-.starter-library .inline { flex-wrap: wrap; }
-.starter-alternatives h4 { margin: 12px 0 6px; font-size: 13px; }
+.starters h3:focus { outline: none; } /* focus moves here so screen readers start on the page; the heading is the cue */
 .starters > p.small:last-child { margin: 8px 0 0; }
-.starter-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; }
 .questions h4 { margin: 2px 0 2px; font-size: 15px; }
 .questions h4:focus { outline: none; } /* focus moves here on each step so the keys follow; the new question is the cue */
 .questions h5 { margin: 12px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
@@ -430,30 +425,79 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .cat-table .range > span { display: flex; align-items: center; gap: 3px; justify-content: center; }
 .definition { min-width: 0; }
 
-/* The village canvas above the chat */
-.demo-page { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.demo-intro { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
-.demo-intro-copy { flex: 1 1 500px; min-width: 0; }
-.demo-intro h2 { margin: 0; font: 600 15px/1.4 Inter, system-ui, sans-serif; }
-.demo-intro p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
-.demo-build { display: inline-block; color: var(--text); font-size: 13px; font-weight: 600; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; border-radius: 3px; }
+/* The demo: the studio shell, like the workshop. A wide screen has the village large on the left with the village
+   tools in three columns under it, and the conversation on the right (with the forge and the gear), held in view while
+   the page scrolls. Time and gold are in the bar, which stays in view too. */
+.demo-page { display: flex; flex-direction: column; min-width: 0; }
+.demo-build { display: inline-block; color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; border-radius: 3px; }
 .demo-build:hover { text-decoration-color: var(--accent); }
+.studio-actions .hud + .demo-build { padding-left: 16px; border-left: 1px solid var(--rule); border-radius: 0; }
 .demo-build:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-@media (min-width: 861px) {
-  .demo-page { height: calc(100vh - 80px); min-height: 720px; }
-  .demo-page > .cols { flex: 1; min-height: 0; }
-  .demo-page .village-col { height: 100%; min-height: 0; }
-  .demo-page .game { height: auto; flex: 1 1 45%; min-height: 220px; }
-  .demo-page .village-col .chat-panel { flex: 1 1 50%; }
-}
-.village-col { height: calc(100vh - 80px); min-height: 640px; }
-.game { height: 50%; min-height: 280px; flex-shrink: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #5a9e4b; }
+.demo-layout { display: grid; grid-template-columns: minmax(0, 1fr) 400px; grid-template-rows: auto 1fr; grid-template-areas: 'stage talk' 'tools talk'; }
+.stage { grid-area: stage; display: flex; flex-direction: column; min-width: 0; }
+.talk-col { grid-area: talk; display: flex; flex-direction: column; min-width: 0; background: var(--pane); border-left: 1px solid var(--rule); }
+.demo-layout > .tools { grid-area: tools; min-width: 0; padding: 16px 0 32px; border-top: 1px solid var(--rule); }
+.game { overflow: hidden; background: #5a9e4b; }
 .game canvas { display: block; }
-.village-col .chat-panel { flex: 1; height: auto; min-height: 300px; }
+.demo-page .hint { border-width: 0 0 1px 3px; border-color: var(--rule) var(--rule) var(--rule) var(--accent); border-radius: 0; background: var(--panel); padding: 8px 16px 8px 13px; }
+.demo-page .talk-col .chat-panel { padding: 12px 16px; }
+.talk-col > .error { border-radius: 0; border-width: 1px 0 0; padding: 10px 16px; }
+.demo-page .talk-col > .forge, .demo-page .talk-col > .inventory { padding: 12px 16px; border-top: 1px solid var(--rule); }
+.demo-page .forge > h2, .demo-page .inventory .panel-toggle .title { font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9a9a9a; }
+.demo-page .forge > h2 { margin: 0 0 10px; }
+.talk-col .inventory-body { max-height: 40vh; overflow-y: auto; }
+.tools .rail-label { padding: 0 16px 8px; }
+.tool > button { display: flex; flex-direction: column; align-items: stretch; gap: 1px; width: 100%; min-height: 48px; padding: 8px 16px 8px 14px; background: none; border: 0; border-left: 2px solid transparent; border-radius: 0; color: #c8c8c8; font-weight: 500; text-align: left; }
+.tool > button:hover { background: #1b1b1b; color: var(--text); }
+.tool > button[aria-expanded='true'] { color: var(--accent); font-weight: 600; }
+.tool > button[aria-expanded='true']:hover { background: none; color: var(--accent-hover); }
+.tool > button[aria-expanded='true'] .tool-hint { color: #d0d0d0; }
+/* An open tool is one block: its row and what it shows share the tint and the yellow edge, set apart from the rest. */
+.tool.open { margin: 4px 0; background: #1f1d17; border-left: 3px solid var(--accent); border-block: 1px solid #3a3426; }
+.tool.open > button { border-left: 0; padding-left: 13px; }
+.tool > button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tool-name { display: flex; align-items: center; gap: 8px; }
+.tool-name::after { content: '▸'; margin-left: auto; color: var(--muted); font-size: 12px; }
+.tool > button[aria-expanded='true'] .tool-name::after { content: '▾'; color: var(--accent); }
+.tools .cue { margin-left: 0; }
+.tool-body { padding: 4px 16px 16px 13px; }
+.tool-body .panel { background: none; border: 0; padding: 0; border-radius: 0; }
+.tool-body .news > h2, .tool-body .ledger > h2, .tool-body .god > h2 { display: none; }
+.tool-body .god > h2 + p { margin-top: 0; }
+.tool-body .ledger { max-height: 560px; overflow-y: auto; background: inherit; }
+.tool.open .tool-body { background: inherit; }
+.tool-hint { font-size: 12px; font-weight: 400; color: var(--muted); }
+@media (min-width: 861px) {
+  .demo-page > .top { position: sticky; top: 0; z-index: 15; }
+  /* The village fills most of the window; the hint and the tools' headings show under it, a scroll away. */
+  .game { height: calc(100vh - var(--top-h, 57px) - 150px); min-height: 420px; flex-shrink: 0; }
+  .talk-col { position: sticky; top: var(--top-h, 57px); align-self: start; height: calc(100vh - var(--top-h, 57px)); }
+  .demo-page .talk-col .chat-panel { flex: 1 1 0; min-height: 240px; height: auto; }
+}
+/* Room for three: the tools side by side, each opening in its own column, split by rules. */
+@media (min-width: 1100px) {
+  .demo-layout > .tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto 1fr; padding-top: 16px; }
+  .demo-layout > .tools > .rail-label { grid-column: 1 / -1; }
+  .tool { border-right: 1px solid var(--rule); }
+  .tool:last-child { border-right: 0; }
+  .tool.open { margin: 0; border-left: 0; border-block: 0; border-top: 3px solid var(--accent); }
+  .tool.open > button { padding-left: 16px; }
+  .tool.open .tool-body { padding-left: 16px; }
+}
 @media (max-width: 860px) {
-  .village-col { height: auto; min-height: 0; }
-  .game { height: 50vh; min-height: 200px; }
-  .village-col .chat-panel { height: 60vh; }
+  .demo-page > .top .tabs { width: auto; margin-left: auto; }
+  .demo-page .studio-actions { flex-basis: 100%; justify-content: flex-start; }
+  .demo-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: 'stage' 'talk' 'tools'; }
+  .game { height: 55vh; min-height: 220px; }
+  .talk-col { border-left: 0; border-top: 1px solid var(--rule); }
+  .demo-page .talk-col .chat-panel { height: 60vh; }
+}
+/* A phone has the Workshop tab right beside it, and no room for both on the bar's second row. */
+@media (max-width: 640px) {
+  .demo-page .hud { gap: 6px; }
+  .demo-page .hud .clock, .demo-page .hud .gold { font-size: 13px; }
+  .demo-page .studio-actions button, .demo-page .studio-actions .help-menu > summary { min-height: 32px; padding: 0 9px; }
+  .demo-page .studio-actions .demo-build { display: none; }
 }
 
 /* Workshop: look and day */
@@ -463,10 +507,29 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .field .inline { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 /* God mode */
 .god .field textarea { resize: vertical; }
-.god-read { margin: -4px 0 10px; }
+/* Sandbox: your note, then the report Read it made from it, then Make it so. */
+.god-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.god-link { all: unset; cursor: pointer; font-size: 12.5px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; border-radius: 3px; }
+.god-link:hover { color: var(--text); }
+.god-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.god-link:disabled { cursor: default; opacity: .5; }
+.god-preview { display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
+.god-label { display: block; margin-bottom: 3px; font: 600 10.5px/1.4 Inter, system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #9a9a9a; }
+.god-wrote { margin: 0; color: var(--muted); font-style: italic; overflow-wrap: anywhere; }
+.god-wrote .god-label { font-style: normal; }
+.god-report { padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid var(--god); border-radius: 6px; background: #1b1820; }
+.god-text { margin: 0 0 8px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.god-report dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 12px; margin: 0; }
+.god-report dt { color: var(--muted); }
+.god-report dd { margin: 0; overflow-wrap: anywhere; }
 .god-people { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 10px; }
 .god-people .check { font-size: 12px; }
 .god-notable { align-self: center; margin: 8px 0 10px; }
+.god .field > .muted.small { margin-top: 4px; }
+.god form > .tag.bad { margin: 0 0 8px; }
+.god-as-you { margin: 4px 0 10px; padding: 10px 12px; border: 1px solid var(--accent); border-left-width: 3px; border-radius: 6px; background: #252219; font-size: 13px; }
+.god-as-you p { margin: 0 0 8px; }
+.god-as-you .actions { margin: 0; }
 
 /* Reference pictures and the trial picture in the workshop's art section. */
 .dropzone { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-height: 76px; padding: 8px; border: 2px dashed var(--line); border-radius: 8px; background: var(--bg); cursor: pointer; }
@@ -483,7 +546,7 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .editor-nav button[aria-current="page"] { background: var(--accent); color: #181818; border-color: var(--accent); }
 
 .workshop-editor { min-width: 0; border: 0; padding: 0; margin: 0; }
-.starter-transfer { display: flex; flex-wrap: wrap; gap: 8px; }
+.workshop-editor[hidden] { display: none !important; } /* the docked grid would otherwise show it on the New NPC page */
 .transfer-help { margin: 12px 0 0; max-width: 85ch; }
 .workshop-editor [hidden] { display: none !important; }
 .overview-disclosure { margin-bottom: 16px; }
@@ -504,7 +567,6 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .bench-suggestions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
 .bench-suggestions button { text-align: left; font-size: 12px; font-weight: 400; overflow-wrap: anywhere; }
 .bench-suggestions button > span { display: block; margin-bottom: 4px; color: var(--accent); font-size: 11px; font-weight: 600; }
-.controlled-results { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 @media (max-width: 520px) {
   .bench-suggestions { grid-template-columns: 1fr; }
   .wh-actions { width: 100%; }
@@ -565,7 +627,7 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 }
 
 /* Recessed inputs on neutral charcoal panels. */
-.field input, .field textarea, .inline select, .starter-library select, .chat-form input, .chat-form textarea, .give input, .give select { background: var(--input); }
+.field input, .field textarea, .inline select, .chat-form input, .chat-form textarea, .give input, .give select { background: var(--input); }
 
 /* Workshop studio: one full-width surface split by rules instead of floating panels. On a wide screen the section
    rail, the definition and the test session sit side by side; on a narrow one the rail becomes tabs. */
@@ -594,10 +656,8 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .app-wide .workshop > .note-box, .app-wide .workshop > .errors { margin: 0; border-radius: 0; border-width: 0 0 1px; padding: 10px 16px; }
 .app-wide .workshop > .errors ul { margin: 6px 0 0; }
 
-/* Starting points: a centred page; templates are a ruled list, not a wall of cards. */
+/* Starting points: a centred page. */
 .app-wide .starters { max-width: 1040px; width: 100%; margin: 0 auto; padding: 24px 16px 48px; }
-.app-wide .cards { gap: 0 28px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
-.app-wide .card { padding: 14px 0; background: none; border: 0; border-top: 1px solid var(--rule); border-radius: 0; }
 .app-wide .choice { background: none; }
 
 /* Narrow: tabs on top, then the visible pane. */
@@ -632,8 +692,7 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .bench-suggestions, .app-wide .bench-suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .bench-suggestions button { min-height: 32px; padding: 0 11px; border-radius: 999px; background: transparent; border: 1px solid #383838; color: #d8d8d8; font-size: 12px; font-weight: 500; }
 .bench-suggestions button:hover:not(:disabled) { border-color: var(--muted); color: var(--text); }
-.bench .controlled-results { margin-top: 12px; }
-.bench .controlled-results > p { margin: 0; }
+.controlled-label { margin: 6px 0 0; }
 .app-wide .bench-handoff { margin-top: 10px; padding-top: 8px; }
 .app-wide .bench-handoff p { margin: 0 0 4px; }
 .app-wide .bench-handoff .actions { margin-top: 0; gap: 14px; }
@@ -641,6 +700,10 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 
 /* Your NPCs: the draft being edited, the ones set aside, and a way to start another. */
 .rail-label { margin: 0; padding: 0 16px 8px; font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9a9a9a; overflow-wrap: anywhere; }
+.rail-current { display: flex; align-items: center; gap: 12px; margin: 16px 0 4px; padding: 16px; border-top: 1px solid var(--line); font: 400 22px/1.15 'Pixelify Sans', monospace; color: var(--accent); min-width: 0; }
+.rail-current > span { display: flex; flex-direction: column; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.rail-current small { font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9a9a9a; }
+.rail-current-logo { width: 48px; height: 48px; }
 .npc-list ul { list-style: none; margin: 0; padding: 0; }
 .npc-row { display: flex; align-items: center; min-width: 0; }
 .npc-row.current { gap: 10px; padding: 8px 16px 8px 14px; background: #1f1f1f; border-left: 2px solid var(--accent); }
@@ -648,7 +711,53 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .npc-open:hover:not(:disabled) { background: #1b1b1b; color: var(--text); }
 .npc-delete { flex: none; min-width: 36px; min-height: 40px; padding: 0 10px; background: none; border: 0; border-radius: 0; color: #8a8a8a; font-size: 17px; font-weight: 400; }
 .npc-delete:hover:not(:disabled) { color: var(--bad); }
-.npc-sprite { width: 32px; height: 32px; flex: none; border-radius: 4px; background: var(--panel-2) url(/assets/dungeon/tilemap_packed.png) no-repeat; background-size: 384px 352px; image-rendering: pixelated; }
+.role-logo { display: block; width: 64px; height: 64px; flex: none; object-fit: contain; image-rendering: pixelated; }
+.npc-role-logo { width: 40px; height: 40px; }
+.button-role-logo { display: inline-block; width: 24px; height: 24px; vertical-align: middle; margin-right: 5px; }
+.role-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; padding: 0; margin: 16px 0 24px; border: 0; min-width: 0; }
+.role-choice { position: relative; display: flex; align-items: flex-start; gap: 14px; padding: 20px 16px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.role-choice input { position: absolute; top: 10px; right: 10px; margin: 0; accent-color: var(--accent); }
+.role-choice .role-logo { width: 56px; height: 56px; }
+.role-choice-copy { display: flex; flex-direction: column; gap: 7px; padding-top: 2px; padding-right: 8px; min-width: 0; }
+.role-choice-copy b { font-size: 16px; }
+.role-choice-copy > span { color: var(--muted); font-size: 13px; line-height: 1.5; }
+.role-choice:hover { border-color: var(--accent-hover); }
+.role-choice:has(input:checked) { border-color: var(--accent); background: #30291b; box-shadow: inset 0 0 0 1px var(--accent); }
+.role-choice:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* New NPC role cards: the emblem centred on top, then the role and what it does. */
+.role-starts { list-style: none; margin: 20px 0 24px; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; } /* six roles: two even rows */
+@media (max-width: 720px) { .role-starts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .role-starts { gap: 10px; } .role-starts .role-choice { padding: 18px 10px 16px; gap: 10px; } .role-starts .role-logo { width: 64px; height: 64px; } .role-starts .role-choice-copy b { font-size: 18px; } .role-starts .role-choice-copy > span { font-size: 12px; } }
+@media (max-width: 320px) { .role-starts { grid-template-columns: minmax(0, 1fr); } }
+.role-starts .role-choice { flex-direction: column; align-items: center; gap: 14px; width: 100%; height: 100%; padding: 26px 18px 22px; font: inherit; font-weight: 400; color: var(--text); text-align: center;
+  background: radial-gradient(120% 70% at 50% 0%, #3a3120 0%, var(--panel-2) 62%); border-radius: 12px; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+.role-starts .role-logo { width: 84px; height: 84px; filter: drop-shadow(0 4px 10px rgba(255, 195, 41, .18)); transition: transform .15s ease; }
+.role-starts .role-choice-copy { align-items: center; gap: 8px; padding: 0; }
+.role-starts .role-choice-copy b { font: 400 21px/1.1 'Pixelify Sans', monospace; color: var(--accent); }
+.role-starts .role-choice-copy > span { max-width: 26ch; }
+.role-starts .role-choice:hover:not(:disabled) { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 10px 24px rgba(0, 0, 0, .35), 0 0 0 1px var(--accent); }
+.role-starts .role-choice:hover:not(:disabled) .role-logo { transform: scale(1.06); }
+.role-starts .role-choice:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.role-starts .role-choice:disabled { cursor: default; opacity: .6; }
+@media (prefers-reduced-motion: reduce) { .role-starts .role-choice, .role-starts .role-logo { transition: none; } .role-starts .role-choice:hover:not(:disabled), .role-starts .role-choice:hover:not(:disabled) .role-logo { transform: none; } }
+.starter-other-h { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.starter-options { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.starter-option { display: flex; align-items: flex-start; gap: 12px; width: 100%; height: 100%; padding: 14px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 10px; font-weight: 400; text-align: left; transition: border-color .15s ease, background .15s ease; }
+.starter-option > span:last-child { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.starter-option b { font-weight: 600; }
+.starter-option > span:last-child > span { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.starter-option-icon { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: #30291b; color: var(--accent); font: 400 18px/1 'Pixelify Sans', monospace; }
+.starter-option:hover:not(:disabled) { border-color: var(--accent); background: #2f2a20; }
+@media (max-width: 900px) { .starter-options { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) { .starter-options { grid-template-columns: minmax(0, 1fr); } }
+.example-list { list-style: none; margin: 16px 0 20px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 10px; }
+.example-choice { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 10px; font-weight: 400; text-align: left; transition: border-color .15s ease; }
+.example-choice .role-logo { width: 48px; height: 48px; }
+.example-choice > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.example-choice b { font: 400 18px/1.15 'Pixelify Sans', monospace; color: var(--accent); }
+.example-choice > span > span { color: var(--muted); font-size: 12px; }
+.example-choice:hover:not(:disabled) { border-color: var(--accent); }
+.starters-back { display: block; width: 100%; max-width: 1040px; margin: 16px auto 0; padding: 0 16px; text-align: left; }
 .npc-text { display: flex; flex-direction: column; min-width: 0; }
 .npc-text b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .npc-text span { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
