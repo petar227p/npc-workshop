@@ -2,10 +2,10 @@ import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Editor } from './Editor';
 import { Entrance } from './Entrance';
+import { SiteHeader, type Page } from './SiteHeader';
 import { VillagePage } from './VillagePage';
 import './style.css';
 
-type Page = 'home' | 'village' | 'workshop';
 const ROUTES: Record<string, Page> = { '': 'home', '#': 'home', '#/': 'home', '#/village': 'village', '#/workshop': 'workshop' };
 const TITLES: Record<Page, string> = { home: 'NPC Workshop', village: 'Blacksmith demo · NPC Workshop', workshop: 'Workshop · NPC Workshop' };
 // An unknown hash goes to the entrance, and the address says so (replaced, so Back doesn't land on it again).
@@ -34,24 +34,8 @@ function App() {
   }, [page]);
 
   return (
-    <main className="app">
-      {page !== 'home' && (
-        <header className="top">
-          <a className="brand" href="#/">
-            <img className="brand-icon" src="/brand/npc-workshop-icon.png" alt="" width="40" height="40" />
-            <span>NPC Workshop</span>
-          </a>
-          <span className="tag">Models propose. Code decides.</span>
-          <nav className="tabs" aria-label="Pages">
-            <a href="#/workshop" aria-current={page === 'workshop' ? 'page' : undefined}>
-              Workshop
-            </a>
-            <a href="#/village" aria-current={page === 'village' ? 'page' : undefined}>
-              Demo
-            </a>
-          </nav>
-        </header>
-      )}
+    <main className={page === 'workshop' ? 'app app-wide' : 'app'}>
+      {page === 'village' && <SiteHeader page={page} />}
       <div ref={content} tabIndex={-1} className="page">
         {page === 'home' ? <Entrance /> : page === 'workshop' ? <Editor /> : <VillagePage />}
       </div>

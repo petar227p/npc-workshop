@@ -13,6 +13,12 @@
   --ok: #81c995;
   --bad: #f28b82;
   --god: #c58af9;
+  --pane: #161616;
+  --rail: #141414;
+  --rule: #2a2a2a;
+  --receipt: #161512;
+  --receipt-line: #4a4740;
+  --mono: ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -560,3 +566,148 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 
 /* Recessed inputs on neutral charcoal panels. */
 .field input, .field textarea, .inline select, .starter-library select, .chat-form input, .chat-form textarea, .give input, .give select { background: var(--input); }
+
+/* Workshop studio: one full-width surface split by rules instead of floating panels. On a wide screen the section
+   rail, the definition and the test session sit side by side; on a narrow one the rail becomes tabs. */
+.app-wide { max-width: none; padding: 0; }
+.app-wide .top { margin: 0; padding: 8px 16px; min-height: 56px; gap: 8px 20px; background: var(--rail); border-bottom: 1px solid var(--rule); }
+.studio-top .tag { display: none; }
+.studio-top .tabs { margin-left: 0; }
+.studio-actions { flex: 1 1 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 16px; min-width: 0; }
+.studio-actions .workshop-status { font-size: 13px; }
+.studio-actions button { min-height: 36px; }
+.studio-actions button.secondary, .studio-actions .workshop-more > summary { background: transparent; border: 1px solid #383838; }
+.studio-actions .workshop-more > summary { display: grid; place-items: center; min-height: 36px; box-sizing: border-box; }
+@media (min-width: 1100px) { .studio-top { position: sticky; top: 0; z-index: 15; } }
+.app-wide .brand { font-size: 18px; }
+.app-wide .brand-icon { width: 28px; height: 28px; flex-basis: 28px; }
+.app-wide .workshop { gap: 0; min-height: calc(100vh - 57px); }
+.app-wide .workshop > .workshop-editor { flex: 1; }
+.app-wide .panel { background: none; border: 0; border-radius: 0; padding: 0; }
+
+/* Toolbar: who you're editing, its state, and the next action. */
+.app-wide .workshop-head.empty { max-width: 1040px; width: 100%; margin: 0 auto; padding: 32px 16px 0; }
+.app-wide .workshop-head.empty h2 { font-size: 24px; }
+.app-wide .workshop > .errors p { margin: 4px 0 8px; }
+
+/* Notices span the page like the toolbar instead of floating under it. */
+.app-wide .workshop > .note-box, .app-wide .workshop > .errors { margin: 0; border-radius: 0; border-width: 0 0 1px; padding: 10px 16px; }
+.app-wide .workshop > .errors ul { margin: 6px 0 0; }
+
+/* Starting points: a centred page; templates are a ruled list, not a wall of cards. */
+.app-wide .starters { max-width: 1040px; width: 100%; margin: 0 auto; padding: 24px 16px 48px; }
+.app-wide .cards { gap: 0 28px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.app-wide .card { padding: 14px 0; background: none; border: 0; border-top: 1px solid var(--rule); border-radius: 0; }
+.app-wide .choice { background: none; }
+
+/* Narrow: tabs on top, then the visible pane. */
+.app-wide .workshop-editor { padding: 12px 16px 32px; }
+.editor-nav .nav-hint { display: none; }
+
+/* Wide: three panes. */
+.workshop-editor.docked { display: grid; grid-template-columns: 220px minmax(0, 1fr) 400px; padding: 0;
+  /* A fieldset's grid box doesn't stretch to its height, so the panes and their rules are painted here. */
+  background: linear-gradient(90deg, var(--rail) 0 220px, var(--rule) 220px 221px, var(--bg) 221px calc(100% - 401px), var(--rule) calc(100% - 401px) calc(100% - 400px), var(--pane) calc(100% - 400px)); }
+.docked .editor-rail-inner { position: sticky; top: 0; padding: 16px 0; }
+.docked .editor-nav { flex-direction: column; gap: 0; margin: 0; }
+.docked .editor-nav button,
+.docked .editor-nav button[aria-current='page'] { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-height: 48px; padding: 8px 16px 8px 14px; background: none; border: 0; border-left: 2px solid transparent; border-radius: 0; color: #c8c8c8; font-weight: 500; text-align: left; }
+.docked .editor-nav button:hover { background: #1b1b1b; color: var(--text); }
+.docked .editor-nav button[aria-current='page'] { background: #1f1f1f; border-left-color: var(--accent); color: var(--text); font-weight: 600; }
+.docked .editor-nav .nav-hint { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+.editor-rail-help { margin-top: 16px; padding: 16px; border-top: 1px solid var(--rule); }
+.editor-rail-help .workshop-intro { margin: 0 !important; }
+.docked .definition { padding: 28px 32px 48px; }
+.docked .definition > * { max-width: 720px; }
+.docked .editor-rail-inner { top: var(--top-h, 57px); }
+.docked .bench-sticky { position: sticky; top: var(--top-h, 57px); height: calc(100vh - var(--top-h, 57px)); display: flex; flex-direction: column; overflow-y: auto; }
+.docked .bench-sticky > .note-box { margin: 0; padding: 10px 16px; border: 0; border-bottom: 1px solid var(--rule); border-radius: 0; background: var(--panel-2); }
+.docked .bench { flex: none; height: calc(100vh - var(--top-h, 57px)); display: flex; flex-direction: column; padding: 0 16px 12px; overflow-y: auto; }
+.docked .bench .def-top { margin: 0 -16px 12px; padding: 12px 16px; border-bottom: 1px solid var(--rule); flex-wrap: nowrap; }
+.docked .bench-messages, .docked .bench-messages.empty { flex: 1 1 auto; height: auto; min-height: 140px; margin: 0 0 10px; }
+.docked .bench .chat-form { margin-top: 8px; }
+.docked .bench-details { padding: 12px 16px 24px; border-top: 1px solid var(--rule); }
+.bench .def-top h2 { font-size: 15px; }
+.bench .def-top p { margin: 0; }
+.bench-suggestions, .app-wide .bench-suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.bench-suggestions button { min-height: 32px; padding: 0 11px; border-radius: 999px; background: transparent; border: 1px solid #383838; color: #d8d8d8; font-size: 12px; font-weight: 500; }
+.bench-suggestions button:hover:not(:disabled) { border-color: var(--muted); color: var(--text); }
+.bench .controlled-results { margin-top: 12px; }
+.bench .controlled-results > p { margin: 0; }
+.app-wide .bench-handoff { margin-top: 10px; padding-top: 8px; }
+.app-wide .bench-handoff p { margin: 0 0 4px; }
+.app-wide .bench-handoff .actions { margin-top: 0; gap: 14px; }
+.app-wide .bench-tools { margin-top: 10px; padding-top: 8px; }
+
+/* Your NPCs: the draft being edited, the ones set aside, and a way to start another. */
+.rail-label { margin: 0; padding: 0 16px 8px; font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9a9a9a; overflow-wrap: anywhere; }
+.npc-list ul { list-style: none; margin: 0; padding: 0; }
+.npc-row { display: flex; align-items: center; min-width: 0; }
+.npc-row.current { gap: 10px; padding: 8px 16px 8px 14px; background: #1f1f1f; border-left: 2px solid var(--accent); }
+.npc-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 8px 4px 8px 16px; background: none; border: 0; border-radius: 0; color: #c8c8c8; font-weight: 400; text-align: left; }
+.npc-open:hover:not(:disabled) { background: #1b1b1b; color: var(--text); }
+.npc-delete { flex: none; min-width: 36px; min-height: 40px; padding: 0 10px; background: none; border: 0; border-radius: 0; color: #8a8a8a; font-size: 17px; font-weight: 400; }
+.npc-delete:hover:not(:disabled) { color: var(--bad); }
+.npc-sprite { width: 32px; height: 32px; flex: none; border-radius: 4px; background: var(--panel-2) url(/assets/dungeon/tilemap_packed.png) no-repeat; background-size: 384px 352px; image-rendering: pixelated; }
+.npc-text { display: flex; flex-direction: column; min-width: 0; }
+.npc-text b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.npc-text span { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.new-npc { display: block; width: calc(100% - 32px); margin: 8px 16px 20px; min-height: 36px; background: transparent; border: 1px dashed #4a4a4a; color: #d0d0d0; }
+.new-npc:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+.nav-group { padding-top: 14px; }
+.docked .editor-nav .nav-group { padding: 16px 16px 6px; }
+.docked .editor-nav .nav-group:first-child { padding-top: 4px; }
+.workshop-editor:not(.docked) .nav-group { flex-basis: 100%; padding: 8px 0 0; }
+.workshop-editor:not(.docked) .nav-test { margin-top: 8px; }
+/* Narrow: the list is a strip above the tabs. */
+.workshop-editor:not(.docked) .npc-list { margin-bottom: 14px; }
+.workshop-editor:not(.docked) .rail-label { padding: 0 0 6px; }
+.workshop-editor:not(.docked) .npc-list ul { display: flex; gap: 4px; overflow-x: auto; }
+.workshop-editor:not(.docked) .npc-row { flex: 0 0 auto; max-width: 220px; }
+.workshop-editor:not(.docked) .new-npc { width: auto; margin: 8px 0 0; padding: 0 12px; }
+.workshop-editor:not(.docked) #workshop-h { display: none; }
+
+/* What it can do, as chips. */
+.ability-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 4px; }
+.chip { padding: 3px 10px; border-radius: 999px; background: #262626; color: #e6e6e6; font-size: 13px; }
+.ability-chips .text-button { margin-left: 4px; font-size: 13px; }
+
+/* The definition reads as a document: a title per section, ruled rows, flat disclosures. */
+.definition { container-type: inline-size; }
+.app-wide .ed-section > h3 { margin: 0 0 4px; font: 700 22px/1.3 Inter, system-ui, sans-serif; letter-spacing: 0; text-transform: none; color: var(--text); }
+.app-wide .ed-section > h3 + p.small { margin-bottom: 20px; font-size: 13px; }
+.app-wide .ed-section + .ed-section { margin-top: 0; padding-top: 0; border-top: 0; }
+.field-row { margin: 0; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+.ed-section > p.small + .field-row { border-top: 1px solid var(--rule); }
+.field-row .field-label { font-size: 13px; font-weight: 500; color: #d4d4d4; }
+@container (min-width: 600px) {
+  .field-row { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 4px 20px; align-items: start; }
+  .field-row > .field-label { padding-top: 7px; }
+  .field-row .field-hint { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; }
+  .field-row .field-hint-dot { display: none; }
+}
+.app-wide .character-abilities { margin: 0; border-radius: 0; background: none; }
+.app-wide .character-abilities p { margin: 6px 0 4px; }
+.app-wide .editor-disclosure, .app-wide .character-advanced, .app-wide .definition > .advanced { margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--rule); border-radius: 0; }
+.app-wide .editor-disclosure > summary, .app-wide .character-advanced > summary, .app-wide .definition > .advanced > summary { padding: 14px 0; margin: 0; font-size: 14px; }
+.app-wide .editor-disclosure[open], .app-wide .character-advanced[open], .app-wide .definition > .advanced[open] { padding-bottom: 18px; }
+.app-wide .editor-disclosure[open] > summary, .app-wide .character-advanced[open] > summary, .app-wide .definition > .advanced[open] > summary { margin: 0 0 6px; }
+.app-wide .editor-next { margin-top: 24px; padding-top: 0; border-top: 0; }
+.app-wide .catalogue-warning { border-radius: 0; }
+.app-wide .bench-handoff { padding: 12px 0 0; border: 0; border-top: 1px solid var(--rule); border-radius: 0; background: none; }
+.app-wide .bench-handoff.ready { border-top-color: var(--ok); }
+.app-wide .game-connection { padding: 24px 16px 48px; }
+
+/* Ledger receipts: every checked proposal reads like a line in the ledger, not another chat bubble. */
+.action-check { padding: 10px 12px; background: var(--receipt); border: 0; border-block: 1px dashed var(--receipt-line); border-radius: 0; font: 12px/1.55 var(--mono); color: #d6d3cc; }
+.action-check-source { display: flex; flex-wrap: wrap; gap: 6px; font-family: var(--mono); letter-spacing: .02em; }
+.action-check-source::before { content: 'LEDGER ·'; color: var(--muted); }
+.action-check-flow { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+.action-check-flow > div { display: grid; grid-template-columns: 8.5em minmax(0, 1fr); gap: 10px; }
+.action-check-flow > div + div { border: 0; padding: 0; }
+.action-check-flow dt { margin: 0; padding-top: 1px; font-size: 10.5px; color: #9a968c; }
+.action-check-verdict dd { font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.bench .note.bad, .bench-verdict { align-self: stretch; padding: 8px 12px; background: var(--receipt); border-block: 1px dashed var(--receipt-line); border-radius: 0; font: 12px/1.55 var(--mono); text-align: left; }
+.attempt { font-size: 13px; }
+.attempt-head b { font-family: var(--mono); font-size: 12px; letter-spacing: .04em; }
+.app-wide .definition > .ed-section + .editor-disclosure { margin-top: 20px; border-top: 1px solid var(--rule); }
