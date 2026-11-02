@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { act, memoriesText, newVillage, report } from '..';
+import { recognition, type Memory } from '../../engine';
 
 describe('the memories fact block', () => {
   it('reads a reported world event as what happened, where and when, and says when it is big news', () => {
@@ -25,5 +26,25 @@ describe('the memories fact block', () => {
     expect(memoriesText(told.world, 'keeper')).toContain('(sure, big news)');
     expect(memoriesText(told.world, 'cottager')).toContain('- e_0001: Edda told you (70% sure): "A troll, dear! Dead at the gate!"');
     expect(memoriesText(told.world, 'cottager')).not.toContain('big news');
+  });
+
+  it('talking to the player, an eyewitness knows them for the stranger; who was told only likely does', () => {
+    const seen = report(newVillage(), { text: 'The stranger slew the troll at the gate.', place: 'gate', involved: ['keeper', 'player'], notable: true }).world;
+    const told = act({ ...seen, tick: 13 }, 'keeper', { action: 'TELL', to: 'cottager', event_id: 'e_0001', summary: 'A stranger killed a troll!' });
+    expect(told.ok).toBe(true);
+    expect(memoriesText(told.world, 'keeper', undefined, 'player')).toContain('The stranger in it is the customer in front of you: you saw them.');
+    expect(memoriesText(told.world, 'cottager', undefined, 'player')).toContain('it is likely the customer in front of you');
+    // Talking to anyone else, nobody is taken for the stranger.
+    expect(memoriesText(told.world, 'keeper', undefined, 'smith')).not.toContain('customer in front of you');
+    // News the player had no part in says nothing about them.
+    const other = report(newVillage(), { text: 'A cart lost a wheel.', place: 'gate', involved: ['keeper'] }).world;
+    expect(memoriesText(other, 'keeper', undefined, 'player')).not.toContain('customer in front of you');
+  });
+
+  it('each retelling blurs who it was, until the stranger in the tale is nobody it would know', () => {
+    const told = (confidence: number): Memory => ({ event_id: 'e_0001', how_learned: 'told_by', told_by: 'keeper', confidence, claim: '', learned: 0 });
+    expect(recognition({ ...told(1), how_learned: 'witnessed' })).toBe('sure');
+    // 70%, 49%, 34%: one, two and three tellings from an eyewitness.
+    expect([0.7, 0.49, 0.34].map((c) => recognition(told(c)))).toEqual(['likely', 'unsure', 'none']);
   });
 });

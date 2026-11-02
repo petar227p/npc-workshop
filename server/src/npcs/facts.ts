@@ -73,7 +73,8 @@ export const FACTS: Record<FactBlock, Block> = {
     return `Your open offers to this customer:\n${offers}`;
   },
   // What it saw or was told, with the event ids TELL, RETELL and ANNOUNCE must cite.
-  memories: (world, npcId, _customer, { vocabulary }) => memoriesText(world, npcId, vocabulary),
+  // Talking to the player, each piece about the stranger says whether it takes the player for them.
+  memories: (world, npcId, customer, { vocabulary }) => memoriesText(world, npcId, vocabulary, customer),
   // What it may ask the game to do, and what each means. The game decides whether it happens, so it is a request.
   signals: (_world, _npc, _customer, { signals }) => {
     const lines = Object.entries(signals).map(([name, meaning]) => `- ${name}: ${meaning}`);
