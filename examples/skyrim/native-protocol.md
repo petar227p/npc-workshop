@@ -1,5 +1,13 @@
 # Skyrim native UI protocol v2
 
+## Carried inventory: local view and model facts
+
+The local **Inventory** view uses the token/generation-bound `NWConversationInventory` event, `_root.nwInventoryRequest` and `_root.nwInventoryPage`. Papyrus calls `nwInventoryBegin(token, request, page, pages, gold)`, up to eight `nwInventoryItem(token, request, slot, name, count, weight, value)` callbacks, then `nwInventoryEnd(token, request, message)`, all string arguments. A nonempty end message reports an unavailable snapshot. The SWF ignores retired tokens and superseded request IDs. Inspection pauses polling/submission and refuses in-flight or unresolved exchanges. It never opens a loot menu or changes inventory.
+
+Polls optionally include `inventory: { gold, total, items: [{ form, name, count, weight, value }] }`. `total` is Skyrim's base-form entry count; `items` has at most 128 positive-count entries, names up to 120 characters, unique signed decimal form IDs, nonnegative finite weights and nonnegative integer values. Gold must equal `sgold`. When list length differs from `total`, the model is explicitly told it is partial. The local paged view remains unlimited. Both paths read `GetNumItems` / `GetNthForm` / `GetItemCount` and share the name helper. Weight/value are per base item; improved/enchanted instances are aggregated. Native dictionary handles are reused rather than allocated per item on every poll. Session changes abort an old enumeration before it can drain a new session's queued command.
+
+For each `say`, the adapter forwards **that poll's** observation in the API say body's optional `inventory` field. The authenticated API validates it and appends quoted structured facts only to that NPC's current turn, including repair attempts. These observations never become player dialogue, persona, stored history, ledger goods, catalogue entries or transfer instructions. A missing observation supplies no carried-inventory facts; previous observations are not reused. Old clients without this field still work. Native poll and API say routes permit up to 128 KiB; browser commands keep their previous cap. Restart both services and reload the updated scripts together before testing.
+
 Milestone 2 is implemented in `bridge.ts` and `local.ts`. The SWF/Papyrus controller now sends both `say` and exact-revision `accept` commands through this protocol. Task 5 opens it via Brann activation with automatic connection; F9 remains a diagnostic fallback. See `ui/activation-test.md` for the current package and gameplay checks. The old echo route remains available for diagnostics.
 
 ## Transport
@@ -83,3 +91,10 @@ Command IDs and receipts live only in the adapter's memory. They do not provide 
 ## Verification
 
 On 2026-11-01, **30 tests passed** across `native.test.ts`, `bridge.test.ts`, and `spike.test.ts`; `npx tsc -p examples/skyrim` passed. Tests use the real API/ledger with scripted model responses and cover native duplicate commands, ID conflicts, stale sessions/requests/menu generations/offer terms, browser/native busy admission, lost post-commit responses, redaction, bounded history/receipts, model outcomes, physical transfer resends, and matching/mismatched acknowledgements. These verify the backend protocol, not v2 UI integration in Skyrim.
+
+
+## General carried-item stock sales
+
+Observed rows optionally add `saleable` and `player_count`. Missing flags never authorize a new sale. The game computes eligibility from playable item type, equipped state, VendorNoSale and valid base value. The bridge creates stable runtime-form good IDs and updates `/api/v1/worlds/:id/catalogue` with `{ npc, goods: [{ id, label, min_price }] }` before synchronizing stock. This authenticated game endpoint rebuilds the same world-owned seller's model schema, facts and ledger catalogue; model output cannot invoke it. Ordinary stock sellers only; no crafting catalogue conversion. Catalogue bodies share the bounded 128 KiB inventory transport allowance and have at most 128 distinct goods. Changed stock is synchronized in batches of at most 128, including zeroes for previously observed goods.
+
+Non-dagger transfer packets retain all original gold/dagger counts and add signed integer `item_form`, plus `item_before_player`, `item_before_seller`, `item_after_player`, `item_after_seller`. Native scripts resolve only that form, recheck eligibility and conservation, move the actual item before charging gold, and retain it as LastTransferItem with LastPlan. A subsequent poll includes `ack_item: { form, player, seller }`, with a signed decimal-string form. The adapter requires its identity and exact after-counts, along with the original gold/dagger checks, before acknowledging delivery. Repeated LastPlan packets are acknowledged without repeating removal. The original dagger plan shape remains supported. Model text and observed rows alone never perform a transfer.

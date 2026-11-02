@@ -1,6 +1,7 @@
 import {
   MAX_SAY_LENGTH,
   MAX_WORLD_CREATE_BYTES,
+  ObservedInventorySchema,
   worldCreationSchema,
   type ApiEvents,
   type ApiConnection,
@@ -22,6 +23,11 @@ import { placeAt } from '../engine';
 import { answers, passTime, playerAccepts, playerGives, playerSays, playerSpeaks, worldReports } from '../game';
 import type { ImageClient } from '../models/image';
 import { NPC_DRAFTS, NPCS, type NpcDefinition } from '../npcs';
+import { withObservedInventory } from '../npcs/observed-inventory';
+import { defineNpc } from '../npcs/types';
+import * as flat from '../agents/flat';
+import { factsFor } from '../npcs/facts';
+import { historyFor } from '../npcs/history';
 import { toView } from '../sessions';
 import { createWorldStore, sameToken, type GameWorld, type WorldLimits } from '../worlds';
 
@@ -36,7 +42,7 @@ const MAX_PAGE = 500; // events per read of the log
 
 // `start`: by actor id ('player' or an NPC in the world), what it holds when the world begins, from the game's own save.
 const NewWorldBody = worldCreationSchema(NPCS.length);
-const SayBody = z.object({ npc: z.string(), text: z.string().trim().min(1).max(MAX_SAY_LENGTH) });
+const SayBody = z.object({ npc: z.string(), text: z.string().trim().min(1).max(MAX_SAY_LENGTH), inventory: ObservedInventorySchema.optional() });
 const AcceptBody = z.object({ contract_id: z.string() });
 const GiveBody = z.object({ to: z.string(), gift: z.unknown() }); // the engine checks the gift itself
 const TickBody = z.object({ hours: z.number().int().min(1).max(MAX_HOURS) });
@@ -228,10 +234,43 @@ export function createV1(deps: V1Deps) {
     return c.json({ events: page, last_event_id: page.at(-1)?.id ?? since ?? null, more: from + page.length < w.world.events.length } satisfies ApiEvents);
   });
 
+  // The authenticated game owns its sale allowlist; the model can never call this.
+  app.post('/worlds/:id/catalogue', async (c) => {
+    const w = open(c);
+    if (w instanceof Response) return w;
+    if (w.busy) return busy(c, w);
+    const parsed = await body(c, z.object({ npc: z.string(), goods: z.array(z.object({
+      id: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), label: z.string().min(1).max(40),
+      min_price: z.number().int().min(1).max(1_000_000),
+    }).strict()).max(128) }).strict());
+    if (!parsed.success) return c.json({ error: 'invalid sale catalogue' }, 400);
+    const npc = w.cast.find(n => n.id === parsed.data.npc);
+    if (!npc || npc.catalogue?.made_to_order || !npc.modelVerbs.some(v => v.verb === 'OFFER')) return c.json({ error: 'stock seller required' }, 400);
+    const goods = parsed.data.goods;
+    if (!goods.length || new Set(goods.map(g => g.id)).size !== goods.length || new Set(goods.map(g => g.label)).size !== goods.length) return c.json({ error: 'distinct nonempty goods required' }, 400);
+    const catalogue = { in_stock: Object.fromEntries(goods.map(g => [g.id, { min_price: g.min_price }])) };
+    const labels = Object.fromEntries(goods.map(g => [g.id, g.label]));
+    const label = (id: string) => labels[id] ?? id;
+    const words = flat.wordsFor(goods.map(g => g.id), label);
+    const updated = defineNpc({ ...npc, catalogue, labels,
+      modelVerbs: npc.modelVerbs.map(v => v.verb === 'OFFER' ? flat.OFFER(catalogue, words) : v.verb === 'COUNTER_OFFER' ? flat.COUNTER_OFFER(catalogue, words) : v),
+      facts: factsFor(npc.id, ['clock', 'purse', 'stock', 'catalogue', 'price_floor', 'open_offers', 'inventory'], catalogue, label),
+      history: historyFor(npc.id, npc.name, label),
+    });
+    Object.assign(npc, updated); // Engine actor and model share this world-owned definition.
+    return c.json({ ok: true });
+  });
+
   app.post('/worlds/:id/say', async (c) => {
     const w = open(c);
     if (w instanceof Response) return w;
-    const parsed = await body(c, SayBody);
+    const sayText = await c.req.text();
+    const parsed = SayBody.safeParse(parseJson(sayText));
+    // Only a valid carried-inventory snapshot needs the larger transport budget.
+    // Ordinary say requests retain the existing 16 KiB raw-body limit.
+    if (Buffer.byteLength(sayText, 'utf8') > 16 * 1024 && (!parsed.success || !parsed.data.inventory)) {
+      return c.json({ error: 'request too large' }, 413);
+    }
     if (!parsed.success) return c.json({ error: `expected { npc, text } with text of 1–${MAX_SAY_LENGTH} characters` }, 400);
     const npc = w.cast.find((n) => n.id === parsed.data.npc);
     if (!npc) return c.json({ error: `there's nobody called '${parsed.data.npc}' in this world (in it: ${w.cast.map((n) => n.id).join(', ')})` }, 400);
@@ -253,7 +292,8 @@ export function createV1(deps: V1Deps) {
     }
     w.busy = npc.name;
     try {
-      const r = await playerSays(w.world, parsed.data.text, model, npc, { act: w.act });
+      const speaker = parsed.data.inventory ? withObservedInventory(npc, parsed.data.inventory) : npc;
+      const r = await playerSays(w.world, parsed.data.text, model, speaker, { act: w.act });
       const refused = save(c, w, r.world);
       if (refused) return refused;
       if (!('attempts' in r)) return result(c, w, r);

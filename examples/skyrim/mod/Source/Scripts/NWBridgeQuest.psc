@@ -44,6 +44,10 @@ Int PlayerGold = 0
 Int SnapshotRevision = -1
 Bool MenuRequested = False
 Bool MenuDriver = False
+Bool InventoryReading = False
+Int InventorySnapshot = -1
+Int[] InventoryHandles
+Form LastTransferItem
 
 Event OnInit()
     BeginSession()
@@ -70,6 +74,10 @@ Function BeginSession()
     NativeConnected = False
     ServerBusy = False
     MenuReady = False
+    InventoryReading = False
+    InventorySnapshot = -1
+    InventoryHandles = Utility.CreateIntArray(128, -1)
+    LastTransferItem = None
     CommandSerial = 0
     PendingCommand = ""
     LastCommandId = ""
@@ -97,6 +105,7 @@ Function BeginSession()
     RegisterForMenu("CustomMenu")
     RegisterForModEvent("NWConversationSend", "OnConversationSend")
     RegisterForModEvent("NWConversationAccept", "OnConversationAccept")
+    RegisterForModEvent("NWConversationInventory", "OnConversationInventory")
     RegisterForModEvent("SKSE_HTTP_OnHttpReplyReceived", "OnReply")
     RegisterForModEvent("SKSE_HTTP_OnHttpErrorReceived", "OnHttpError")
     ; Reapply the reference's default-activation block after every save load,
@@ -142,11 +151,12 @@ Event OnUpdate()
 EndEvent
 
 Function SendPoll()
-    If !Enabled || Waiting
+    If !Enabled || Waiting || InventoryReading
         Return
     EndIf
     ; Reserve before any latent native calls. The callback holds this through inventory application.
     Waiting = True
+    String pollSession = Session
     If Brann == None || Gold == None || Dagger == None
         Debug.MessageBox("NPC Workshop: missing quest properties/forms. Check mod setup.")
         Enabled = False
@@ -154,6 +164,7 @@ Function SendPoll()
         Return
     EndIf
     Request += 1
+    Int pollRequest = Request
     Int h = SKSE_HTTP.createDictionary()
     SKSE_HTTP.setString(h, "session", Session)
     SKSE_HTTP.setInt(h, "request", Request)
@@ -165,6 +176,26 @@ Function SendPoll()
     SKSE_HTTP.setInt(h, "sgold", Brann.GetItemCount(Gold))
     SKSE_HTTP.setInt(h, "pitem", p.GetItemCount(Dagger))
     SKSE_HTTP.setInt(h, "sitem", Brann.GetItemCount(Dagger))
+    If Ack != "" && LastTransferItem != None
+        Int itemAck = SKSE_HTTP.createDictionary()
+        SKSE_HTTP.setString(itemAck, "form", LastTransferItem.GetFormID() as String)
+        SKSE_HTTP.setInt(itemAck, "player", p.GetItemCount(LastTransferItem))
+        SKSE_HTTP.setInt(itemAck, "seller", Brann.GetItemCount(LastTransferItem))
+        SKSE_HTTP.setNestedDictionary(h, "ack_item", itemAck)
+    EndIf
+    ; The same carried items as the Inventory view, sampled afresh before a reply.
+    ; Never inspect intermediate transfer counts; acknowledgement uses the old path.
+    If NearSmith() && Ack == "" && !Failed
+        Int observed = ReadCarriedInventory(SKSE_HTTP.getInt(h, "sgold"), pollSession)
+        If observed >= 0
+            SKSE_HTTP.setNestedDictionary(h, "inventory", observed)
+        EndIf
+    EndIf
+    ; Save loading may interrupt enumeration. Do not drain a new session's command
+    ; into an old packet or reset that new session's Waiting flag.
+    If Session != pollSession || Request != pollRequest
+        Return
+    EndIf
     RequestGeneration = 0
     If NativeTransport
         RequestGeneration = MenuGeneration
@@ -196,9 +227,88 @@ Function SendPoll()
     ; No timed mutation retry: an ambiguous network failure requires a save reload.
 EndFunction
 
+String Function InventoryDisplayName(Form entry)
+    String label = entry.GetName()
+    If label == ""
+        label = "Unnamed item"
+    EndIf
+    Return StringUtil.Substring(label, 0, 120)
+EndFunction
+
+Bool Function CanSellInventoryItem(Form entry)
+    If entry == None || entry == Gold || !entry.IsPlayable() || Brann.IsEquipped(entry) || entry.HasKeywordString("VendorNoSale") || entry.GetGoldValue() < 0
+        Return False
+    EndIf
+    Int kind = entry.GetType()
+    Return kind == 26 || kind == 27 || kind == 30 || kind == 32 || kind == 41 || kind == 42 || kind == 46 || kind == 52
+EndFunction
+
+Int Function ReadCarriedInventory(Int observedGold, String expectedSession)
+    ; Reuse our handles rather than allocating a dictionary per item every poll.
+    ; Never clear the HTTP plugin's global dictionary store (other mods use it).
+    If expectedSession != Session
+        Return -1
+    EndIf
+    If InventorySnapshot < 0
+        InventorySnapshot = SKSE_HTTP.createDictionary()
+    EndIf
+    Int snapshotHandle = InventorySnapshot
+    Int[] handles = InventoryHandles
+    Int total = Brann.GetNumItems()
+    Int limit = total
+    If limit > 128
+        limit = 128
+    EndIf
+    Int[] items = Utility.CreateIntArray(limit)
+    Int index = 0
+    Int used = 0
+    While index < limit && Session == expectedSession
+        Form entry = Brann.GetNthForm(index)
+        If entry != None
+            Int count = Brann.GetItemCount(entry)
+            If count > 0
+                If handles[used] < 0
+                    handles[used] = SKSE_HTTP.createDictionary()
+                EndIf
+                Int row = handles[used]
+                SKSE_HTTP.setString(row, "form", entry.GetFormID() as String)
+                SKSE_HTTP.setString(row, "name", InventoryDisplayName(entry))
+                SKSE_HTTP.setInt(row, "count", count)
+                SKSE_HTTP.setInt(row, "player_count", Game.GetPlayer().GetItemCount(entry))
+                SKSE_HTTP.setBool(row, "saleable", CanSellInventoryItem(entry))
+                Float weight = entry.GetWeight()
+                If weight < 0.0
+                    weight = 0.0
+                EndIf
+                Int value = entry.GetGoldValue()
+                If value < 0
+                    value = 0
+                EndIf
+                SKSE_HTTP.setFloat(row, "weight", weight)
+                SKSE_HTTP.setInt(row, "value", value)
+                items[used] = row
+                used += 1
+            EndIf
+        EndIf
+        index += 1
+    EndWhile
+    If Session != expectedSession
+        Return -1
+    EndIf
+    SKSE_HTTP.setInt(snapshotHandle, "gold", observedGold)
+    SKSE_HTTP.setInt(snapshotHandle, "total", total)
+    SKSE_HTTP.setNestedDictionariesArray(snapshotHandle, "items", Utility.ResizeIntArray(items, used))
+    Return snapshotHandle
+EndFunction
+
 Bool Function CountsMatch(Int h, String prefix)
     Actor p = Game.GetPlayer()
-    Return p.GetItemCount(Gold) == SKSE_HTTP.getInt(h, prefix + "pgold", -1) && Brann.GetItemCount(Gold) == SKSE_HTTP.getInt(h, prefix + "sgold", -1) && p.GetItemCount(Dagger) == SKSE_HTTP.getInt(h, prefix + "pitem", -1) && Brann.GetItemCount(Dagger) == SKSE_HTTP.getInt(h, prefix + "sitem", -1)
+    Bool mapped = p.GetItemCount(Gold) == SKSE_HTTP.getInt(h, prefix + "pgold", -1) && Brann.GetItemCount(Gold) == SKSE_HTTP.getInt(h, prefix + "sgold", -1) && p.GetItemCount(Dagger) == SKSE_HTTP.getInt(h, prefix + "pitem", -1) && Brann.GetItemCount(Dagger) == SKSE_HTTP.getInt(h, prefix + "sitem", -1)
+    If !mapped || !SKSE_HTTP.hasKey(h, "item_form")
+        Return mapped
+    EndIf
+    Form entry = Game.GetForm(SKSE_HTTP.getInt(h, "item_form"))
+    Return entry != None && p.GetItemCount(entry) == SKSE_HTTP.getInt(h, "item_" + prefix + "player", -1) && Brann.GetItemCount(entry) == SKSE_HTTP.getInt(h, "item_" + prefix + "seller", -1)
 EndFunction
 
 Event OnReply(Int h)
@@ -226,14 +336,30 @@ Event OnReply(Int h)
             Ack = plan
         ElseIf NearSmith() && CountsMatch(h, "before_")
             Int price = SKSE_HTTP.getInt(h, "before_pgold") - SKSE_HTTP.getInt(h, "after_pgold")
+            Form saleItem = Dagger
+            Bool extraItem = SKSE_HTTP.hasKey(h, "item_form")
+            If extraItem
+                saleItem = Game.GetForm(SKSE_HTTP.getInt(h, "item_form"))
+            EndIf
             Int qty = SKSE_HTTP.getInt(h, "after_pitem") - SKSE_HTTP.getInt(h, "before_pitem")
+            Bool itemsValid = CanSellInventoryItem(saleItem) && SKSE_HTTP.getInt(h, "after_sitem") == SKSE_HTTP.getInt(h, "before_sitem") - qty
+            If extraItem
+                qty = SKSE_HTTP.getInt(h, "item_after_player") - SKSE_HTTP.getInt(h, "item_before_player")
+                itemsValid = CanSellInventoryItem(saleItem) && SKSE_HTTP.getInt(h, "item_after_seller") == SKSE_HTTP.getInt(h, "item_before_seller") - qty && SKSE_HTTP.getInt(h, "after_pitem") == SKSE_HTTP.getInt(h, "before_pitem") && SKSE_HTTP.getInt(h, "after_sitem") == SKSE_HTTP.getInt(h, "before_sitem")
+            EndIf
             ; Check both conservation equations and bounds before any RemoveItem.
-            If price >= 0 && qty > 0 && SKSE_HTTP.getInt(h, "after_sgold") == SKSE_HTTP.getInt(h, "before_sgold") + price && SKSE_HTTP.getInt(h, "after_sitem") == SKSE_HTTP.getInt(h, "before_sitem") - qty
+            If price >= 0 && qty > 0 && itemsValid && SKSE_HTTP.getInt(h, "after_sgold") == SKSE_HTTP.getInt(h, "before_sgold") + price
                 LastPlan = plan ; persisted in Skyrim save with the inventory
-                If price > 0
-                    Game.GetPlayer().RemoveItem(Gold, price, True, Brann)
+                LastTransferItem = saleItem
+                Int playerBefore = Game.GetPlayer().GetItemCount(saleItem)
+                Int sellerBefore = Brann.GetItemCount(saleItem)
+                Brann.RemoveItem(saleItem, qty, True, Game.GetPlayer())
+                ; Charge only after the actual item moved (quest-protected items may refuse removal).
+                If Game.GetPlayer().GetItemCount(saleItem) == playerBefore + qty && Brann.GetItemCount(saleItem) == sellerBefore - qty
+                    If price > 0
+                        Game.GetPlayer().RemoveItem(Gold, price, True, Brann)
+                    EndIf
                 EndIf
-                Brann.RemoveItem(Dagger, qty, True, Game.GetPlayer())
                 If CountsMatch(h, "after_")
                     Ack = plan
                     Debug.Notification("NPC Workshop: trade applied; awaiting acknowledgement.")
@@ -388,8 +514,81 @@ Event OnConversationSend(String eventName, String token, Float generation, Form 
 EndEvent
 
 Bool Function CanSubmitConversation()
-    Return Enabled && !RecoveryRequired && NativeConnected && MenuReady && !ServerBusy && PendingCommand == "" && NearSmith()
+    Return Enabled && !RecoveryRequired && NativeConnected && MenuReady && !ServerBusy && !InventoryReading && PendingCommand == "" && NearSmith()
 EndFunction
+
+Event OnConversationInventory(String eventName, String token, Float generation, Form sender)
+    If token != MenuToken || generation != MenuGeneration || !OwnsConversationMenu() || !NearSmith()
+        Return
+    EndIf
+    Int serial = UI.GetInt("CustomMenu", "_root.nwInventoryRequest")
+    Int page = UI.GetInt("CustomMenu", "_root.nwInventoryPage")
+    If serial < 1
+        Return
+    EndIf
+    String[] done = new String[3]
+    done[0] = token
+    done[1] = serial as String
+    ; Never sample the middle of an acknowledged transfer. Inspection does not
+    ; queue an API command, open a loot menu, or change either actor's items.
+    If Waiting || ServerBusy || InventoryReading || PendingCommand != "" || Ack != "" || Failed
+        done[2] = "An exchange or update is in progress. Select Refresh when it finishes."
+        UI.InvokeStringA("CustomMenu", "_root.nwInventoryEnd", done)
+        Return
+    EndIf
+    InventoryReading = True
+    Int total = Brann.GetNumItems()
+    Int pages = (total + 7) / 8
+    If pages < 1
+        pages = 1
+    EndIf
+    If page < 0
+        page = 0
+    ElseIf page >= pages
+        page = pages - 1
+    EndIf
+    String[] header = new String[5]
+    header[0] = token
+    header[1] = serial as String
+    header[2] = page as String
+    header[3] = pages as String
+    header[4] = Brann.GetItemCount(Gold) as String
+    UI.InvokeStringA("CustomMenu", "_root.nwInventoryBegin", header)
+    Int index = page * 8
+    Int slot = 0
+    String[] item = new String[7]
+    item[0] = token
+    item[1] = serial as String
+    While index < total && index < (page + 1) * 8
+        If token != MenuToken || generation != MenuGeneration || !OwnsConversationMenu()
+            If token == MenuToken
+                InventoryReading = False
+            EndIf
+            Return
+        EndIf
+        Form entry = Brann.GetNthForm(index)
+        If entry != None
+            Int count = Brann.GetItemCount(entry)
+            If count > 0
+                item[2] = slot as String
+                item[3] = InventoryDisplayName(entry)
+                item[4] = count as String
+                item[5] = entry.GetWeight() as String
+                item[6] = entry.GetGoldValue() as String
+                UI.InvokeStringA("CustomMenu", "_root.nwInventoryItem", item)
+                slot += 1
+            EndIf
+        EndIf
+        index += 1
+    EndWhile
+    If token == MenuToken && generation == MenuGeneration && OwnsConversationMenu()
+        done[2] = ""
+        UI.InvokeStringA("CustomMenu", "_root.nwInventoryEnd", done)
+    EndIf
+    If token == MenuToken
+        InventoryReading = False
+    EndIf
+EndEvent
 
 Event OnConversationAccept(String eventName, String token, Float generation, Form sender)
     If token != MenuToken || generation != MenuGeneration || !OwnsConversationMenu()
@@ -462,6 +661,7 @@ Function CloseConversationMenu(Int expectedGeneration = -1)
     EndIf
     MenuRequested = False
     MenuDriver = False
+    InventoryReading = False
     MenuReady = False
     MenuGeneration += 1
     Debug.Trace("[NWConversation] driver retired " + MenuToken)
