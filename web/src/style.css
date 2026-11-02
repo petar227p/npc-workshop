@@ -507,10 +507,29 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .field .inline { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 /* God mode */
 .god .field textarea { resize: vertical; }
-.god-read { margin: -4px 0 10px; }
+/* Sandbox: your note, then the report Read it made from it, then Make it so. */
+.god-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.god-link { all: unset; cursor: pointer; font-size: 12.5px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; border-radius: 3px; }
+.god-link:hover { color: var(--text); }
+.god-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.god-link:disabled { cursor: default; opacity: .5; }
+.god-preview { display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
+.god-label { display: block; margin-bottom: 3px; font: 600 10.5px/1.4 Inter, system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #9a9a9a; }
+.god-wrote { margin: 0; color: var(--muted); font-style: italic; overflow-wrap: anywhere; }
+.god-wrote .god-label { font-style: normal; }
+.god-report { padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid var(--god); border-radius: 6px; background: #1b1820; }
+.god-text { margin: 0 0 8px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.god-report dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 12px; margin: 0; }
+.god-report dt { color: var(--muted); }
+.god-report dd { margin: 0; overflow-wrap: anywhere; }
 .god-people { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 10px; }
 .god-people .check { font-size: 12px; }
 .god-notable { align-self: center; margin: 8px 0 10px; }
+.god .field > .muted.small { margin-top: 4px; }
+.god form > .tag.bad { margin: 0 0 8px; }
+.god-as-you { margin: 4px 0 10px; padding: 10px 12px; border: 1px solid var(--accent); border-left-width: 3px; border-radius: 6px; background: #252219; font-size: 13px; }
+.god-as-you p { margin: 0 0 8px; }
+.god-as-you .actions { margin: 0; }
 
 /* Reference pictures and the trial picture in the workshop's art section. */
 .dropzone { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-height: 76px; padding: 8px; border: 2px dashed var(--line); border-radius: 8px; background: var(--bg); cursor: pointer; }
