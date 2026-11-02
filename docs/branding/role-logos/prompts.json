@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "style": "Shaded gold pixel-art gear with charcoal medallion",
+  "generation": "Built-in image_gen tool; original brand icon and wordmark supplied as references.",
+  "references": [
+    "web/public/brand/npc-workshop-icon.png",
+    "web/public/brand/npc-workshop-logo.png"
+  ],
+  "basePrompt": "Use case: logo-brand.\nAsset type: individual NPC role logo for NPC Workshop.\nReference image 1 is the approved existing brand icon; reference image 2 is the approved wordmark. Use both as STYLE REFERENCES, not edit targets.\nCreate ONE square transparent-background role emblem. Match the approved shaded pixel-art gold gear badge: chunky stepped square pixels, dark charcoal near-black outlines, warm golden bevels and highlights at top left, ochre shadows bottom right, charcoal circular inner medallion. Keep outer gear shape, proportion, pixel scale and palette very close to reference 1. Replace central N with the specified role pictogram, large and readable, centered within the dark medallion. Simple deliberate silhouette, limited details. No letters, words, captions, watermarks, background scene, extra border, or decorative particles. Entire gear visible with 6% transparent padding. Crisp hard pixel edges, no blur or smooth vector curves. Gold is dominant; pictogram may use small steel, warm wood, cream highlights when needed. Output 1024x1024 PNG with real alpha.\n",
+  "roles": [
+    {
+      "id": "smith",
+      "name": "Blacksmith",
+      "file": "/brand/roles/smith.png",
+      "symbol": "A blacksmith's broad anvil with an angled short forging hammer above it. Clear anvil silhouette."
+    },
+    {
+      "id": "merchant",
+      "name": "Merchant / market trader",
+      "file": "/brand/roles/merchant.png",
+      "symbol": "A tied merchant's coin purse with two large gold coins at its base. Clear purse silhouette."
+    },
+    {
+      "id": "craftsperson",
+      "name": "Craftsperson",
+      "file": "/brand/roles/craftsperson.png",
+      "symbol": "A woodworking hand plane resting across a short wood plank, with a single curled shaving. Clear hand-plane silhouette, distinct from blacksmith anvil."
+    },
+    {
+      "id": "villager",
+      "name": "Villager",
+      "file": "/brand/roles/villager.png",
+      "symbol": "A simple timber cottage with a pitched roof, a small chimney and a glowing square window. Clear welcoming cottage silhouette."
+    },
+    {
+      "id": "storyteller",
+      "name": "Storyteller",
+      "file": "/brand/roles/storyteller.png",
+      "symbol": "An open storybook with a cream page spread and a single gold four-point glint over the center. Clear open book silhouette."
+    },
+    {
+      "id": "guard",
+      "name": "Gate guard",
+      "file": "/brand/roles/guard.png",
+      "symbol": "A broad medieval kite shield with a vertical short sword rising behind it, steel blade and golden crossguard. No heraldic letters."
+    },
+    {
+      "id": "cottager",
+      "name": "Washerwoman",
+      "file": "/brand/roles/cottager.png",
+      "symbol": "A wooden washtub with a folded cream cloth draped over its rim and two pale blue water pixels. Clear tub-and-cloth silhouette."
+    },
+    {
+      "id": "crier",
+      "name": "Town crier",
+      "file": "/brand/roles/crier.png",
+      "symbol": "An angled handbell with a wooden handle, broad gold bell mouth and visible clapper. Clear ringing bell silhouette, no sound lines outside medallion."
+    },
+    {
+      "id": "farmer",
+      "name": "Farmer",
+      "file": "/brand/roles/farmer.png",
+      "symbol": "Three ripe golden wheat ears tied with a small brown cord. Clear wheat sheaf silhouette."
+    },
+    {
+      "id": "keeper",
+      "name": "Chapel keeper",
+      "file": "/brand/roles/keeper.png",
+      "symbol": "A single lit cream candle standing in a small gold candleholder with a curved handle. Clear candle silhouette, one compact amber flame."
+    },
+    {
+      "id": "bard",
+      "name": "Travelling bard",
+      "file": "/brand/roles/bard.png",
+      "symbol": "An angled medieval lute, round warm wood body, dark sound hole, short fretted neck and gold strings. Clear lute silhouette."
+    }
+  ]
+}
+

@@ -41,6 +41,7 @@ import { editorIdentity } from './editorPresentation';
 import { ConversationLog } from './ConversationLog';
 import { BROWSER_DRAFT_KEY, readDrafts, saveBrowserDraft, saveDrafts, shelveDraft, type ShelvedDraft } from './browserDraft';
 import { SiteHeader } from './SiteHeader';
+import { RoleLogo, roleLogoForDraft } from './RoleLogo';
 
 // The NPC workshop: edit a definition on the left, try it on the test bench on the right.
 // The draft lives in this browser; the server checks it on every preview and bench turn.
@@ -615,13 +616,13 @@ export function Editor() {
                 <h2 id="npc-list-h" className="rail-label">Your NPCs</h2>
                 <ul>
                   <li className="npc-row current" aria-current="true">
-                    <span className="npc-sprite" style={spriteStyle(draft.sprite)} aria-hidden="true" />
+                    <RoleLogo role={roleLogoForDraft(draft)} className="npc-role-logo" />
                     <span className="npc-text"><b>{draft.name || 'Unnamed character'}</b><span>{identity?.role} · editing</span></span>
                   </li>
                   {drafts.map((d) => (
                     <li key={d.key} className="npc-row">
                       <button type="button" className="npc-open" disabled={locked} onClick={() => openDraft(d)}>
-                        <span className="npc-sprite" style={spriteStyle(d.draft.sprite)} aria-hidden="true" />
+                        <RoleLogo role={roleLogoForDraft(d.draft)} className="npc-role-logo" />
                         <span className="npc-text"><b>{d.draft.name || 'Unnamed character'}</b><span>{editorIdentity(d.draft).role} · draft</span></span>
                       </button>
                       <button type="button" className="npc-delete" disabled={locked} aria-label={`Delete draft ${d.draft.name || 'Unnamed character'}`} title="Delete draft" onClick={() => deleteDraft(d)}>×</button>
@@ -879,12 +880,14 @@ function Starters({
       <ul className="cards">
         {SETUP_ROLES.map((role) => (
           <li key={role} className="card">
+            <RoleLogo role={role} />
             <b className="card-title">{ROLE_CARDS[role].label}</b>
             <p className="muted small">{ROLE_CARDS[role].blurb}</p>
             <div className="card-actions">
               {role === 'storyteller' ? (
                 TELLERS.map((t) => (
                   <button key={t} type="button" disabled={locked} title={TELLER_INFO[t].description} aria-label={`Use the ${TELLER_INFO[t].label} template`} onClick={() => onTemplate(role, t)}>
+                    <RoleLogo role={t} className="button-role-logo" />
                     {TELLER_INFO[t].label}
                   </button>
                 ))

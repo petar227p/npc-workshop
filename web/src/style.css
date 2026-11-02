@@ -648,7 +648,21 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .npc-open:hover:not(:disabled) { background: #1b1b1b; color: var(--text); }
 .npc-delete { flex: none; min-width: 36px; min-height: 40px; padding: 0 10px; background: none; border: 0; border-radius: 0; color: #8a8a8a; font-size: 17px; font-weight: 400; }
 .npc-delete:hover:not(:disabled) { color: var(--bad); }
-.npc-sprite { width: 32px; height: 32px; flex: none; border-radius: 4px; background: var(--panel-2) url(/assets/dungeon/tilemap_packed.png) no-repeat; background-size: 384px 352px; image-rendering: pixelated; }
+.role-logo { display: block; width: 64px; height: 64px; flex: none; object-fit: contain; image-rendering: pixelated; }
+.npc-role-logo { width: 40px; height: 40px; }
+.button-role-logo { display: inline-block; width: 24px; height: 24px; vertical-align: middle; margin-right: 5px; }
+.role-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; padding: 0; margin: 16px 0 24px; border: 0; min-width: 0; }
+.role-choice { position: relative; display: flex; align-items: flex-start; gap: 14px; padding: 20px 16px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.role-choice input { position: absolute; top: 10px; right: 10px; margin: 0; accent-color: var(--accent); }
+.role-choice .role-logo { width: 56px; height: 56px; }
+.role-choice-copy { display: flex; flex-direction: column; gap: 7px; padding-top: 2px; padding-right: 8px; min-width: 0; }
+.role-choice-copy b { font-size: 16px; }
+.role-choice-copy > span { color: var(--muted); font-size: 13px; line-height: 1.5; }
+.role-choice:hover { border-color: var(--accent-hover); }
+.role-choice:has(input:checked) { border-color: var(--accent); background: #30291b; box-shadow: inset 0 0 0 1px var(--accent); }
+.role-choice:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
+.app-wide .starters .cards { gap: 12px; }
+.app-wide .starters .card { padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); }
 .npc-text { display: flex; flex-direction: column; min-width: 0; }
 .npc-text b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .npc-text span { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { buildSetup, ROLE_CARDS, SETUP_ROLES, TELLERS, TELLER_INFO, MAX_SETUP_NAME, MAX_PERSONALITY, type SetupRole, type Teller, type SetupResult } from '@blacksmith/shared/src/setup';
+import { buildSetup, MAX_SETUP_NAME, MAX_PERSONALITY, type SetupRole, type Teller, type SetupResult } from '@blacksmith/shared/src/setup';
 import { benchIdeas } from '@blacksmith/shared/src/handoff';
 import { MAX_PERSONA_LENGTH } from '@blacksmith/shared/src/npc-info';
 import { markSetupPersonality } from './personality';
-
-const ROLE_HINTS: Record<SetupRole, string> = { merchant: 'Sells goods and bargains.', craftsperson: 'Makes items to order.', villager: 'Chats and can share news.', storyteller: 'Shares stories or news with a crowd.', guard: 'Offers passes and can request actions from your game.' };
+import { RoleLogo, ROLE_OPTIONS } from './RoleLogo';
 
 export function GuidedSetup({ taken, locked, onUse, onCancel, cancelLabel = 'Cancel' }: { taken: string[]; locked: boolean; onUse: (result: SetupResult) => void; onCancel: () => void; cancelLabel?: string }) {
   const [step, setStep] = useState(0);
@@ -25,10 +24,13 @@ export function GuidedSetup({ taken, locked, onUse, onCancel, cancelLabel = 'Can
     <h3 id="guide-heading" ref={heading} tabIndex={-1}>{['What does your character do?', 'Make the character yours', 'Your character is ready to review'][step]}</h3>
     {step === 0 && <>
       <p className="muted small">Choose a starting point. You can change the settings later.</p>
-      <fieldset className="choices"><legend className="sr-only">Character role</legend>
-        {SETUP_ROLES.map(r => <label className="check choice" key={r}><input type="radio" name="guided-role" checked={role === r} onChange={() => setRole(r)} /><span><b>{ROLE_CARDS[r].label}</b> <span className="muted">{ROLE_HINTS[r]}</span></span></label>)}
+      <fieldset className="role-choices"><legend className="sr-only">Character role</legend>
+        {ROLE_OPTIONS.map(option => <label className="role-choice" key={option.logo}>
+          <input type="radio" name="guided-role" checked={role === option.role && (!option.teller || teller === option.teller)} onChange={() => { setRole(option.role); if (option.teller) setTeller(option.teller); }} />
+          <RoleLogo role={option.logo} />
+          <span className="role-choice-copy"><b>{option.label}</b><span>{option.description}</span></span>
+        </label>)}
       </fieldset>
-      {role === 'storyteller' && <label className="field">How do they share news?<select value={teller} onChange={e => setTeller(e.target.value as Teller)}>{TELLERS.map(t => <option key={t} value={t}>{TELLER_INFO[t].label}</option>)}</select></label>}
     </>}
     {step === 1 && <><p className="muted small">Both fields are optional. Leave them empty to use the example character.</p>
       <label className="field"><span className="field-label">Name</span><input value={name} maxLength={MAX_SETUP_NAME} onChange={e => setName(e.target.value)} placeholder="e.g. Mira" /></label>
