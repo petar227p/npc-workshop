@@ -117,6 +117,7 @@ export * from './integration';
 export * from './limits';
 export * from './npc';
 export * from './npc-info';
+export * from './observed-inventory';
 export * from './questions';
 export * from './setup';
 export * from './snapshot';

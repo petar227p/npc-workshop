@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { MAX_NOTE_LENGTH, MAX_REFERENCE_BYTES, MAX_REFERENCES, MAX_SAY_LENGTH, MAX_VOICE_SECONDS, MAX_WORLD_CREATE_BYTES, type ActionResponse, type ArtResponse, type ModelChoice, type ReadNoteResponse, type StateView, type TranscribeResponse } from '@blacksmith/shared';
+import { MAX_INVENTORY_BODY_BYTES, MAX_NOTE_LENGTH, MAX_REFERENCE_BYTES, MAX_REFERENCES, MAX_SAY_LENGTH, MAX_VOICE_SECONDS, MAX_WORLD_CREATE_BYTES, type ActionResponse, type ArtResponse, type ModelChoice, type ReadNoteResponse, type StateView, type TranscribeResponse } from '@blacksmith/shared';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
@@ -75,8 +75,9 @@ export function createApi(deps: ApiDeps) {
   const artLimit = bodyLimit({ maxSize: MAX_ART_BODY_BYTES, onError: tooLarge });
   const worldLimit = bodyLimit({ maxSize: MAX_WORLD_CREATE_BYTES, onError: tooLarge });
   const voiceLimit = bodyLimit({ maxSize: MAX_VOICE_BYTES, onError: tooLarge });
+  const inventoryLimit = bodyLimit({ maxSize: MAX_INVENTORY_BODY_BYTES, onError: tooLarge });
   const limitFor = (path: string) =>
-    path === '/api/transcribe' ? voiceLimit : ART_ROUTES.includes(path) ? artLimit : path.startsWith('/api/editor/') ? editorLimit : limit;
+    /^\/api\/v1\/worlds\/[^/]+\/(say|catalogue)$/.test(path) ? inventoryLimit : path === '/api/transcribe' ? voiceLimit : ART_ROUTES.includes(path) ? artLimit : path.startsWith('/api/editor/') ? editorLimit : limit;
   app.use('/api/*', (c, next) =>
     (c.req.method === 'POST' && c.req.path === '/api/v1/worlds' ? worldLimit : limitFor(c.req.path))(c, next));
 

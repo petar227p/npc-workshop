@@ -13,6 +13,18 @@ load your test save, and activate Brann near Warmaidens using your configured
 Activate control. The panel connects automatically. F9/F8 are diagnostics.
 Type messages; review the exact offer and click Confirm purchase to accept.
 Trade complete requires actual inventory transfer and its acknowledgement.
+Inventory shows Brann's actual carried items, quantities, base weights/values
+and gold. Use Previous/Next for all pages and Refresh to read Skyrim again.
+This view is read only; Esc/Back returns to chat with your draft preserved.
+Enchanted/improved copies share a base-item row; values are not trade prices.
+The model receives current carried-inventory facts before each reply, up to
+128 base forms (larger inventories are explicitly marked partial). Restart
+both API and bridge with the updated repository, then reload a test save.
+Eligible carried items can now be negotiated and bought through checked offers.
+Equipped gear, gold, non-playable forms and VendorNoSale items are excluded.
+The item moves before gold is charged; exact counts must be acknowledged.
+New goods use their base gold value as a minimum price (at least 1 gold).
+Daggers retain their 10-gold floor. Enchantments/improvements are not priced.
 Esc closes the panel and releases input. A submitted action is not cancelled
 by closure. Unknown outcomes require recovery; never blindly retry a trade.
 

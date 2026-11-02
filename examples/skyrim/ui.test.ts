@@ -123,6 +123,74 @@ function showOffers(root: any, offers = [offer], token = 'session_menu_1', revis
   root.nwOffersEnd(token, revision);
 }
 
+describe('live Skyrim inventory inspection', () => {
+  it('requests real inventory and renders arbitrary carried items without submitting chat', () => {
+    const { menu, root, skse, ready } = setup(); ready(); menu.inspectInventory(); menu.send();
+    expect(skse.SendModEvent.mock.calls).toEqual([['NWConversationInventory', 'session_menu_1', 1]]);
+    expect(root.nwInventoryPage).toBe(0); expect(root.nwInventoryRequest).toBe(1);
+    root.nwInventoryBegin('session_menu_1', '1', '0', '3', '57');
+    root.nwInventoryItem('session_menu_1', '1', '0', '<b>Steel sword</b>', '2', '10', '45');
+    root.nwInventoryEnd('session_menu_1', '1', '');
+    expect(menu.inventoryRows.slice(0, 4).map((f: any) => f.text)).toEqual(['<b>Steel sword</b>', '2', '10', '45']);
+    expect(menu.inventoryRows[0].html).toBe(false); expect(menu.inventory.summary.text).toContain('57');
+    expect(menu.inventory.footer.text).toBe('Page 1 / 3'); expect(menu.input.type).toBe('dynamic');
+    menu.dismissInventory(); expect(menu.input.type).toBe('input'); expect(menu.input.text).toBe('draft');
+  });
+
+  it('bounds paging, excludes overlapping reads and rejects superseded/menu-mismatched callbacks', () => {
+    const { menu, root, ready, skse } = setup(); ready(); menu.inspectInventory(); menu.requestInventory(1);
+    expect(skse.SendModEvent).toHaveBeenCalledTimes(1);
+    root.nwInventoryBegin('session_menu_1', '1', '0', '4', '50');
+    root.nwInventoryItem('session_menu_1', '1', '0', 'Dagger', '6', '2', '10');
+    root.nwInventoryEnd('session_menu_1', '1', ''); menu.requestInventory(99);
+    expect(root.nwInventoryPage).toBe(3); expect(root.nwInventoryRequest).toBe(2);
+    expect(menu.inventoryRows[0].text).toBe('');
+    root.nwInventoryItem('old-menu', '2', '0', 'Wrong', '1', '1', '1');
+    root.nwInventoryItem('session_menu_1', '1', '0', 'Late', '1', '1', '1');
+    root.nwInventoryItem('session_menu_1', '2', '8', 'Out of bounds', '1', '1', '1');
+    root.nwInventoryEnd('session_menu_1', '1', 'Old error');
+    expect(menu.inventoryLoading).toBe(true); expect(menu.inventoryRows[0].text).toBe('');
+    root.nwInventoryBegin('session_menu_1', '2', '3', '4', '50');
+    root.nwInventoryEnd('session_menu_1', '2', '');
+    expect(menu.inventoryRows[0].text).toBe('No items on this page.');
+    menu.requestInventory(-5); expect(root.nwInventoryPage).toBe(0);
+  });
+
+  it('returns to chat with Esc, keeps drafts and ignores late replies after reopening', () => {
+    const { menu, root, key, skse, ready } = setup(); ready(); menu.inspectInventory();
+    key.getCode.mockReturnValue(key.ENTER); menu.keys.onKeyDown();
+    expect(skse.SendModEvent).toHaveBeenCalledTimes(1);
+    key.getCode.mockReturnValue(key.ESCAPE); menu.keys.onKeyDown();
+    expect(menu.inventoryOpen).toBe(false); expect(skse.CloseMenu).not.toHaveBeenCalled();
+    menu.inspectInventory(); root.nwInventoryEnd('session_menu_1', '1', 'Late');
+    expect(menu.inventoryLoading).toBe(true); expect(root.nwInventoryRequest).toBe(2);
+    menu.dismissInventory(); menu.keys.onKeyDown();
+    expect(skse.CloseMenu).toHaveBeenCalledWith('CustomMenu'); expect(root.nwText).toBe('draft');
+    expect(skse.AllowTextInput.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it('blocks inspection during confirmation or a pending command without accepting a purchase', () => {
+    const { menu, root, ready, skse } = setup(); ready(); showOffers(root); menu.review(0);
+    menu.inspectInventory(); expect(menu.inventoryOpen).toBe(false);
+    menu.dismissConfirmation(); menu.send(); menu.inspectInventory(); expect(menu.inventoryOpen).toBe(false);
+    root.nwPending('session_menu_1', 'say-1', 'draft', 'say'); menu.inspectInventory();
+    expect(menu.inventoryOpen).toBe(false);
+    expect(skse.SendModEvent.mock.calls).toEqual([['NWConversationSend', 'session_menu_1', 1]]);
+  });
+
+  it('supports local inspection before service readiness and refreshes after a native busy failure', () => {
+    const { menu, root, skse } = setup(); menu.inspectInventory();
+    root.nwInventoryEnd('session_menu_1', '1', 'Select Refresh when the update finishes.');
+    expect(menu.inventoryLoading).toBe(false); expect(menu.inventory.summary.text).toBe('Inventory unavailable');
+    menu.requestInventory(0); root.nwInventoryBegin('session_menu_1', '2', '0', '1', '74');
+    root.nwInventoryItem('session_menu_1', '2', '0', 'Iron dagger', '4', '2', '10');
+    root.nwInventoryEnd('session_menu_1', '2', '');
+    expect(menu.inventoryRows[1].text).toBe('4'); expect(menu.inventory.summary.text).toContain('74');
+    menu.dismissInventory(); expect(menu.input.type).toBe('dynamic'); expect(menu.input.text).toBe('draft');
+    expect(skse.SendModEvent.mock.calls.every(([name]) => name === 'NWConversationInventory')).toBe(true);
+  });
+});
+
 describe('offer review and acceptance in the actual conversation SWF methods', () => {
   it('shows quantity, unit and exact total, pages through eight offers, and freezes the selected contract/revision', () => {
     const { menu, root, ready, skse } = setup();

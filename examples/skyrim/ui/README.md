@@ -1,5 +1,7 @@
 # Milestone 1: CustomMenu feasibility experiment
 
+**Latest conversation build:** Skyrim-style translucent panels and a read-only Inventory button show Brann's actual carried items. The same native inventory APIs now feed current model facts before each reply. Use [the inventory installation and gameplay checklist](inventory-test.md); the probe instructions below are historical.
+
 **Current package:** task 6 adds verified packaging and an automated regression record to the task-five conversation/activation build. Use [the current release installation and gameplay checklist](release-test.md). F9 remains a diagnostic fallback. The probe instructions below are historical; explicitly pass `--source examples/skyrim/ui/ConversationProbe.as` and a probe `--output` path to build that old diagnostic asset. The probe is excluded from the release ZIP.
 
 **Build and adapter verification passed; basic menu behavior is user-verified.** The user observed advancing callbacks with `nested arrays=true`, then confirmed the echo/input and close/reopen checks worked. Open-menu trade/acknowledgement and the remaining interruption/conflict checks are still pending. This is an HTTP echo probe, not the finished conversation interface. It adds no native DLL. The user authorized milestone 2 backend work; the remaining runtime gate on Skyrim **1.7.104.0 / SKSE 2.3.1** remains required before declaring full UI feasibility.

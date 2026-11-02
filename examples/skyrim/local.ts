@@ -4,6 +4,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { createBridge, nativeFailure, NativePoll } from './bridge';
 import { ZodError } from 'zod';
 import { spikePoll } from './spike';
+import { MAX_INVENTORY_BODY_BYTES } from '@blacksmith/shared';
 
 export function localApp(bridge: ReturnType<typeof createBridge>, port = 8788) {
   const app = new Hono();
@@ -18,7 +19,7 @@ export function localApp(bridge: ReturnType<typeof createBridge>, port = 8788) {
     c.header('Content-Security-Policy', `default-src 'none'; script-src 'nonce-${csrf}'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`);
     await next();
   });
-  app.use('*', bodyLimit({ maxSize: 16_384 }));
+  app.use('*', async (c, next) => bodyLimit({ maxSize: c.req.path.startsWith('/skyrim/') ? MAX_INVENTORY_BODY_BYTES : 16_384 })(c, next));
   app.get('/', c => c.html(page(csrf)));
   app.get('/state', c => c.json(bridge.view()));
   app.post('/command', async c => {
@@ -79,6 +80,6 @@ function page(csrf: string) {
 let state;const el=id=>document.getElementById(id);
 async function command(command){try{const r=await fetch('/command',{method:'POST',headers:{'content-type':'application/json','x-workshop-ui':'${csrf}'},body:JSON.stringify({session:state.session,command})});const b=await r.json();if(!r.ok)throw Error(b.error);el('error').textContent='';}catch(e){el('error').textContent=e.message;}}
 el('send').onclick=()=>{if(el('text').value.trim())command({kind:'say',text:el('text').value});};
-async function refresh(){try{state=await(await fetch('/state')).json();el('status').textContent=state.fault||(state.connected?(state.fresh?'Connected':'Game paused or in background — queue your message, then return to Skyrim')+' • '+state.gold+' ledger gold'+(state.busy?' • Return to Skyrim to continue…':''):'Waiting for Skyrim');el('lines').textContent=state.messages.join('\n');el('send').disabled=!state.connected||state.busy||!!state.fault;el('offers').replaceChildren();for(const o of state.offers){const b=document.createElement('button');b.textContent='Accept '+o.contract_id+': '+o.qty+' iron dagger(s), '+o.price+' gold';b.disabled=el('send').disabled;b.onclick=()=>command({kind:'accept',contract:o.contract_id,revision:o.revision});el('offers').append(b);}}catch{el('error').textContent='Local bridge disconnected';}setTimeout(refresh,1000);}refresh();
+async function refresh(){try{state=await(await fetch('/state')).json();el('status').textContent=state.fault||(state.connected?(state.fresh?'Connected':'Game paused or in background — queue your message, then return to Skyrim')+' • '+state.gold+' ledger gold'+(state.busy?' • Return to Skyrim to continue…':''):'Waiting for Skyrim');el('lines').textContent=state.messages.join('\n');el('send').disabled=!state.connected||state.busy||!!state.fault;el('offers').replaceChildren();for(const o of state.offers){const b=document.createElement('button');b.textContent='Accept '+o.contract_id+': '+o.qty+' '+(o.item_label||o.good)+', '+o.price+' gold';b.disabled=el('send').disabled;b.onclick=()=>command({kind:'accept',contract:o.contract_id,revision:o.revision});el('offers').append(b);}}catch{el('error').textContent='Local bridge disconnected';}setTimeout(refresh,1000);}refresh();
 </script></html>`;
 }

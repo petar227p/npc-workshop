@@ -27,35 +27,67 @@ class ConversationMenu {
     static var confirmButton:MovieClip;
     static var cancelButton:MovieClip;
     static var playerGold:Number = 0;
+    static var inventory:MovieClip;
+    static var inventoryOpen:Boolean = false;
+    static var inventoryLoading:Boolean = false;
+    static var inventoryRequest:Number = 0;
+    static var inventoryPage:Number = 0;
+    static var inventoryPages:Number = 1;
+    static var inventoryRows:Array;
+    static var inventoryControls:Array;
+    static var inventoryButton:MovieClip;
 
-    static function field(name:String, depth:Number, x:Number, y:Number, w:Number, h:Number, size:Number):TextField {
-        root.createTextField(name, depth, x, y, w, h);
-        var f:TextField = root[name];
-        f.setNewTextFormat(new TextFormat("$EverywhereFont", size, 0xeee2cc));
-        f.multiline = true; f.wordWrap = true; f.html = false;
+    static function panel(mc:MovieClip, x:Number, y:Number, w:Number, h:Number, alpha:Number):Void {
+        mc.beginFill(0x08090b, alpha);
+        mc.moveTo(x, y); mc.lineTo(x + w, y); mc.lineTo(x + w, y + h); mc.lineTo(x, y + h); mc.lineTo(x, y); mc.endFill();
+    }
+
+    static function divider(mc:MovieClip, x:Number, y:Number, w:Number):Void {
+        mc.lineStyle(1, 0xb9bdbe, 65);
+        mc.moveTo(x, y); mc.lineTo(x + w / 2 - 9, y);
+        mc.moveTo(x + w / 2 + 9, y); mc.lineTo(x + w, y);
+        mc.moveTo(x + w / 2, y - 4); mc.lineTo(x + w / 2 + 4, y);
+        mc.lineTo(x + w / 2, y + 4); mc.lineTo(x + w / 2 - 4, y); mc.lineTo(x + w / 2, y - 4);
+        mc.lineStyle();
+    }
+
+    static function childField(mc:MovieClip, fieldName:String, depth:Number, x:Number, y:Number, w:Number, h:Number, size:Number):TextField {
+        mc.createTextField(fieldName, depth, x, y, w, h);
+        var f:TextField = mc[fieldName];
+        f.setNewTextFormat(new TextFormat("$EverywhereFont", size, 0xe8e8e8));
+        f.multiline = true; f.wordWrap = true; f.html = false; f.selectable = false;
         return f;
     }
 
-    static function button(name:String, depth:Number, x:Number, y:Number, w:Number, label:String, action:Function):MovieClip {
-        var b:MovieClip = root.createEmptyMovieClip(name, depth);
+    static function field(fieldName:String, depth:Number, x:Number, y:Number, w:Number, h:Number, size:Number):TextField {
+        return childField(root, fieldName, depth, x, y, w, h, size);
+    }
+
+    static function button(buttonName:String, depth:Number, x:Number, y:Number, w:Number, label:String, action:Function):MovieClip {
+        var b:MovieClip = root.createEmptyMovieClip(buttonName, depth);
         b._x = x; b._y = y;
-        b.beginFill(0x514b40, 100);
-        b.moveTo(0, 0); b.lineTo(w, 0); b.lineTo(w, 40); b.lineTo(0, 40); b.lineTo(0, 0); b.endFill();
+        panel(b, 0, 0, w, 40, 35);
+        b.lineStyle(1, 0xb9bdbe, 55);
+        b.moveTo(0, 39); b.lineTo(w, 39); b.lineStyle();
+        var hover:MovieClip = b.createEmptyMovieClip("hover", 0);
+        panel(hover, 0, 0, w, 40, 16); hover._visible = false;
         b.createTextField("label", 1, 10, 7, w - 14, 30);
-        b.label.setNewTextFormat(new TextFormat("$EverywhereFont", 20, 0xeee2cc));
+        b.label.setNewTextFormat(new TextFormat("$EverywhereFont", 20, 0xe8e8e8));
         b.label.text = label; b.label.selectable = false; b.onRelease = action;
+        b.onRollOver = function():Void { this.hover._visible = true; this.label.textColor = 0xffffff; };
+        b.onRollOut = b.onReleaseOutside = function():Void { this.hover._visible = false; this.label.textColor = 0xe8e8e8; };
         return b;
     }
 
     static function setBusy(locked:Boolean):Void {
         busy = locked || awaitingAdmission;
-        sendButton._alpha = busy || selected != null ? 40 : 100;
-        input.type = busy || selected != null ? "dynamic" : "input";
+        sendButton._alpha = busy || selected != null || inventoryOpen ? 40 : 100;
+        input.type = busy || selected != null || inventoryOpen ? "dynamic" : "input";
         renderOffers();
     }
 
     static function send():Void {
-        if (busy || selected != null || root.nwToken == "" || input.text.split(" ").join("").split("\t").join("").split("\r").join("").split("\n").join("") == "") return;
+        if (busy || selected != null || inventoryOpen || root.nwToken == "" || input.text.split(" ").join("").split("\t").join("").split("\r").join("").split("\n").join("") == "") return;
         root.nwText = input.text; root.nwSubmitted = input.text;
         pendingText = input.text;
         pendingKind = "say";
@@ -87,14 +119,14 @@ class ConversationMenu {
     }
 
     static function pageOffers(delta:Number):Void {
-        if (selected != null) return;
+        if (selected != null || inventoryOpen) return;
         offerPage = Math.max(0, Math.min(offerPage + delta, Math.ceil(offers.length / 2) - 1));
         renderOffers();
     }
 
     static function review(index:Number):Void {
         var o:Object = offers[offerPage * 2 + index];
-        if (busy || selected != null || o == undefined || o.total > playerGold || root.nwToken == "") return;
+        if (busy || selected != null || inventoryOpen || o == undefined || o.total > playerGold || root.nwToken == "") return;
         // Freeze this contract/revision and all displayed terms. Updates never retarget confirmation.
         selected = { contract:o.contract, revision:o.revision, item:o.item, quantity:o.quantity, unit:o.unit, total:o.total };
         confirmation.details.text = terms(selected) + "\n\nPlayer gold: " + playerGold + "\nOffer: " + selected.contract + " / revision " + selected.revision;
@@ -139,34 +171,69 @@ class ConversationMenu {
 
     static function scroll(delta:Number):Void { history.scroll += delta; }
 
+    static function inspectInventory():Void {
+        if (selected != null || awaitingAdmission || pendingId != "" || root.nwToken == "") return;
+        inventoryOpen = true; inventory._visible = true;
+        var i:Number;
+        for (i = 0; i < inventoryControls.length; i++) inventoryControls[i]._visible = true;
+        Selection.setFocus(null); setBusy(busy);
+        requestInventory(0);
+    }
+
+    static function requestInventory(page:Number):Void {
+        if (!inventoryOpen || inventoryLoading) return;
+        inventoryPage = Math.max(0, Math.min(page, inventoryPages - 1));
+        inventoryRequest++; inventoryLoading = true;
+        root.nwInventoryPage = inventoryPage; root.nwInventoryRequest = inventoryRequest;
+        inventory.summary.text = "Reading Brann's inventory...";
+        inventory.footer.text = "";
+        var i:Number;
+        for (i = 0; i < inventoryRows.length; i++) inventoryRows[i].text = "";
+        _global.skse.SendModEvent("NWConversationInventory", root.nwToken, root.nwGeneration);
+    }
+
+    static function dismissInventory():Void {
+        inventoryOpen = false; inventoryLoading = false; inventory._visible = false;
+        var i:Number;
+        for (i = 0; i < inventoryControls.length; i++) inventoryControls[i]._visible = false;
+        setBusy(busy);
+        if (!busy) Selection.setFocus(input);
+    }
+
     static function main(mc:MovieClip):Void {
         root = mc; Stage.scaleMode = "showAll"; Stage.align = "";
         root.nwToken = ""; root.nwText = ""; root.nwSubmitted = ""; root.nwGeneration = 0;
         root.nwProtocol = 2;
         root.nwAcceptContract = ""; root.nwAcceptRevision = 0;
         offers = []; incomingOffers = []; offerCards = []; offerButtons = [];
-        root.beginFill(0x171817, 96); root.lineStyle(2, 0x8f826b, 100);
-        root.moveTo(150, 45); root.lineTo(1130, 45); root.lineTo(1130, 675); root.lineTo(150, 675); root.lineTo(150, 45); root.endFill();
-        field("heading", 1, 185, 62, 650, 44, 32).text = "Brann — Warmaidens";
-        gold = field("gold", 2, 885, 76, 210, 32, 20);
-        status = field("status", 3, 185, 114, 900, 52, 19);
+        root.nwInventoryPage = 0; root.nwInventoryRequest = 0;
+        panel(root, 0, 0, 1280, 720, 28);
+        panel(root, 90, 194, 690, 316, 66);
+        panel(root, 790, 194, 400, 316, 72);
+        divider(root, 110, 148, 1060); divider(root, 110, 616, 1060);
+        field("heading", 1, 110, 62, 680, 50, 36).text = "BRANN";
+        field("location", 19, 113, 112, 630, 30, 18).text = "Warmaidens  /  Whiterun";
+        inventoryButton = button("inventoryButton", 20, 920, 103, 250, "Inventory", inspectInventory);
+        gold = field("gold", 2, 920, 66, 250, 32, 22);
+        status = field("status", 3, 110, 157, 1060, 34, 18);
         status.text = "Connecting...";
-        history = field("history", 4, 185, 174, 490, 250, 22);
-        history.background = true; history.backgroundColor = 0x22231f;
-        button("scrollUp", 5, 685, 174, 58, "Up", function():Void { ConversationMenu.scroll(-5); });
-        button("scrollDown", 6, 685, 384, 58, "Dn", function():Void { ConversationMenu.scroll(5); });
-        pending = field("pending", 7, 185, 433, 558, 48, 18);
-        offerCount = field("offerCount", 12, 765, 170, 330, 32, 20);
-        offerCards.push(field("offer0", 13, 765, 207, 330, 70, 19));
-        offerCards.push(field("offer1", 14, 765, 325, 330, 70, 19));
-        offerButtons.push(button("review0", 15, 765, 279, 330, "Review offer", function():Void { ConversationMenu.review(0); }));
-        offerButtons.push(button("review1", 16, 765, 397, 330, "Review offer", function():Void { ConversationMenu.review(1); }));
-        button("offersPrev", 17, 765, 443, 155, "Previous", function():Void { ConversationMenu.pageOffers(-1); });
-        button("offersNext", 18, 940, 443, 155, "Next", function():Void { ConversationMenu.pageOffers(1); });
-        input = field("input", 8, 185, 489, 910, 95, 22);
+        history = field("history", 4, 110, 208, 604, 250, 22);
+        history.selectable = true;
+        button("scrollUp", 5, 726, 208, 36, "^", function():Void { ConversationMenu.scroll(-5); });
+        button("scrollDown", 6, 726, 416, 36, "v", function():Void { ConversationMenu.scroll(5); });
+        pending = field("pending", 7, 110, 465, 652, 42, 17);
+        offerCount = field("offerCount", 12, 810, 205, 360, 30, 20);
+        offerCards.push(field("offer0", 13, 810, 240, 360, 70, 19));
+        offerCards.push(field("offer1", 14, 810, 353, 360, 70, 19));
+        offerButtons.push(button("review0", 15, 810, 310, 360, "Review offer", function():Void { ConversationMenu.review(0); }));
+        offerButtons.push(button("review1", 16, 810, 423, 360, "Review offer", function():Void { ConversationMenu.review(1); }));
+        button("offersPrev", 17, 810, 468, 170, "Previous", function():Void { ConversationMenu.pageOffers(-1); });
+        button("offersNext", 18, 1000, 468, 170, "Next", function():Void { ConversationMenu.pageOffers(1); });
+        field("prompt", 21, 110, 518, 1060, 26, 18).text = "What would you like to say?";
+        input = field("input", 8, 110, 547, 1060, 62, 22);
         input.type = "dynamic"; input.maxChars = 500;
-        input.background = true; input.backgroundColor = 0x30312e;
-        input.border = true; input.borderColor = 0x8f826b;
+        input.selectable = true;
+        panel(root, 110, 547, 1060, 62, 70);
         input.onChanged = function():Void {
             if (Key.isDown(Key.ENTER) && !Key.isDown(Key.SHIFT)) {
                 var text:String = ConversationMenu.input.text;
@@ -176,31 +243,62 @@ class ConversationMenu {
             }
             ConversationMenu.root.nwText = ConversationMenu.input.text;
         };
-        sendButton = button("sendButton", 9, 185, 601, 150, "Send", send);
-        button("closeButton", 10, 945, 601, 150, "Close", close);
-        field("hint", 11, 350, 603, 575, 52, 17).text = "Enter: send  |  Shift+Enter: new line  |  Esc: close\nScroll history: wheel, Up/Dn buttons or Page Up/Down";
+        sendButton = button("sendButton", 9, 110, 633, 145, "[Enter] Say", send);
+        button("closeButton", 10, 1015, 633, 155, "[Esc] Exit", close);
+        field("hint", 11, 280, 634, 710, 45, 17).text = "Shift+Enter  New line     /     Wheel or Page Up / Down  Conversation";
         confirmation = root.createEmptyMovieClip("confirmation", 40);
-        confirmation.beginFill(0x11120f, 100); confirmation.lineStyle(2, 0x8f826b, 100);
-        confirmation.moveTo(175, 155); confirmation.lineTo(1105, 155); confirmation.lineTo(1105, 590); confirmation.lineTo(175, 590); confirmation.lineTo(175, 155); confirmation.endFill();
+        panel(confirmation, 0, 0, 1280, 720, 94);
+        divider(confirmation, 220, 162, 840); divider(confirmation, 220, 490, 840);
         // Capture clicks on the modal backdrop so underlying offer/history controls cannot activate.
         confirmation.onRelease = function():Void {};
         confirmation.useHandCursor = false;
         confirmation.createTextField("title", 1, 220, 175, 840, 45);
-        confirmation.title.setNewTextFormat(new TextFormat("$EverywhereFont", 28, 0xeee2cc));
+        confirmation.title.setNewTextFormat(new TextFormat("$EverywhereFont", 28, 0xe8e8e8));
         confirmation.title.text = "Confirm this offer"; confirmation.title.selectable = false;
         confirmation.createTextField("details", 2, 220, 230, 840, 195);
-        confirmation.details.setNewTextFormat(new TextFormat("$EverywhereFont", 23, 0xeee2cc));
+        confirmation.details.setNewTextFormat(new TextFormat("$EverywhereFont", 23, 0xe8e8e8));
         confirmation.details.multiline = true; confirmation.details.wordWrap = true; confirmation.details.html = false;
         confirmation.createTextField("hint", 3, 220, 440, 840, 45);
-        confirmation.hint.setNewTextFormat(new TextFormat("$EverywhereFont", 18, 0xeee2cc));
-        confirmation.hint.text = "Click Confirm purchase to accept. Delivery is complete only after inventory acknowledgement.";
+        confirmation.hint.setNewTextFormat(new TextFormat("$EverywhereFont", 18, 0xe8e8e8));
+        confirmation.hint.text = "Confirm purchase to accept these terms. Your items arrive when Skyrim confirms the exchange.";
         confirmation.hint.multiline = true; confirmation.hint.wordWrap = true;
         confirmButton = button("confirmPurchase", 41, 220, 510, 365, "Confirm purchase", confirm);
         cancelButton = button("cancelPurchase", 42, 695, 510, 365, "Back", dismissConfirmation);
         confirmation._visible = false; confirmButton._visible = false; cancelButton._visible = false;
+        inventory = root.createEmptyMovieClip("inventory", 50);
+        panel(inventory, 0, 0, 1280, 720, 96);
+        divider(inventory, 180, 169, 920); divider(inventory, 180, 586, 920);
+        inventory.onRelease = function():Void {}; inventory.useHandCursor = false;
+        childField(inventory, "title", 1, 195, 111, 900, 50, 34).text = "BRANN'S INVENTORY";
+        childField(inventory, "summary", 2, 195, 184, 900, 38, 22);
+        childField(inventory, "columnItem", 3, 195, 238, 515, 30, 18).text = "ITEM";
+        childField(inventory, "columnCount", 6, 725, 238, 100, 30, 18).text = "QTY";
+        childField(inventory, "columnWeight", 7, 850, 238, 100, 30, 18).text = "WEIGHT";
+        childField(inventory, "columnValue", 8, 995, 238, 100, 30, 18).text = "VALUE";
+        inventoryRows = []; inventoryControls = [];
+        var row:Number;
+        for (row = 0; row < 8; row++) {
+            inventoryRows.push(childField(inventory, "item" + row, 10 + row * 4, 195, 279 + row * 34, 515, 32, 22));
+            inventoryRows.push(childField(inventory, "count" + row, 11 + row * 4, 725, 279 + row * 34, 100, 32, 22));
+            inventoryRows.push(childField(inventory, "weight" + row, 12 + row * 4, 850, 279 + row * 34, 100, 32, 22));
+            inventoryRows.push(childField(inventory, "value" + row, 13 + row * 4, 995, 279 + row * 34, 100, 32, 22));
+        }
+        childField(inventory, "footer", 4, 195, 554, 900, 28, 18);
+        childField(inventory, "note", 5, 195, 663, 920, 32, 16).text = "Items carried in Skyrim. Read only. Weight and value are per base item; enchanted or improved copies share a row.";
+        inventoryControls.push(button("inventoryPrev", 51, 195, 607, 180, "Previous", function():Void { ConversationMenu.requestInventory(ConversationMenu.inventoryPage - 1); }));
+        inventoryControls.push(button("inventoryNext", 52, 395, 607, 180, "Next", function():Void { ConversationMenu.requestInventory(ConversationMenu.inventoryPage + 1); }));
+        inventoryControls.push(button("inventoryRefresh", 53, 680, 607, 180, "Refresh", function():Void { ConversationMenu.requestInventory(ConversationMenu.inventoryPage); }));
+        inventoryControls.push(button("inventoryBack", 54, 880, 607, 215, "[Esc] Back", dismissInventory));
+        dismissInventory();
         keys = new Object();
         keys.onKeyDown = function():Void {
             var code:Number = Key.getCode();
+            if (ConversationMenu.inventoryOpen) {
+                if (code == Key.ESCAPE) ConversationMenu.dismissInventory();
+                else if (code == Key.PGUP) ConversationMenu.requestInventory(ConversationMenu.inventoryPage - 1);
+                else if (code == Key.PGDN) ConversationMenu.requestInventory(ConversationMenu.inventoryPage + 1);
+                return;
+            }
             if (code == Key.ESCAPE) ConversationMenu.close();
             else if (code == Key.PGUP) ConversationMenu.scroll(-7);
             else if (code == Key.PGDN) ConversationMenu.scroll(7);
@@ -209,7 +307,7 @@ class ConversationMenu {
         Key.addListener(keys);
         mouse = new Object();
         mouse.onMouseWheel = function(delta:Number):Void {
-            if (ConversationMenu.selected == null && ConversationMenu.root._xmouse <= 743 && ConversationMenu.root._ymouse >= 174 && ConversationMenu.root._ymouse <= 424) ConversationMenu.scroll(-delta * 3);
+            if (ConversationMenu.selected == null && !ConversationMenu.inventoryOpen && ConversationMenu.root._xmouse >= 110 && ConversationMenu.root._xmouse <= 762 && ConversationMenu.root._ymouse >= 208 && ConversationMenu.root._ymouse <= 458) ConversationMenu.scroll(-delta * 3);
         };
         Mouse.addListener(mouse);
         root.nwInitialize = function(token:String, generation:String, draft:String):Void {
@@ -217,6 +315,31 @@ class ConversationMenu {
             ConversationMenu.input.text = draft; ConversationMenu.root.nwText = draft;
             if (!ConversationMenu.captured) { _global.skse.AllowTextInput(true); ConversationMenu.captured = true; }
             Selection.setFocus(ConversationMenu.input);
+        };
+        root.nwInventoryBegin = function(token:String, request:String, page:String, pages:String, gold:String):Void {
+            if (token != ConversationMenu.root.nwToken || !ConversationMenu.inventoryOpen || !ConversationMenu.inventoryLoading || Number(request) != ConversationMenu.inventoryRequest) return;
+            ConversationMenu.inventoryPage = Number(page); ConversationMenu.inventoryPages = Number(pages);
+            ConversationMenu.inventory.summary.text = "Gold: " + gold + "    /    Carried in Skyrim";
+            ConversationMenu.inventory.footer.text = "Page " + (Number(page) + 1) + " / " + pages;
+        };
+        root.nwInventoryItem = function(token:String, request:String, slot:String, name:String, count:String, weight:String, value:String):Void {
+            if (token != ConversationMenu.root.nwToken || !ConversationMenu.inventoryOpen || !ConversationMenu.inventoryLoading || Number(request) != ConversationMenu.inventoryRequest) return;
+            var index:Number = Number(slot);
+            if (index < 0 || index >= 8 || index != Math.floor(index)) return;
+            ConversationMenu.inventoryRows[index * 4].text = name;
+            ConversationMenu.inventoryRows[index * 4 + 1].text = count;
+            ConversationMenu.inventoryRows[index * 4 + 2].text = weight;
+            ConversationMenu.inventoryRows[index * 4 + 3].text = value;
+        };
+        root.nwInventoryEnd = function(token:String, request:String, message:String):Void {
+            if (token != ConversationMenu.root.nwToken || !ConversationMenu.inventoryOpen || !ConversationMenu.inventoryLoading || Number(request) != ConversationMenu.inventoryRequest) return;
+            ConversationMenu.inventoryLoading = false;
+            if (message != "") {
+                ConversationMenu.inventory.summary.text = "Inventory unavailable";
+                ConversationMenu.inventory.footer.text = message;
+            } else if (ConversationMenu.inventoryRows[0].text == "") {
+                ConversationMenu.inventoryRows[0].text = "No items on this page.";
+            }
         };
         root.nwReceive = function(token:String, message:String, locked:String, gold:String, support:String, command:String, state:String):Void {
             if (token != ConversationMenu.root.nwToken) return;
@@ -233,7 +356,7 @@ class ConversationMenu {
                 ConversationMenu.dismissConfirmation();
                 ConversationMenu.status.text = message + " — confirmation closed; review current offers again.";
             }
-            if (wasBusy && !ConversationMenu.busy) Selection.setFocus(ConversationMenu.input);
+            if (wasBusy && !ConversationMenu.busy && !ConversationMenu.inventoryOpen) Selection.setFocus(ConversationMenu.input);
         };
         root.nwHistory = function(token:String, transcript:String, revision:String):Void {
             if (token != ConversationMenu.root.nwToken || transcript == ConversationMenu.history.text) return;

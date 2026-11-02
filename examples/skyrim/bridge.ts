@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { ApiResult, ApiState, ApiWorldCreated, EngineEvent } from '@blacksmith/shared';
+import { ObservedInventorySchema } from '@blacksmith/shared';
 import { brann, ITEM } from './npc';
 
 const count = z.number().int().min(0).max(1_000_000);
@@ -9,6 +10,8 @@ export type Inventory = z.infer<typeof Inventory>;
 export const Poll = Inventory.extend({
   session: z.string().regex(/^[a-zA-Z0-9_.-]{1,100}$/), request: z.number().int().positive(),
   near: z.boolean(), ack: z.string().max(100), failed: z.boolean(),
+  inventory: ObservedInventorySchema.optional(),
+  ack_item: z.object({ form: z.string(), player: count, seller: count }).strict().optional(),
 }).strict();
 export type Poll = z.infer<typeof Poll>;
 export const Command = z.discriminatedUnion('kind', [
@@ -40,8 +43,22 @@ const statuses = {
   service_unavailable: 'Service unavailable', recovery_required: 'Recovery required. Reload a known save.',
 } as const;
 type Command = z.infer<typeof Command>;
-type Plan = { id: string; before: Inventory; after: Inventory; events: string[] };
+type Sale = { form: string; label: string; min_price: number; player: number; seller: number };
+type Plan = { id: string; before: Inventory; after: Inventory; events: string[]; item?: { form: string; before_player: number; before_seller: number; after_player: number; after_seller: number } };
+function sales(p: Poll): Map<string, Sale> {
+  const result = new Map<string, Sale>([[ITEM.good, { form: String(ITEM.localId), label: ITEM.label, min_price: 10, player: p.pitem, seller: p.sitem }]]);
+  for (const row of p.inventory?.items ?? []) {
+    if (Number(row.form) === ITEM.localId && row.saleable === false) result.get(ITEM.good)!.seller = 0;
+    if (!row.saleable || row.player_count === undefined || Number(row.form) === ITEM.localId || Number(row.form) === 15 || row.count > 1_000_000 || row.player_count > 1_000_000) continue;
+    if (result.size >= 128) break;
+    const id = 'skyrim_' + row.form.replace('-', 'n');
+    const label = row.name.replace(/\s+/g, ' ').trim().slice(0, 24) + ' [' + row.form + ']';
+    result.set(id, { form: row.form, label, min_price: Math.max(1, Math.min(row.value, 1_000_000)), player: row.player_count, seller: row.count });
+  }
+  return result;
+}
 type Session = {
+  sales: Map<string, Sale>; catalogueFingerprint: string; syncedGoods: string[];
   id: string; world: string; token: string; state: ApiState; busy: boolean; lastSeen: number;
   pending?: Plan; queued?: Command; fault?: string; messages: string[]; seen: Set<string>;
   lines: { id: string; role: 'player' | 'brann' | 'system'; text: string }[]; lineSerial: number;
@@ -66,7 +83,7 @@ function refreshOffers(s: Session) {
 }
 function currentOffer(s: Session, command: Extract<Command, { kind: 'accept' }>) {
   const c = s.state.contracts.find(c => c.contract_id === command.contract && c.status === 'proposed');
-  return c && c.kind === 'in_stock' && c.good === ITEM.good && c.seller === brann.id &&
+  return c && c.kind === 'in_stock' && s.sales.has(c.good) && c.seller === brann.id && c.qty <= s.sales.get(c.good)!.seller && c.price >= s.sales.get(c.good)!.min_price * c.qty &&
     (command.revision === undefined || s.offers.get(c.contract_id)?.revision === command.revision);
 }
 function nativeSnapshot(s?: Session, override?: Status, receipt?: Receipt) {
@@ -76,9 +93,9 @@ function nativeSnapshot(s?: Session, override?: Status, receipt?: Receipt) {
     status, status_text: statuses[status], support_code: status === 'recovery_required' ? 'NW_RECOVERY' : status === 'service_unavailable' ? 'NW_SERVICE' : '',
     busy: !!(s?.busy || s?.pending || s?.queued), gold: s?.observedGold ?? 0,
     messages: s?.lines ?? [],
-    offers: s ? s.state.contracts.filter(c => c.kind === 'in_stock').filter(c => c.status === 'proposed' && c.good === ITEM.good && c.seller === brann.id)
+    offers: s ? s.state.contracts.filter(c => c.kind === 'in_stock').filter(c => c.status === 'proposed' && s.sales.has(c.good) && c.seller === brann.id)
       .slice(0, 8).map(c => ({ contract: c.contract_id, revision: s.offers.get(c.contract_id)!.revision,
-        item: ITEM.label, quantity: c.qty, unit_price: c.price / c.qty, total_price: c.price })) : [],
+        item: s.sales.get(c.good)!.label, quantity: c.qty, unit_price: c.price / c.qty, total_price: c.price })) : [],
     command: receipt ?? s?.lastCommand ?? { id: '', state: 'none', code: 'none' },
   };
   const fingerprint = JSON.stringify(value);
@@ -91,11 +108,13 @@ export const NativeReply = z.object({
   request: wireInt, generation: wireInt, reset: z.boolean(), plan: z.string().max(100), message: z.string().max(200),
   before_pgold: count.optional(), before_sgold: count.optional(), before_pitem: count.optional(), before_sitem: count.optional(),
   after_pgold: count.optional(), after_sgold: count.optional(), after_pitem: count.optional(), after_sitem: count.optional(),
+  item_form: z.number().int().min(-2_147_483_648).max(2_147_483_647).optional(),
+  item_before_player: count.optional(), item_before_seller: count.optional(), item_after_player: count.optional(), item_after_seller: count.optional(),
   ui: z.object({
     revision: wireInt, status: z.enum(Object.keys(statuses) as [Status, ...Status[]]), status_text: z.string().max(200), support_code: z.string().max(40),
     busy: z.boolean(), gold: count,
     messages: z.array(z.object({ id: commandId, role: z.enum(['player', 'brann', 'system']), text: z.string().max(900) }).strict()).max(32),
-    offers: z.array(z.object({ contract: z.string().regex(/^c_\d+$/), revision: wireInt.min(1), item: z.literal(ITEM.label),
+    offers: z.array(z.object({ contract: z.string().regex(/^c_\d+$/), revision: wireInt.min(1), item: z.string().min(1).max(120),
       quantity: count.min(1), unit_price: z.number().finite().nonnegative(), total_price: count }).strict()).max(8),
     command: z.object({ id: commandId.or(z.literal('')), state: z.enum(['none', 'queued', 'executing', 'completed', 'rejected', 'uncertain']), code: z.string().max(40) }).strict(),
   }).strict(),
@@ -104,7 +123,7 @@ export const NativeReply = z.object({
 // Always use a fixed, redacted recovery packet for malformed/failed native requests.
 export function nativeFailure(raw: unknown) {
   const p = NativePoll.safeParse(raw);
-  const envelope = Poll.omit({ near: true, ack: true, failed: true, pgold: true, sgold: true, pitem: true, sitem: true }).passthrough().safeParse(raw);
+  const envelope = Poll.omit({ near: true, ack: true, failed: true, pgold: true, sgold: true, pitem: true, sitem: true, inventory: true, ack_item: true }).passthrough().safeParse(raw);
   const data = envelope.success ? envelope.data : undefined;
   return NativeReply.parse({ version: 2, bridge: 'npc-workshop', session: data?.session ?? '', request: Math.min(data?.request ?? 0, 2_147_483_647),
     generation: p.success ? p.data.generation : (typeof data?.generation === 'number' && Number.isSafeInteger(data.generation) && data.generation > 0 ? Math.min(data.generation, 2_147_483_647) : 0),
@@ -114,23 +133,31 @@ const snapshot = (p: Inventory): Inventory => ({ pgold: p.pgold, sgold: p.sgold,
 const equal = (a: Inventory, b: Inventory) => Object.keys(a).every(k => a[k as keyof Inventory] === b[k as keyof Inventory]);
 
 /** Derive only allowlisted physical effects from checked events, never dialogue or model JSON. */
-export function transferPlan(events: EngineEvent[], before: Inventory, seen: Set<string>): Plan | undefined {
+export function transferPlan(events: EngineEvent[], before: Inventory, seen: Set<string>, goods?: Map<string, Sale>): Plan | undefined {
   const after = { ...before };
   const ids: string[] = [];
+  let item: Plan['item'];
   for (const e of events) {
     if (seen.has(e.id)) continue;
     if (e.type === 'CONTRACT_ACCEPTED') {
       if (e.actor !== 'player' || e.target !== brann.id) throw new Error('Unexpected trade parties');
       after.pgold -= e.data.price; after.sgold += e.data.price; ids.push(e.id);
     } else if (e.type === 'GOODS_DELIVERED') {
-      if (e.actor !== brann.id || e.target !== 'player' || e.data.good !== ITEM.good) throw new Error('Unmapped delivery');
-      after.pitem += e.data.qty; after.sitem -= e.data.qty; ids.push(e.id);
+      if (e.actor !== brann.id || e.target !== 'player') throw new Error('Unmapped delivery');
+      if (e.data.good === ITEM.good) { after.pitem += e.data.qty; after.sitem -= e.data.qty; }
+      else {
+        const sale = goods?.get(e.data.good);
+        if (!sale || item || e.data.qty < 1 || e.data.qty > sale.seller) throw new Error('Unmapped delivery');
+        item = { form: sale.form, before_player: sale.player, before_seller: sale.seller, after_player: sale.player + e.data.qty, after_seller: sale.seller - e.data.qty };
+        count.parse(item.after_player); count.parse(item.after_seller);
+      }
+      ids.push(e.id);
     } else if (['ITEM_DELIVERED', 'GIVEN', 'WORK_STARTED'].includes(e.type)) throw new Error('Unsupported physical effect');
   }
   Inventory.parse(after);
   if (!ids.length) return;
   if (!events.some(e => e.type === 'CONTRACT_ACCEPTED') || !events.some(e => e.type === 'GOODS_DELIVERED')) throw new Error('Incomplete stock sale');
-  return { id: randomUUID(), before, after, events: ids };
+  return { id: randomUUID(), before, after, events: ids, ...(item ? { item } : {}) };
 }
 
 export function createBridge({ server = 'http://127.0.0.1:8787', fetcher = fetch, now = Date.now } = {}) {
@@ -153,7 +180,7 @@ export function createBridge({ server = 'http://127.0.0.1:8787', fetcher = fetch
   const call = (s: Session, action: string, body: unknown): Promise<ApiResult> => api(`/worlds/${s.world}/${action}`, body, s.token);
   const view = () => active ? {
     connected: true, session: active.id, busy: active.busy || !!active.queued || !!active.pending,
-    fault: active.fault ?? '', messages: active.messages, offers: active.state.contracts.filter(c => c.status === 'proposed').map(c => ({ ...c, revision: active!.offers.get(c.contract_id)!.revision })),
+    fault: active.fault ?? '', messages: active.messages, offers: active.state.contracts.filter(c => c.status === 'proposed').map(c => ({ ...c, item_label: c.kind === 'in_stock' ? (active!.sales.get(c.good)?.label ?? c.good) : c.item_name, revision: active!.offers.get(c.contract_id)!.revision })),
     gold: active.state.gold, fresh: now() - active.lastSeen < 5000,
   } : { connected: false, messages: ['Load the demo save and stand near Brann.'], offers: [], busy: false };
   function enqueue(raw: unknown, session: string) {
@@ -187,6 +214,7 @@ export function createBridge({ server = 'http://127.0.0.1:8787', fetcher = fetch
   }
   async function poll(raw: unknown, native?: { p: NativePoll; receipt?: Receipt; status?: Status }) {
     const p = Poll.parse(raw);
+    if (p.inventory && p.inventory.gold !== p.sgold) throw new Error('Inventory gold does not match the native snapshot');
     let connectedNow = false;
     const reply = { bridge: 'npc-workshop', session: p.session, request: p.request, plan: '', message: '', reset: false };
     if (retired.has(p.session)) return { ...reply, reset: true, message: 'Old save session ignored.' };
@@ -202,6 +230,7 @@ export function createBridge({ server = 'http://127.0.0.1:8787', fetcher = fetch
         } });
         if (active) retire(active.id);
         active = { id: creatingId, world: made.world_id, token: made.token, state: made.state, busy: false,
+          sales: sales(p), catalogueFingerprint: '', syncedGoods: [],
           messages: [], seen: new Set(), lastSeen: now(), lines: [], lineSerial: 0,
           receipts: new Map(), offers: new Map(), offerSerial: 0, status: 'ready', nativeRequest: 0, generation: 0,
           observedGold: p.pgold, uiRevision: 0, uiFingerprint: '' };
@@ -212,6 +241,7 @@ export function createBridge({ server = 'http://127.0.0.1:8787', fetcher = fetch
       } finally { opening = false; }
     }
     const s = active;
+    if (!s.pending && !s.busy && (!native || p.request > s.nativeRequest)) s.sales = sales(p);
     if (native) {
       if (p.request <= s.nativeRequest) {
         const old = native.p.command && s.receipts.get(native.p.command.id);
@@ -235,7 +265,7 @@ export function createBridge({ server = 'http://127.0.0.1:8787', fetcher = fetch
       return { ...reply, message: s.fault, reset: true };
     }
     if (s.pending) {
-      if (p.ack === s.pending.id && equal(snapshot(p), s.pending.after)) {
+      if (p.ack === s.pending.id && equal(snapshot(p), s.pending.after) && (!s.pending.item || (p.ack_item?.form === s.pending.item.form && p.ack_item.player === s.pending.item.after_player && p.ack_item.seller === s.pending.item.after_seller))) {
         s.pending.events.forEach(id => s.seen.add(id)); s.pending = undefined;
         line(s, 'Skyrim confirmed the gold and item transfer.');
         s.status = 'delivery_confirmed';
@@ -260,11 +290,21 @@ export function createBridge({ server = 'http://127.0.0.1:8787', fetcher = fetch
     s.queuedId = undefined;
     if (receipt) Object.assign(receipt, { state: 'executing', code: 'executing' });
     try {
+      const goods = [...s.sales].map(([id, g]) => ({ id, label: g.label, min_price: g.min_price }));
+      const fingerprint = JSON.stringify(goods);
+      if (fingerprint !== s.catalogueFingerprint) {
+        await call(s, 'catalogue', { npc: brann.id, goods });
+        s.catalogueFingerprint = fingerprint;
+      }
       // Sync external Skyrim loot/spending/theft only when no ledger transfer is outstanding.
       for (const [actor, gold, qty] of [['player', p.pgold, p.pitem], [brann.id, p.sgold, p.sitem]] as const) {
-        const synced = await call(s, 'sync', { actor, gold, stock: { [ITEM.good]: qty }, reason: 'Skyrim pre-action inventory snapshot' });
-        if (!synced.ok) throw new Error('Inventory synchronization refused');
+        const stock = Object.entries({ ...Object.fromEntries(s.syncedGoods.map(id => [id, 0])), ...Object.fromEntries([...s.sales].map(([id, g]) => [id, actor === 'player' ? g.player : g.seller])), [ITEM.good]: qty });
+        for (let offset = 0; offset < stock.length; offset += 128) {
+          const synced = await call(s, 'sync', { actor, gold, stock: Object.fromEntries(stock.slice(offset, offset + 128)), reason: 'Skyrim pre-action inventory snapshot' });
+          if (!synced.ok) throw new Error('Inventory synchronization refused');
+        }
       }
+      s.syncedGoods = [...s.sales.keys()];
       if (command.kind === 'accept') {
         if (!currentOffer(s, command)) {
           if (receipt) Object.assign(receipt, { state: 'rejected', code: 'stale_offer' });
@@ -272,7 +312,7 @@ export function createBridge({ server = 'http://127.0.0.1:8787', fetcher = fetch
           return reply;
         }
       }
-      const result = command.kind === 'say' ? await call(s, 'say', { npc: brann.id, text: command.text }) : await call(s, 'accept', { contract_id: command.contract });
+      const result = command.kind === 'say' ? await call(s, 'say', { npc: brann.id, text: command.text, ...(p.inventory ? { inventory: p.inventory } : {}) }) : await call(s, 'accept', { contract_id: command.contract });
       s.state = result.state;
       refreshOffers(s);
       for (const event of result.events) {
@@ -281,7 +321,7 @@ export function createBridge({ server = 'http://127.0.0.1:8787', fetcher = fetch
       }
       if (!result.ok) line(s, `Refused: ${result.reason}`, 'system', 'The action was refused.');
       if (result.outcome === 'unavailable' || result.outcome === 'fallback') line(s, `Model outcome: ${result.outcome}; this is not proof of a successful model reply.`);
-      s.pending = transferPlan(result.events, snapshot(p), s.seen);
+      s.pending = transferPlan(result.events, snapshot(p), s.seen, s.sales);
       s.status = s.pending ? 'transfer_pending' : !result.ok || result.events.some(e => e.type === 'ACTION_REJECTED' || e.type === 'CONTRACT_REFUSED') ? 'offer_rejected' :
         result.outcome === 'unavailable' || result.outcome === 'fallback' ? 'model_unavailable' : 'ready';
       if (receipt) Object.assign(receipt, { state: 'completed', code: result.ok ? 'completed' : 'action_rejected' });
@@ -309,6 +349,6 @@ export function createBridge({ server = 'http://127.0.0.1:8787', fetcher = fetch
 }
 
 function packet(plan: Plan) {
-  return { plan: plan.id, ...Object.fromEntries(Object.entries(plan.before).map(([k, v]) => [`before_${k}`, v])),
+  return { plan: plan.id, ...(plan.item ? { item_form: Number(plan.item.form), item_before_player: plan.item.before_player, item_before_seller: plan.item.before_seller, item_after_player: plan.item.after_player, item_after_seller: plan.item.after_seller } : {}), ...Object.fromEntries(Object.entries(plan.before).map(([k, v]) => [`before_${k}`, v])),
     ...Object.fromEntries(Object.entries(plan.after).map(([k, v]) => [`after_${k}`, v])) };
 }
