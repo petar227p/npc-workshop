@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-If the NPC server is already running, keep using it. Live replies require the key for the NPC's selected model on that server: `MODEL_API_KEY` for Muse Spark or `BASETEN_API_KEY` for Muse Spark Open; see the root [setup instructions](../../README.md#run-it). The example needs no provider key. It uses the API directly and does not need development file saving.
+If the NPC server is already running, keep using it. Live replies require the key for the NPC's selected model on that server: `MODEL_API_KEY` for Muse Spark or `BASETEN_API_KEY` for Muse Spark Open; see the root [setup instructions](../../README.md#quick-start). The example needs no provider key. It uses the API directly and does not need development file saving.
 
 In [Workshop](http://localhost:5174/#/workshop), create/test a character and choose **Use in your game**. Its first step downloads the character; its second step lets you copy this command with your server URL and file path. **Download NPC** is also available directly in the toolbar. In a second terminal, change to this repository's root and run:
 
