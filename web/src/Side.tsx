@@ -21,60 +21,55 @@ export function Hud({
   onSkip: (ticks: number) => void;
   onReset: () => void;
   help?: ReactNode;
-  className?: string; // where it sits: beside the village on wide screens, above the chat on narrow ones
+  className?: string;
 }) {
   const [menu, setMenu] = useState<'closed' | 'open' | 'confirm'>('closed');
   const close = useCallback(() => setMenu('closed'), []);
   return (
-    <section className={`panel hud ${className}`} aria-label="Time and gold">
-      <div className="hud-row">
-        <span className="clock">{clockText(view.tick)}</span>
-        <span className="gold" aria-label={`${view.gold} gold`}>
-          🪙 {view.gold}
-        </span>
-        {help}
-        <Popover label="Menu" open={menu !== 'closed'} onOpen={() => setMenu('open')} onClose={close} className="hud-menu">
-          {menu === 'confirm' ? (
-            <div className="confirm">
-              <p>Start over? Time, gold, items, offers and everything the villagers remember go back to the beginning.</p>
-              <div className="actions">
-                <button
-                  className="danger small"
-                  disabled={disabled}
-                  onClick={() => {
-                    close();
-                    onReset();
-                  }}
-                >
-                  Start a new game
-                </button>
-                <button className="secondary small" onClick={() => setMenu('open')} autoFocus>
-                  Cancel
-                </button>
-              </div>
+    <section className={`hud ${className}`} aria-label="Time and gold">
+      <span className="clock">{clockText(view.tick)}</span>
+      <span className="gold" aria-label={`${view.gold} gold`}>
+        🪙 {view.gold}
+      </span>
+      <Tip text="Village time moves only when you choose. Use +1 hour to see what happens next.">
+        <button className="secondary small" onClick={() => onSkip(1)} disabled={disabled} data-focus-home>
+          +1 hour
+        </button>
+      </Tip>
+      {help}
+      <Popover label="Menu" open={menu !== 'closed'} onOpen={() => setMenu('open')} onClose={close} className="hud-menu">
+        {menu === 'confirm' ? (
+          <div className="confirm">
+            <p>Start over? Time, gold, items, offers and everything the villagers remember go back to the beginning.</p>
+            <div className="actions">
+              <button
+                className="danger small"
+                disabled={disabled}
+                onClick={() => {
+                  close();
+                  onReset();
+                }}
+              >
+                Start a new game
+              </button>
+              <button className="secondary small" onClick={() => setMenu('open')} autoFocus>
+                Cancel
+              </button>
             </div>
-          ) : (
-            <ul className="menu-list">
-              <li>
-                <button className="secondary small" onClick={() => setMenu('confirm')} disabled={disabled}>
-                  New game…
-                </button>
-              </li>
-              <li>
-                <a href="#/">Back to the entrance</a>
-              </li>
-            </ul>
-          )}
-        </Popover>
-      </div>
-      <div className="hud-time">
-        <Tip text="Village time advances when you choose. Use +1 hour to see what happens next.">
-          <button className="secondary small" onClick={() => onSkip(1)} disabled={disabled} data-focus-home>
-            +1 hour
-          </button>
-        </Tip>
-        <span className="muted small">Village time moves only when you choose.</span>
-      </div>
+          </div>
+        ) : (
+          <ul className="menu-list">
+            <li>
+              <button className="secondary small" onClick={() => setMenu('confirm')} disabled={disabled}>
+                New game…
+              </button>
+            </li>
+            <li>
+              <a href="#/">Back to the entrance</a>
+            </li>
+          </ul>
+        )}
+      </Popover>
     </section>
   );
 }

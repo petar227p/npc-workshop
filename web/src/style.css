@@ -92,8 +92,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .status { margin-top: 8px; }
 
 /* Side panels */
-.hud-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-.hud-row button { margin-left: auto; }
 .gold { color: var(--accent); }
 .job { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
 .job-body { flex: 1; min-width: 0; }
@@ -151,11 +149,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Village shell: time and gold, folded gear, tools, drawers */
-.hud .hud-row { margin-bottom: 8px; }
-.hud .help-menu { margin-left: auto; }
-.hud-menu { margin-left: auto; }
-.hud .help-menu + .hud-menu { margin-left: 0; }
-.hud-time { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.hud { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.hud .clock, .hud .gold { font-size: 15px; white-space: nowrap; }
 .popover-wrap { position: relative; }
 .popover { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: max-content; max-width: min(280px, calc(100vw - 32px)); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px; box-shadow: 0 8px 24px #0008; }
 .popover p { margin: 0; font-size: 13px; }
@@ -170,8 +165,6 @@ button.danger { background: var(--bad); color: #2b1219; }
 .panel-toggle .title { font-size: 15px; font-weight: 600; flex: 1; }
 .panel-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .inventory-body { margin-top: 10px; }
-.tools { display: flex; flex-direction: column; gap: 6px; }
-.tools button { text-align: left; display: flex; align-items: center; gap: 8px; }
 .cue { margin-left: auto; font-size: 11px; font-weight: 600; background: var(--accent); color: #181818; border-radius: 999px; padding: 0 7px; }
 .chat-head-extra { margin-left: auto; }
 /* Names now carry roles, so a narrow chat head wraps rather than push past the screen. */
@@ -198,13 +191,6 @@ button.danger { background: var(--bad); color: #2b1219; }
 /* With a mouse, hovering the control is enough; the ? is for touch screens, which can't hover. */
 .tip-wrap > .tip-help { display: none; }
 @media (hover: none) { .tip-wrap > .tip-help { display: inline-grid; width: 24px; height: 24px; } .tip-wrap > .help { width: 24px; height: 24px; } }
-.tools .tip-wrap { display: flex; }
-.tools .tip-wrap > button:first-child { flex: 1; }
-.tools .tip-wrap > .tip-help, .tools .tip-wrap > .help { padding: 0; }
-
-/* Time and gold: one copy beside the village on wide screens, one above the chat on narrow ones. */
-.hud-top { display: none; }
-@media (max-width: 860px) { .hud-top { display: block; } .hud-side { display: none; } }
 
 /* Hints and help */
 .hint-slot:empty { display: none; }
@@ -428,30 +414,67 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .cat-table .range > span { display: flex; align-items: center; gap: 3px; justify-content: center; }
 .definition { min-width: 0; }
 
-/* The village canvas above the chat */
-.demo-page { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.demo-intro { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
-.demo-intro-copy { flex: 1 1 500px; min-width: 0; }
-.demo-intro h2 { margin: 0; font: 600 15px/1.4 Inter, system-ui, sans-serif; }
-.demo-intro p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
-.demo-build { display: inline-block; color: var(--text); font-size: 13px; font-weight: 600; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; border-radius: 3px; }
+/* The demo: the studio shell, like the workshop. The village and the conversation fill the page; the rail on the right
+   holds the forge, the gear and the tools as flat sections. Time and gold are in the bar, which stays in view. */
+.demo-page { display: flex; flex-direction: column; min-width: 0; }
+.demo-build { display: inline-block; color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; border-radius: 3px; }
 .demo-build:hover { text-decoration-color: var(--accent); }
+.studio-actions .hud + .demo-build { padding-left: 16px; border-left: 1px solid var(--rule); border-radius: 0; }
 .demo-build:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-@media (min-width: 861px) {
-  .demo-page { height: calc(100vh - 80px); min-height: 720px; }
-  .demo-page > .cols { flex: 1; min-height: 0; }
-  .demo-page .village-col { height: 100%; min-height: 0; }
-  .demo-page .game { height: auto; flex: 1 1 45%; min-height: 220px; }
-  .demo-page .village-col .chat-panel { flex: 1 1 50%; }
-}
-.village-col { height: calc(100vh - 80px); min-height: 640px; }
-.game { height: 50%; min-height: 280px; flex-shrink: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #5a9e4b; }
+.demo-page > .cols { gap: 0; grid-template-columns: minmax(0, 1fr) 360px; align-items: stretch; }
+.demo-page .village-col, .demo-page .side-col { gap: 0; }
+.game { overflow: hidden; background: #5a9e4b; }
 .game canvas { display: block; }
-.village-col .chat-panel { flex: 1; height: auto; min-height: 300px; }
+.demo-page .hint { border-width: 0 0 1px 3px; border-color: var(--rule) var(--rule) var(--rule) var(--accent); border-radius: 0; background: var(--panel); padding: 8px 16px 8px 13px; }
+.demo-page .village-col .chat-panel { padding: 12px 16px; border-top: 1px solid var(--rule); }
+.demo-page .village-col > .error { border-radius: 0; border-width: 1px 0 0; padding: 10px 16px; }
+.demo-page .side-col { background: var(--pane); border-left: 1px solid var(--rule); }
+.demo-page .side-col > .panel { padding: 16px; border-bottom: 1px solid var(--rule); }
+.demo-page .forge > h2, .demo-page .inventory .panel-toggle .title { font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9a9a9a; }
+.demo-page .forge > h2 { margin: 0 0 10px; }
+.demo-page .side-col > .tools { padding: 16px 0; }
+.tools .rail-label { padding: 0 16px 6px; }
+.tool > button { display: flex; flex-direction: column; align-items: stretch; gap: 1px; width: 100%; min-height: 48px; padding: 8px 16px 8px 14px; background: none; border: 0; border-left: 2px solid transparent; border-radius: 0; color: #c8c8c8; font-weight: 500; text-align: left; }
+.tool > button:hover { background: #1b1b1b; color: var(--text); }
+.tool > button[aria-expanded='true'] { color: var(--accent); font-weight: 600; }
+.tool > button[aria-expanded='true']:hover { background: none; color: var(--accent-hover); }
+.tool > button[aria-expanded='true'] .tool-hint { color: #d0d0d0; }
+/* An open tool is one block: its row and what it shows share the tint and the yellow edge, set apart from the rest. */
+.tool.open { margin: 4px 0; background: #1f1d17; border-left: 3px solid var(--accent); border-block: 1px solid #3a3426; }
+.tool.open > button { border-left: 0; padding-left: 13px; }
+.tool > button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tool-name { display: flex; align-items: center; gap: 8px; }
+.tool-name::after { content: '▸'; margin-left: auto; color: var(--muted); font-size: 12px; }
+.tool > button[aria-expanded='true'] .tool-name::after { content: '▾'; color: var(--accent); }
+.tools .cue { margin-left: 0; }
+.tool-body { padding: 4px 16px 16px 13px; }
+.tool-body .panel { background: none; border: 0; padding: 0; border-radius: 0; }
+.tool-body .news > h2, .tool-body .ledger > h2, .tool-body .god > h2 { display: none; }
+.tool-body .god > h2 + p { margin-top: 0; }
+.tool-hint { font-size: 12px; font-weight: 400; color: var(--muted); }
+@media (min-width: 861px) {
+  .demo-page > .top { position: sticky; top: 0; z-index: 15; }
+  .demo-page > .cols { height: calc(100vh - var(--top-h, 57px)); min-height: 640px; }
+  .demo-page .village-col { min-height: 0; }
+  /* A fixed share of the column, so the hint coming and going resizes the chat, not the village. */
+  .game { flex: 0 0 45%; min-height: 220px; }
+  .demo-page .village-col .chat-panel { flex: 1 1 0; min-height: 300px; height: auto; }
+  .demo-page .side-col { overflow-y: auto; }
+}
 @media (max-width: 860px) {
-  .village-col { height: auto; min-height: 0; }
+  .demo-page > .top .tabs { width: auto; margin-left: auto; }
+  .demo-page .studio-actions { flex-basis: 100%; justify-content: flex-start; }
+  .demo-page > .cols { grid-template-columns: minmax(0, 1fr); }
   .game { height: 50vh; min-height: 200px; }
-  .village-col .chat-panel { height: 60vh; }
+  .demo-page .village-col .chat-panel { height: 60vh; }
+  .demo-page .side-col { border-left: 0; border-top: 1px solid var(--rule); }
+}
+/* A phone has the Workshop tab right beside it, and no room for both on the bar's second row. */
+@media (max-width: 640px) {
+  .demo-page .hud { gap: 6px; }
+  .demo-page .hud .clock, .demo-page .hud .gold { font-size: 13px; }
+  .demo-page .studio-actions button, .demo-page .studio-actions .help-menu > summary { min-height: 32px; padding: 0 9px; }
+  .demo-page .studio-actions .demo-build { display: none; }
 }
 
 /* Workshop: look and day */
