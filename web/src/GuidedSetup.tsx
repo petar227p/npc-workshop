@@ -3,12 +3,13 @@ import { buildSetup, MAX_SETUP_NAME, MAX_PERSONALITY, type SetupRole, type Telle
 import { benchIdeas } from '@blacksmith/shared/src/handoff';
 import { MAX_PERSONA_LENGTH } from '@blacksmith/shared/src/npc-info';
 import { markSetupPersonality } from './personality';
-import { RoleLogo, ROLE_OPTIONS } from './RoleLogo';
+import { RoleLogo, ROLE_OPTIONS, type RoleOption } from './RoleLogo';
 
-export function GuidedSetup({ taken, locked, onUse, onCancel, cancelLabel = 'Cancel' }: { taken: string[]; locked: boolean; onUse: (result: SetupResult) => void; onCancel: () => void; cancelLabel?: string }) {
-  const [step, setStep] = useState(0);
-  const [role, setRole] = useState<SetupRole | null>(null);
-  const [teller, setTeller] = useState<Teller>('bard');
+// `initial` is a role already picked on the starting points, which skips the role step.
+export function GuidedSetup({ initial, taken, locked, onUse, onCancel, cancelLabel = 'Cancel' }: { initial?: RoleOption; taken: string[]; locked: boolean; onUse: (result: SetupResult) => void; onCancel: () => void; cancelLabel?: string }) {
+  const [step, setStep] = useState(initial ? 1 : 0);
+  const [role, setRole] = useState<SetupRole | null>(initial?.role ?? null);
+  const [teller, setTeller] = useState<Teller>(initial?.teller ?? 'bard');
   const [name, setName] = useState('');
   const [personality, setPersonality] = useState('');
   const heading = useRef<HTMLHeadingElement>(null);

@@ -6,7 +6,7 @@ import { SiteHeader, type Page } from './SiteHeader';
 import { VillagePage } from './VillagePage';
 import './style.css';
 
-const ROUTES: Record<string, Page> = { '': 'home', '#': 'home', '#/': 'home', '#/village': 'village', '#/workshop': 'workshop' };
+const ROUTES: Record<string, Page> = { '': 'home', '#': 'home', '#/': 'home', '#/village': 'village', '#/workshop': 'workshop', '#/workshop/new': 'workshop' };
 const TITLES: Record<Page, string> = { home: 'NPC Workshop', village: 'Blacksmith demo · NPC Workshop', workshop: 'Workshop · NPC Workshop' };
 // An unknown hash goes to the entrance, and the address says so (replaced, so Back doesn't land on it again).
 const pageFromHash = (): Page => {

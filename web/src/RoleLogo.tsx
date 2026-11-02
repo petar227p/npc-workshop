@@ -4,7 +4,8 @@ import { editorIdentity } from './editorPresentation';
 
 export type RoleLogoId = 'merchant' | 'craftsperson' | 'villager' | 'storyteller' | 'guard' | 'smith' | 'cottager' | 'crier' | 'farmer' | 'keeper' | 'bard';
 
-export const ROLE_OPTIONS: { role: SetupRole; teller?: Teller; label: string; description: string; logo: RoleLogoId }[] = [
+export type RoleOption = { role: SetupRole; teller?: Teller; label: string; description: string; logo: RoleLogoId };
+export const ROLE_OPTIONS: RoleOption[] = [
   { role: 'merchant', label: 'Merchant', description: 'Sells goods from stock and bargains with customers.', logo: 'merchant' },
   { role: 'craftsperson', label: 'Craftsperson', description: 'Takes orders and makes items from materials over time.', logo: 'craftsperson' },
   { role: 'villager', label: 'Villager', description: 'Chats in character and can share news it knows.', logo: 'villager' },

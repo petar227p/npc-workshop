@@ -65,6 +65,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .note.ok { color: var(--ok); }
 .chat-form { display: flex; gap: 8px; margin-top: 10px; }
 .chat-form input { flex: 1; min-width: 0; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font: inherit; }
+.chat-input { position: relative; flex: 1; min-width: 0; display: flex; }
+.chat-input input { width: 100%; }
+.input-status { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 6px; background: var(--input); color: var(--muted); font-size: 12px; pointer-events: none; white-space: nowrap; }
+.input-status:empty { display: none; }
+.chat-input.checking input { padding-left: 168px; } /* typed text stays readable beside the status */
+.spinner { width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } }
 .chat-form .mic { min-width: 44px; font-variant-numeric: tabular-nums; }
 .chat-form .mic.on { background: #302020; border-color: var(--bad); color: #f6c7c4; }
 .error { background: #302020; border: 1px solid var(--bad); color: #f6c7c4; border-radius: 8px; padding: 8px 12px; font-size: 13px; overflow-wrap: anywhere; max-height: 12em; overflow-y: auto; }
@@ -483,6 +491,7 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .editor-nav button[aria-current="page"] { background: var(--accent); color: #181818; border-color: var(--accent); }
 
 .workshop-editor { min-width: 0; border: 0; padding: 0; margin: 0; }
+.workshop-editor[hidden] { display: none !important; } /* the docked grid would otherwise show it on the New NPC page */
 .starter-transfer { display: flex; flex-wrap: wrap; gap: 8px; }
 .transfer-help { margin: 12px 0 0; max-width: 85ch; }
 .workshop-editor [hidden] { display: none !important; }
@@ -504,7 +513,6 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .bench-suggestions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
 .bench-suggestions button { text-align: left; font-size: 12px; font-weight: 400; overflow-wrap: anywhere; }
 .bench-suggestions button > span { display: block; margin-bottom: 4px; color: var(--accent); font-size: 11px; font-weight: 600; }
-.controlled-results { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 @media (max-width: 520px) {
   .bench-suggestions { grid-template-columns: 1fr; }
   .wh-actions { width: 100%; }
@@ -632,8 +640,7 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .bench-suggestions, .app-wide .bench-suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .bench-suggestions button { min-height: 32px; padding: 0 11px; border-radius: 999px; background: transparent; border: 1px solid #383838; color: #d8d8d8; font-size: 12px; font-weight: 500; }
 .bench-suggestions button:hover:not(:disabled) { border-color: var(--muted); color: var(--text); }
-.bench .controlled-results { margin-top: 12px; }
-.bench .controlled-results > p { margin: 0; }
+.controlled-label { margin: 6px 0 0; }
 .app-wide .bench-handoff { margin-top: 10px; padding-top: 8px; }
 .app-wide .bench-handoff p { margin: 0 0 4px; }
 .app-wide .bench-handoff .actions { margin-top: 0; gap: 14px; }
@@ -641,6 +648,10 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 
 /* Your NPCs: the draft being edited, the ones set aside, and a way to start another. */
 .rail-label { margin: 0; padding: 0 16px 8px; font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9a9a9a; overflow-wrap: anywhere; }
+.rail-current { display: flex; align-items: center; gap: 12px; margin: 16px 0 4px; padding: 16px; border-top: 1px solid var(--line); font: 400 22px/1.15 'Pixelify Sans', monospace; color: var(--accent); min-width: 0; }
+.rail-current > span { display: flex; flex-direction: column; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.rail-current small { font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9a9a9a; }
+.rail-current-logo { width: 48px; height: 48px; }
 .npc-list ul { list-style: none; margin: 0; padding: 0; }
 .npc-row { display: flex; align-items: center; min-width: 0; }
 .npc-row.current { gap: 10px; padding: 8px 16px 8px 14px; background: #1f1f1f; border-left: 2px solid var(--accent); }
@@ -661,6 +672,11 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .role-choice:hover { border-color: var(--accent-hover); }
 .role-choice:has(input:checked) { border-color: var(--accent); background: #30291b; box-shadow: inset 0 0 0 1px var(--accent); }
 .role-choice:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
+.role-starts { list-style: none; margin: 16px 0 20px; }
+.role-starts .role-choice { width: 100%; height: 100%; font: inherit; color: var(--text); text-align: left; }
+.role-starts .role-choice:disabled { cursor: default; opacity: .6; }
+.starters-back { display: block; width: 100%; max-width: 1040px; margin: 16px auto 0; padding: 0 16px; text-align: left; }
+.starter-transfer { align-items: center; }
 .app-wide .starters .cards { gap: 12px; }
 .app-wide .starters .card { padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); }
 .npc-text { display: flex; flex-direction: column; min-width: 0; }
