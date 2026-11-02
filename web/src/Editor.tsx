@@ -22,7 +22,7 @@ import {
   type Trigger,
 } from '@blacksmith/shared/src/npc-info';
 import { benchIdeas } from '@blacksmith/shared/src/handoff';
-import { buildSetup, freshNpcId, ROLE_CARDS, SETUP_ROLES, TELLER_INFO, TELLERS, type SetupResult, type SetupRole, type Teller } from '@blacksmith/shared/src/setup';
+import { freshNpcId, type SetupResult } from '@blacksmith/shared/src/setup';
 import { Fragment, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { clockText, editorApi } from './api';
 import { outcomeText } from './benchVerdict';
@@ -373,14 +373,6 @@ export function Editor() {
   };
 
   const ids = library.map((n) => n.id);
-  const fromTemplate = (role: SetupRole, teller?: Teller) => {
-    const { draft: next, summary } = buildSetup({ role, teller }, ids);
-    void applyDraft(
-      next,
-      `Start from the ${summary.role} template`,
-      `Created ${next.name} from the ${summary.role} template. Make the character yours below.`,
-    );
-  };
   const fromAnswers = (r: SetupResult, openTest = false) =>
     void applyDraft(
       r.draft,
@@ -630,7 +622,7 @@ export function Editor() {
       )}
       {transferBusy && <div className="note-box" role="status">Preparing the NPC file…</div>}
       {transferError && <div className="errors" role="alert"><b>{transferError.title}</b><ul>{transferError.errors.map((error, i) => <li key={i}>{error}</li>)}</ul><p>Your current draft and test conversation have been kept.</p></div>}
-      {(!draft || starting) && <Starters first={!draft} library={library} locked={locked} onTemplate={fromTemplate} onAnswers={fromAnswers} onBlank={blank} onLoad={load} onImport={(file) => void importNpc(file)} onCancel={draft ? cancelStarting : undefined} cancelLabel={draft ? `Back to ${draft.name || 'your NPC'}` : undefined} />}
+      {(!draft || starting) && <Starters first={!draft} library={library} locked={locked} onAnswers={fromAnswers} onBlank={blank} onLoad={load} onImport={(file) => void importNpc(file)} onCancel={draft ? cancelStarting : undefined} cancelLabel={draft ? `Back to ${draft.name || 'your NPC'}` : undefined} />}
 
       {draft && (
         <fieldset className={`workshop-editor${docked ? ' docked' : ''}`} aria-label="NPC editor and test session" hidden={starting} disabled={applying || transferBusy}>
@@ -856,13 +848,12 @@ export function Editor() {
   );
 }
 
-// A starting point: a template (a new draft with example settings), the answers to a few questions, a blank NPC, or a
-// copy of one from the village.
+// A starting point: a role (the guided steps; left empty they give the role's example character), the answers to a
+// few questions, a copy of a named NPC from the example village, a blank NPC, or an imported file.
 function Starters({
   first,
   library,
   locked,
-  onTemplate,
   onAnswers,
   onBlank,
   onLoad,
@@ -873,7 +864,6 @@ function Starters({
   first: boolean;
   library: NpcDraft[];
   locked: boolean;
-  onTemplate: (role: SetupRole, teller?: Teller) => void;
   onAnswers: (r: SetupResult, openTest?: boolean) => void;
   onBlank: () => void;
   onLoad: (n: NpcDraft) => void;
@@ -881,16 +871,34 @@ function Starters({
   onCancel?: () => void;
   cancelLabel?: string;
 }) {
-  const [pick, setPick] = useState('');
-  const [asking, setAsking] = useState(false);
+  const [view, setView] = useState<'roles' | 'asking' | 'examples'>('roles');
   const [guiding, setGuiding] = useState<RoleOption | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => { heading.current?.focus(); }, [guiding, asking]);
-  const chosen = library.find((n) => n.id === pick);
+  useEffect(() => { heading.current?.focus(); }, [guiding, view]);
   const back = onCancel && <button type="button" className="text-button starters-back" disabled={locked} onClick={onCancel}>← {cancelLabel}</button>;
-  // The guided steps and the questions cancel back to these starting points; the back link leaves the page.
-  if (guiding) return <>{back}<GuidedSetup key={guiding.logo} initial={guiding} taken={library.map((n) => n.id)} locked={locked} onUse={(result) => onAnswers(result, true)} onCancel={() => setGuiding(null)} /></>;
-  if (asking) return <>{back}<Questionnaire taken={library.map((n) => n.id)} locked={locked} onUse={onAnswers} onCancel={() => setAsking(false)} /></>;
+  // The guided steps, the questions and the examples go back to these starting points; the back link leaves the page.
+  const toRoles = () => { setGuiding(null); setView('roles'); };
+  if (guiding) return <>{back}<GuidedSetup key={guiding.logo} initial={guiding} taken={library.map((n) => n.id)} locked={locked} onUse={(result) => onAnswers(result, true)} onCancel={toRoles} /></>;
+  if (view === 'asking') return <>{back}<Questionnaire taken={library.map((n) => n.id)} locked={locked} onUse={onAnswers} onCancel={toRoles} /></>;
+  if (view === 'examples') return (
+    <>
+    {back}
+    <section className="panel starters" id="starters" aria-labelledby="starters-h">
+      <h3 id="starters-h" ref={heading} tabIndex={-1}>Copy an example NPC</h3>
+      <p>Start from a named character in the demo village. You edit a copy; the village keeps its own.</p>
+      {library.length === 0 ? <p className="muted small">The example NPCs are still loading…</p> : <ul className="example-list">
+        {library.map((n) => <li key={n.id}>
+          <button type="button" className="example-choice" disabled={locked} onClick={() => onLoad(n)}>
+            <RoleLogo role={roleLogoForDraft(n)} />
+            <span><b>{n.name}</b><span>{editorIdentity(n).role}</span></span>
+          </button>
+        </li>)}
+      </ul>}
+      <div className="actions"><button type="button" className="secondary" disabled={locked} onClick={toRoles}>Back to starting points</button></div>
+      {locked && <p className="muted small">Waiting for the test session to finish…</p>}
+    </section>
+    </>
+  );
   return (
     <>
     {back}
@@ -905,62 +913,21 @@ function Starters({
           </button>
         </li>)}
       </ul>
-      <div className="starter-transfer"><span className="muted small">Already have one?</span><ImportNpcButton disabled={locked} onImport={onImport} /></div>
-      <details className="starter-alternatives"><summary>Other starting points</summary>
-      <p className="muted small">A template is a new draft with example settings, ready to test and change. It doesn&apos;t touch the village or its NPCs.</p>
-      <div className="starter-ask">
-        <button type="button" className="secondary" disabled={locked} onClick={() => setAsking(true)}>
-          Help me choose
-        </button>
-        <span className="muted small">Not sure which? Answer up to four questions, then check the proposal before it replaces anything.</span>
-      </div>
-      <h4>Role templates</h4>
-      <ul className="cards">
-        {SETUP_ROLES.map((role) => (
-          <li key={role} className="card">
-            <RoleLogo role={role} />
-            <b className="card-title">{ROLE_CARDS[role].label}</b>
-            <p className="muted small">{ROLE_CARDS[role].blurb}</p>
-            <div className="card-actions">
-              {role === 'storyteller' ? (
-                TELLERS.map((t) => (
-                  <button key={t} type="button" disabled={locked} title={TELLER_INFO[t].description} aria-label={`Use the ${TELLER_INFO[t].label} template`} onClick={() => onTemplate(role, t)}>
-                    <RoleLogo role={t} className="button-role-logo" />
-                    {TELLER_INFO[t].label}
-                  </button>
-                ))
-              ) : (
-                <button type="button" disabled={locked} aria-label={`Use the ${ROLE_CARDS[role].label} template`} onClick={() => onTemplate(role)}>
-                  Use template
-                </button>
-              )}
-            </div>
-          </li>
-        ))}
+      <h4 className="starter-other-h">Other ways to start</h4>
+      <ul className="starter-options">
+        <li><button type="button" className="starter-option" disabled={locked} onClick={() => setView('asking')}>
+          <span className="starter-option-icon" aria-hidden="true">?</span><span><b>Help me choose</b><span>Answer up to four questions and get a suggested setup.</span></span>
+        </button></li>
+        <li><button type="button" className="starter-option" disabled={locked} onClick={() => setView('examples')}>
+          <span className="starter-option-icon" aria-hidden="true">⧉</span><span><b>Copy an example</b><span>Start from a named NPC in the demo village.</span></span>
+        </button></li>
+        <li><button type="button" className="starter-option" disabled={locked} onClick={onBlank}>
+          <span className="starter-option-icon" aria-hidden="true">+</span><span><b>Blank NPC</b><span>Only speech switched on. Set up everything yourself.</span></span>
+        </button></li>
+        <li><ImportNpcButton className="starter-option" disabled={locked} onImport={onImport}>
+          <span className="starter-option-icon" aria-hidden="true">↥</span><span><b>Import NPC</b><span>Open a file you downloaded from the workshop.</span></span>
+        </ImportNpcButton></li>
       </ul>
-      <div className="starter-other">
-        <button type="button" className="secondary" disabled={locked} onClick={onBlank}>
-          Blank NPC
-        </button>
-      </div>
-      <div className="starter-library">
-        <h4>Example NPCs</h4>
-        <p className="muted small">Load an editable draft copy of a named NPC from the example village. Role templates above start independent characters.</p>
-        <span className="inline">
-          <select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Example NPC from the library" disabled={locked}>
-            <option value="">Choose…</option>
-            {library.map((n) => (
-              <option key={n.id} value={n.id}>
-                {n.name} ({n.id}) · example
-              </option>
-            ))}
-          </select>
-          <button type="button" className="secondary" disabled={locked || !chosen} onClick={() => chosen && onLoad(chosen)}>
-            Load example
-          </button>
-        </span>
-      </div>
-      </details>
       {locked && <p className="muted small">Waiting for the test session to finish…</p>}
     </section>
     </>

@@ -319,18 +319,8 @@ button.danger { background: var(--bad); color: #2b1219; }
 .pill.ok { color: var(--ok); border-color: var(--ok); }
 .pill.bad { color: #f6c7c4; border-color: var(--bad); }
 .starters h3 { margin: 0 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); }
-.cards { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
-.card { display: flex; flex-direction: column; gap: 6px; padding: 10px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; }
-.card-title { font-family: 'Pixelify Sans', monospace; font-size: 16px; font-weight: 400; color: var(--text); }
-.card p.small { margin: 0; flex: 1; }
-.card-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.starter-other { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 12px; }
-.starter-library { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
-.starter-library select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font: inherit; min-width: 0; max-width: 100%; }
-.starter-library .inline { flex-wrap: wrap; }
-.starter-alternatives h4 { margin: 12px 0 6px; font-size: 13px; }
+.starters h3:focus { outline: none; } /* focus moves here so screen readers start on the page; the heading is the cue */
 .starters > p.small:last-child { margin: 8px 0 0; }
-.starter-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; }
 .questions h4 { margin: 2px 0 2px; font-size: 15px; }
 .questions h4:focus { outline: none; } /* focus moves here on each step so the keys follow; the new question is the cue */
 .questions h5 { margin: 12px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
@@ -492,7 +482,6 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 
 .workshop-editor { min-width: 0; border: 0; padding: 0; margin: 0; }
 .workshop-editor[hidden] { display: none !important; } /* the docked grid would otherwise show it on the New NPC page */
-.starter-transfer { display: flex; flex-wrap: wrap; gap: 8px; }
 .transfer-help { margin: 12px 0 0; max-width: 85ch; }
 .workshop-editor [hidden] { display: none !important; }
 .overview-disclosure { margin-bottom: 16px; }
@@ -573,7 +562,7 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 }
 
 /* Recessed inputs on neutral charcoal panels. */
-.field input, .field textarea, .inline select, .starter-library select, .chat-form input, .chat-form textarea, .give input, .give select { background: var(--input); }
+.field input, .field textarea, .inline select, .chat-form input, .chat-form textarea, .give input, .give select { background: var(--input); }
 
 /* Workshop studio: one full-width surface split by rules instead of floating panels. On a wide screen the section
    rail, the definition and the test session sit side by side; on a narrow one the rail becomes tabs. */
@@ -602,10 +591,8 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .app-wide .workshop > .note-box, .app-wide .workshop > .errors { margin: 0; border-radius: 0; border-width: 0 0 1px; padding: 10px 16px; }
 .app-wide .workshop > .errors ul { margin: 6px 0 0; }
 
-/* Starting points: a centred page; templates are a ruled list, not a wall of cards. */
+/* Starting points: a centred page. */
 .app-wide .starters { max-width: 1040px; width: 100%; margin: 0 auto; padding: 24px 16px 48px; }
-.app-wide .cards { gap: 0 28px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
-.app-wide .card { padding: 14px 0; background: none; border: 0; border-top: 1px solid var(--rule); border-radius: 0; }
 .app-wide .choice { background: none; }
 
 /* Narrow: tabs on top, then the visible pane. */
@@ -672,13 +659,40 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .role-choice:hover { border-color: var(--accent-hover); }
 .role-choice:has(input:checked) { border-color: var(--accent); background: #30291b; box-shadow: inset 0 0 0 1px var(--accent); }
 .role-choice:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
-.role-starts { list-style: none; margin: 16px 0 20px; }
-.role-starts .role-choice { width: 100%; height: 100%; font: inherit; color: var(--text); text-align: left; }
+/* New NPC role cards: the emblem centred on top, then the role and what it does. */
+.role-starts { list-style: none; margin: 20px 0 24px; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; } /* six roles: two even rows */
+@media (max-width: 720px) { .role-starts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .role-starts { gap: 10px; } .role-starts .role-choice { padding: 18px 10px 16px; gap: 10px; } .role-starts .role-logo { width: 64px; height: 64px; } .role-starts .role-choice-copy b { font-size: 18px; } .role-starts .role-choice-copy > span { font-size: 12px; } }
+@media (max-width: 320px) { .role-starts { grid-template-columns: minmax(0, 1fr); } }
+.role-starts .role-choice { flex-direction: column; align-items: center; gap: 14px; width: 100%; height: 100%; padding: 26px 18px 22px; font: inherit; font-weight: 400; color: var(--text); text-align: center;
+  background: radial-gradient(120% 70% at 50% 0%, #3a3120 0%, var(--panel-2) 62%); border-radius: 12px; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+.role-starts .role-logo { width: 84px; height: 84px; filter: drop-shadow(0 4px 10px rgba(255, 195, 41, .18)); transition: transform .15s ease; }
+.role-starts .role-choice-copy { align-items: center; gap: 8px; padding: 0; }
+.role-starts .role-choice-copy b { font: 400 21px/1.1 'Pixelify Sans', monospace; color: var(--accent); }
+.role-starts .role-choice-copy > span { max-width: 26ch; }
+.role-starts .role-choice:hover:not(:disabled) { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 10px 24px rgba(0, 0, 0, .35), 0 0 0 1px var(--accent); }
+.role-starts .role-choice:hover:not(:disabled) .role-logo { transform: scale(1.06); }
+.role-starts .role-choice:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .role-starts .role-choice:disabled { cursor: default; opacity: .6; }
+@media (prefers-reduced-motion: reduce) { .role-starts .role-choice, .role-starts .role-logo { transition: none; } .role-starts .role-choice:hover:not(:disabled), .role-starts .role-choice:hover:not(:disabled) .role-logo { transform: none; } }
+.starter-other-h { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.starter-options { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.starter-option { display: flex; align-items: flex-start; gap: 12px; width: 100%; height: 100%; padding: 14px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 10px; font-weight: 400; text-align: left; transition: border-color .15s ease, background .15s ease; }
+.starter-option > span:last-child { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.starter-option b { font-weight: 600; }
+.starter-option > span:last-child > span { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.starter-option-icon { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: #30291b; color: var(--accent); font: 400 18px/1 'Pixelify Sans', monospace; }
+.starter-option:hover:not(:disabled) { border-color: var(--accent); background: #2f2a20; }
+@media (max-width: 900px) { .starter-options { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) { .starter-options { grid-template-columns: minmax(0, 1fr); } }
+.example-list { list-style: none; margin: 16px 0 20px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 10px; }
+.example-choice { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 10px; font-weight: 400; text-align: left; transition: border-color .15s ease; }
+.example-choice .role-logo { width: 48px; height: 48px; }
+.example-choice > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.example-choice b { font: 400 18px/1.15 'Pixelify Sans', monospace; color: var(--accent); }
+.example-choice > span > span { color: var(--muted); font-size: 12px; }
+.example-choice:hover:not(:disabled) { border-color: var(--accent); }
 .starters-back { display: block; width: 100%; max-width: 1040px; margin: 16px auto 0; padding: 0 16px; text-align: left; }
-.starter-transfer { align-items: center; }
-.app-wide .starters .cards { gap: 12px; }
-.app-wide .starters .card { padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); }
 .npc-text { display: flex; flex-direction: column; min-width: 0; }
 .npc-text b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .npc-text span { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
