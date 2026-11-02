@@ -52,6 +52,8 @@ function modelVerb(v: ModelVerb, d: Pick<NpcDraft, 'catalogue' | 'signals'>, goo
   return flat[v];
 }
 
+const isTell = (v: string) => v === 'TELL' || v === 'RETELL' || v === 'ANNOUNCE';
+
 export type Built = { ok: true; npc: NpcDefinition; draft: NpcDraft } | { ok: false; errors: string[] };
 
 // The places a draft names that aren't on the village map, each as one readable line.
@@ -69,7 +71,7 @@ export function buildNpc(input: unknown, places: readonly string[] | null = PLAC
   const missing = places ? offMap(d, places) : [];
   if (missing.length > 0) return { ok: false, errors: missing };
   // Passing news on cites an event id, which only the memories block tells it.
-  const tells = d.verbs.filter((v) => v === 'TELL' || v === 'RETELL' || v === 'ANNOUNCE');
+  const tells = d.verbs.filter(isTell);
   if (tells.length > 0 && !d.facts.includes('memories')) return { ok: false, errors: [`${tells.join(', ')} needs the "News it knows" facts, or it can't know an event id to pass on`] };
   // A signal's name alone doesn't say what it does; the model learns that from its facts.
   if (d.model_verbs.includes('SIGNAL') && !d.facts.includes('signals')) return { ok: false, errors: ['SIGNAL needs the "What it can ask the game for" facts, or it can\'t know what its signals mean'] };
@@ -95,7 +97,8 @@ export function buildNpc(input: unknown, places: readonly string[] | null = PLAC
       perception_radius: d.perception_radius,
       model: d.model,
       effort: d.effort,
-      facts: factsFor(d.id, d.facts, d.catalogue, label, d.signals, vocabulary),
+      // Only a verb the model can choose passes news on; one the ledger alone has gives the model no way to cite an id.
+      facts: factsFor(d.id, d.facts, d.catalogue, label, d.signals, vocabulary, d.model_verbs.some(isTell)),
       history: historyFor(d.id, d.name, label, vocabulary?.nameOf),
       triggers: d.triggers,
       cue: d.cue,

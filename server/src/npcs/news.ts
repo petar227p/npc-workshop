@@ -93,10 +93,12 @@ const KNOWS_YOU: Record<Recognition, string> = {
 
 // The memories fact block: what it has in mind, newest first (engine/memory.ts inMind). What it saw reads as what
 // happened; what it was told reads as the words it was told in, since that is all it has.
-export function memoriesText(world: World, npcId: string, vocabulary: Vocabulary = villageVocabulary, customer: string | null = null): string {
+// `passOn`: the model can TELL, RETELL or ANNOUNCE. Without one, the news is background to talk about, with no event id
+// to cite: told to cite one, it would try a verb it hasn't and the ledger would reject it.
+export function memoriesText(world: World, npcId: string, vocabulary: Vocabulary = villageVocabulary, customer: string | null = null, passOn = true): string {
   const { nameOf } = vocabulary;
   const known = inMind(world, npcId);
-  if (known.length === 0) return 'News you know: none yet. You have nothing to pass on, so never claim you have.';
+  if (known.length === 0) return passOn ? 'News you know: none yet. You have nothing to pass on, so never claim you have.' : "What you know of the village's news: nothing yet, so never claim you have heard any.";
   const byId = new Map(world.events.map((e) => [e.id, e]));
   const big = notableIds(world);
   // Only what it saw itself is marked big news: told it, all it has is the teller's words.
@@ -107,5 +109,6 @@ export function memoriesText(world: World, npcId: string, vocabulary: Vocabulary
         : `- ${m.event_id}: ${nameOf(m.told_by ?? '')} told you (${pct(m.confidence)} sure): ${JSON.stringify(m.claim)}`;
     return customer === 'player' && involves(byId.get(m.event_id)!, 'player') ? `${line} ${KNOWS_YOU[recognition(m)]}` : line;
   });
+  if (!passOn) return `What you know of the village's news. It is yours to talk about if it comes up, in your own words:\n${lines.join('\n')}`;
   return `News you know. To pass one on, give its id in event_id; the ledger checks you really know it:\n${lines.join('\n')}`;
 }

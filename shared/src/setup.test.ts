@@ -22,7 +22,7 @@ describe('guided setup', () => {
   it('picks what each ability needs, and leaves the code-only verbs out of what the model may choose', () => {
     const merchant = build({ role: 'merchant' }).draft;
     expect(merchant.verbs).toEqual(['SAY', 'OFFER', 'COUNTER_OFFER', 'REFUSE']);
-    expect(merchant.facts).toEqual(['clock', 'purse', 'stock', 'catalogue', 'price_floor', 'open_offers']);
+    expect(merchant.facts).toEqual(['clock', 'purse', 'stock', 'catalogue', 'price_floor', 'open_offers', 'memories']);
     expect(merchant.catalogue.in_stock).toBeDefined();
 
     const crafter = build({ role: 'craftsperson' }).draft;
@@ -163,11 +163,12 @@ describe('guided setup', () => {
 
   it('reads back the abilities a setup switched on, and only those', () => {
     expect(abilitiesOf(build({ role: 'merchant', news: 'tells' }).draft)).toEqual(['talk', 'sell', 'tell']);
-    expect(abilitiesOf(build({ role: 'craftsperson' }).draft)).toEqual(['talk', 'craft']);
+    expect(abilitiesOf(build({ role: 'craftsperson' }).draft)).toEqual(['talk', 'craft', 'knows']);
+    expect(abilitiesOf(build({ role: 'craftsperson', news: 'none' }).draft)).toEqual(['talk', 'craft']);
     expect(abilitiesOf(build({ role: 'guard', news: 'knows' }).draft)).toEqual(['talk', 'grant', 'knows', 'signal']);
     expect(abilitiesOf(build({ role: 'storyteller', teller: 'crier' }).draft)).toEqual(['talk', 'announce']);
     // A verb the ledger allows but the model may not choose isn't something it does on its own.
-    const d = build({ role: 'merchant' }).draft;
+    const d = build({ role: 'merchant', news: 'none' }).draft;
     expect(abilitiesOf({ ...d, model_verbs: ['SAY'] })).toEqual(['talk']);
   });
 });

@@ -3,7 +3,7 @@
   "name": "Garrick",
   "verbs": ["SAY", "OFFER", "REFUSE", "SIGNAL"],
   "model_verbs": ["SAY", "OFFER", "REFUSE", "SIGNAL"],
-  "facts": ["clock", "stock", "catalogue", "open_offers", "signals"],
+  "facts": ["clock", "stock", "catalogue", "open_offers", "memories", "signals"],
   "perception_radius": 6,
   "model": "muse_spark_open",
   "effort": "low",

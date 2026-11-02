@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { act, memoriesText, newVillage, report } from '..';
+import { act, memoriesText, newVillage, NPCS, report } from '..';
 import { recognition, type Memory } from '../../engine';
 
 describe('the memories fact block', () => {
@@ -39,6 +39,21 @@ describe('the memories fact block', () => {
     // News the player had no part in says nothing about them.
     const other = report(newVillage(), { text: 'A cart lost a wheel.', place: 'gate', involved: ['keeper'] }).world;
     expect(memoriesText(other, 'keeper', undefined, 'player')).not.toContain('customer in front of you');
+  });
+
+  it("for an NPC that can't pass news on, it is background to talk about, with no event id to cite", () => {
+    const w = report(newVillage(), { text: 'The stranger killed an army at the gate.', place: 'gate', involved: ['guard', 'keeper', 'player'], notable: true }).world;
+    const block = memoriesText(w, 'guard', undefined, 'player', false);
+    expect(block).toMatch(/^What you know of the village's news\. It is yours to talk about if it comes up/);
+    expect(block).not.toContain('event_id');
+    expect(block).toContain('"The stranger killed an army at the gate."');
+    expect(block).toContain('The stranger in it is the customer in front of you: you saw them.');
+    expect(memoriesText(newVillage(), 'guard', undefined, 'player', false)).not.toContain('pass on');
+    // Built from the files: Garrick sells and grants, so he is told the news as background; Edda gossips, so she cites ids.
+    const npc = (id: string) => NPCS.find((n) => n.id === id)!;
+    expect(npc('guard').facts(w, 'player')).toContain('It is yours to talk about');
+    expect(npc('guard').facts(w, 'player')).not.toContain('event_id');
+    expect(npc('keeper').facts(w, 'player')).toContain('give its id in event_id');
   });
 
   it('each retelling blurs who it was, until the stranger in the tale is nobody it would know', () => {
