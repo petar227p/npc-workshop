@@ -102,6 +102,7 @@ export function God({ view, disabled, onRead, onReport }: Props) {
     <section className="panel god">
       <h2>God mode</h2>
       <p className="muted small">Something happened that no action covers. A game would report it; here you write it.</p>
+      {error && <p className="tag bad" role="alert">{error}</p>}
 
       {step === 'note' && (
         <form
@@ -121,11 +122,6 @@ export function God({ view, disabled, onRead, onReport }: Props) {
             />
             <span className="muted small">In your own words. Read it turns this into a report you can check before anything happens.</span>
           </label>
-          {error && (
-            <p className="tag bad" role="alert">
-              {error}
-            </p>
-          )}
           <div className="actions god-actions">
             <button disabled={busy || !noteText.trim()}>{reading ? 'Reading…' : 'Read it'}</button>
             <button

@@ -91,8 +91,8 @@ export class VillageScene extends Phaser.Scene {
     cam.centerOn(this.player.x, this.player.y);
     // Phaser's own rounding (on with pixelArt, and in startFollow) floors the camera to whole village pixels, so the
     // ground stepped 4 screen pixels at a time under a player moving smoothly. Off: after physics has moved the player,
-    // settle puts both on the nearest screen pixel instead, and everything else is placed with snap. The renderer still
-    // rounds each sprite's corners to screen pixels, which keeps centred labels and the walking bob sharp.
+    // settle puts the camera on the nearest screen pixel instead, and everything else is placed with snap. The player
+    // keeps its fractional physics position; the renderer rounds sprite corners to keep it and the walking bob sharp.
     cam.setRoundPixels(false);
     const preRender = cam.preRender.bind(cam);
     cam.preRender = () => {
@@ -347,11 +347,10 @@ export class VillageScene extends Phaser.Scene {
     return best;
   }
 
-  // The player and the camera, on screen pixels. The camera closes on the player by a share of the way scaled to the
-  // frame's length, so it feels the same at 60 and 120 Hz.
+  // Snap only the camera: rounding the player would discard fractional movement when physics reads it next frame.
+  // The camera closes on the player by a share of the way scaled to the frame's length.
   private settle(_time: number, delta: number) {
     if (!this.ready) return;
-    this.player.setPosition(this.snap(this.player.x), this.snap(this.player.y));
     const cam = this.cameras.main;
     const follow = 1 - Math.pow(1 - FOLLOW, delta / (1000 / 60));
     const x = cam.scrollX + (this.player.x - cam.width / 2 - cam.scrollX) * follow;
