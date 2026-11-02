@@ -3,7 +3,7 @@
   "name": "Brann",
   "verbs": ["SAY", "OFFER", "COUNTER_OFFER", "REFUSE", "START_WORK"],
   "model_verbs": ["SAY", "OFFER", "COUNTER_OFFER", "REFUSE"],
-  "facts": ["clock", "purse", "stock", "catalogue", "price_floor", "open_offers"],
+  "facts": ["clock", "purse", "stock", "catalogue", "price_floor", "open_offers", "memories"],
   "perception_radius": 4,
   "model": "muse_spark",
   "effort": "low",

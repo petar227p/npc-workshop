@@ -3,7 +3,7 @@
   "name": "Mira",
   "verbs": ["SAY", "OFFER", "COUNTER_OFFER", "REFUSE"],
   "model_verbs": ["SAY", "OFFER", "COUNTER_OFFER", "REFUSE"],
-  "facts": ["purse", "stock", "catalogue", "price_floor", "open_offers"],
+  "facts": ["purse", "stock", "catalogue", "price_floor", "open_offers", "memories"],
   "perception_radius": 4,
   "model": "muse_spark_open",
   "effort": "low",

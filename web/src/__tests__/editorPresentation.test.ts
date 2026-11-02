@@ -11,9 +11,9 @@ describe('editor identity', () => {
 
   it('summarizes actual abilities after editing, rather than retaining the template role', () => {
     const draft = buildSetup({ role: 'merchant' }).draft;
-    expect(editorIdentity(draft).abilities).toBe('Sells stocked goods and bargains');
+    expect(editorIdentity(draft).abilities).toBe('Sells stocked goods and bargains · Remembers news');
     draft.model_verbs = ['SAY'];
-    expect(editorIdentity(draft)).toEqual({ role: 'Villager', abilities: 'Talks in character' });
+    expect(editorIdentity(draft)).toEqual({ role: 'Villager', abilities: 'Remembers news' });
   });
 
   it('distinguishes a town crier and a character that both sells and crafts', () => {

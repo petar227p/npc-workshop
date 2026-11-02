@@ -351,8 +351,8 @@ const kindOf = (role: SetupRole, teller: Teller): TemplateKind => (role === 'sto
 // The questionnaire's second question: what it may do on its own, the role's usual choice first.
 export const autoChoices = (role: SetupRole, teller: Teller = 'bard'): AutoChoice[] => TEMPLATES[kindOf(role, teller)]().autos;
 
-// The news answer a role gets when none is given: a villager gossips, the others keep to their work.
-export const usualNews = (role: SetupRole): NewsChoice => (role === 'villager' ? 'tells' : 'none');
+// The news answer a role gets when none is given: a villager gossips; the others know what they saw or heard, and keep it.
+export const usualNews = (role: SetupRole): NewsChoice => (role === 'villager' ? 'tells' : 'knows');
 
 // The third question, given the second: the news choices that fit. Empty for a bard or crier, whose job is the news;
 // only the ones that bring the verb a trigger needs (TRIGGER_NEEDS) when it needs one.

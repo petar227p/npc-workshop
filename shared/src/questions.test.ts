@@ -49,7 +49,7 @@ describe('help me choose', () => {
     expect(suggested('act', { job: 'storyteller', teller: 'crier' })).toBe('news');
     expect(suggested('act', { job: 'guard' })).toBe('none');
     expect(suggested('news', { job: 'villager', auto: 'timer' })).toBe('tells');
-    expect(suggested('news', { job: 'merchant', auto: 'none' })).toBe('none');
+    expect(suggested('news', { job: 'merchant', auto: 'none' })).toBe('knows');
     expect(suggested('teller', { job: 'storyteller' })).toBe('bard');
   });
 
