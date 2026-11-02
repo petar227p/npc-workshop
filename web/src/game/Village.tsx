@@ -16,29 +16,41 @@ export function Village({ view, onTalk }: { view: StateView; onTalk: (npcId: str
 
   useEffect(() => {
     let game: Phaser.Game | null = null;
+    let observer: ResizeObserver | null = null;
     let gone = false;
+    // A canvas pixel for every screen pixel, shown at CSS size: on a Retina screen a CSS-sized canvas is stretched 2x,
+    // so movement could only land on every other screen pixel. (More than 2x buys nothing you can see.)
+    const dpr = Math.min(2, Math.max(1, Math.round(window.devicePixelRatio || 1)));
     // Wait for the pixel font, so speech bubbles don't render in a fallback font.
     document.fonts.load('8px "Pixelify Sans"').finally(() => {
-      if (gone || !host.current) return;
+      const el = host.current;
+      if (gone || !el) return;
       const s = new VillageScene({
         onTalk: (id) => talk.current(id),
         label: (id) => withRole(id, latest.current.people.find((p) => p.id === id)?.name ?? id),
       });
       game = new Phaser.Game({
         type: Phaser.AUTO,
-        parent: host.current,
+        parent: el,
         pixelArt: true,
         backgroundColor: '#5a9e4b',
-        scale: { mode: Phaser.Scale.RESIZE, width: '100%', height: '100%' },
-        physics: { default: 'arcade', arcade: { debug: false } },
+        scale: { mode: Phaser.Scale.NONE, width: el.clientWidth * dpr, height: el.clientHeight * dpr, zoom: 1 / dpr },
+        // Each frame moves by its own length: a fixed 60 Hz step judders on a 120 Hz screen.
+        physics: { default: 'arcade', arcade: { debug: false, fixedStep: false } },
         scene: [s],
       });
+      const g = game;
+      observer = new ResizeObserver(() => {
+        if (el.clientWidth && el.clientHeight) g.scale.resize(el.clientWidth * dpr, el.clientHeight * dpr);
+      });
+      observer.observe(el);
       s.setView(latest.current);
       scene.current = s;
       if (import.meta.env.DEV) Object.assign(window, { game });
     });
     return () => {
       gone = true;
+      observer?.disconnect();
       scene.current = null;
       game?.destroy(true);
     };
