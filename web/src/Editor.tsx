@@ -39,7 +39,8 @@ import { GameConnection } from './GameConnection';
 import { draftKey, hasCheckedModelAction, type HandoffSnapshot } from './gameHandoff';
 import { editorIdentity } from './editorPresentation';
 import { ConversationLog } from './ConversationLog';
-import { BROWSER_DRAFT_KEY, saveBrowserDraft } from './browserDraft';
+import { BROWSER_DRAFT_KEY, readDrafts, saveBrowserDraft, saveDrafts, shelveDraft, type ShelvedDraft } from './browserDraft';
+import { SiteHeader } from './SiteHeader';
 
 // The NPC workshop: edit a definition on the left, try it on the test bench on the right.
 // The draft lives in this browser; the server checks it on every preview and bench turn.
@@ -66,6 +67,40 @@ const BLANK: NpcDraft = {
   cue: "Reply to the customer's last words.",
   fallbacks: { rejected: 'Hm. Ask me again.', unavailable: "I'm busy. Come back in a moment." },
 };
+
+// Every rail entry is a page of its own, in the rail's groups. 'test' is a page only on a narrow screen, where the
+// test session doesn't sit beside the definition.
+const PAGE_GROUPS = [
+  ['Character', [
+    ['character', 'Basics', 'Name, personality, what it can do'],
+    ['appearance', 'Appearance', 'Its sprite in the village'],
+    ['artwork', 'Item artwork', 'Pictures of what it sells'],
+    ['settings', 'Advanced settings', 'Id, model, fallbacks'],
+  ]],
+  ['Abilities & rules', [
+    ['abilities', 'What it sells', 'Catalogue, prices, stock'],
+    ['world', 'Example village', 'Place, schedule, timers'],
+    ['advanced', 'Advanced', 'Permissions, facts, labels'],
+  ]],
+] as const;
+type PageEntry = (typeof PAGE_GROUPS)[number][1][number];
+
+const PROBLEM_PAGES: Record<NonNullable<ValidationHelp['target']>, string> = {
+  character: 'character', appearance: 'appearance', artwork: 'artwork', 'character-advanced': 'settings',
+  catalogue: 'abilities', abilities: 'abilities', world: 'world', permissions: 'advanced',
+};
+
+function useMedia(query: string): boolean {
+  const [matches, setMatches] = useState(() => typeof matchMedia === 'function' && matchMedia(query).matches);
+  useEffect(() => {
+    const list = matchMedia(query);
+    const update = () => setMatches(list.matches);
+    update();
+    list.addEventListener('change', update);
+    return () => list.removeEventListener('change', update);
+  }, [query]);
+  return matches;
+}
 
 const DEFAULT_TIMER: Extract<Trigger, { kind: 'every_hours' }> = { kind: 'every_hours', hours: 6, cue: 'Nobody has spoken to you for a while. Do what you would do now, unasked.' };
 
@@ -112,6 +147,17 @@ function loadStored(): NpcDraft | null {
   } catch {
     return null;
   }
+  return readDraft(raw);
+}
+
+function loadDrafts(): ShelvedDraft[] {
+  return readDrafts().flatMap((d) => {
+    const draft = readDraft(d.draft);
+    return draft ? [{ key: d.key, saved: d.saved, draft }] : [];
+  });
+}
+
+function readDraft(raw: unknown): NpcDraft | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const v = raw as Record<string, unknown>;
   const text = <K extends 'id' | 'name' | 'persona' | 'cue'>(k: K) => (typeof v[k] === 'string' ? (v[k] as string) : BLANK[k]);
@@ -178,6 +224,7 @@ export function Editor() {
   const [places, setPlaces] = useState<string[]>([]);
   // A draft from an earlier visit opens as it was. A first visit picks a starting point instead.
   const [doc, setDoc] = useState<Doc>(() => ({ draft: loadStored(), rev: 0 }));
+  const [drafts, setDrafts] = useState<ShelvedDraft[]>(loadDrafts);
   const [browserSave, setBrowserSave] = useState<{ rev: number; ok: boolean } | null>(null);
   const [storageRetry, setStorageRetry] = useState(0);
   const [check, setCheck] = useState<Check | null>(null);
@@ -197,13 +244,18 @@ export function Editor() {
   const [testedKey, setTestedKey] = useState<string | null>(null);
   const returnTo = useRef<{ element: HTMLElement | null; scroll: number }>({ element: null, scroll: 0 });
   const [section, setSection] = useState('character');
+  // On a wide screen the test session sits beside the definition, so 'test' only moves the keys there and the
+  // definition keeps showing the section it had.
+  const docked = useMedia('(min-width: 1100px)');
+  const lastDefinition = useRef('character');
+  if (section !== 'test') lastDefinition.current = section;
+  const definitionSection = section === 'test' ? lastDefinition.current : section;
   // The draft as it was started or saved, to tell whether replacing it loses edits. A restored draft's start is
   // unknown, so it counts as edited.
   const baseline = useRef<string | null>(null);
   const latest = useRef(0);
-  const advanced = useRef<HTMLDetailsElement>(null);
-  const characterAdvanced = useRef<HTMLDetailsElement>(null);
   const moreMenu = useRef<HTMLDetailsElement>(null);
+  const newNpcButton = useRef<HTMLButtonElement>(null);
   const currentDoc = useRef(doc);
   currentDoc.current = doc;
 
@@ -266,27 +318,37 @@ export function Editor() {
   const ready = fresh && 'result' in fresh && fresh.result.ok ? fresh.result : null;
   // This draft's problems. While a newer edit is being checked the last ones stay, dimmed.
   const problems = check && 'result' in check && !check.result.ok ? check.result.errors : [];
+  const hasArtwork = Boolean(draft && (draft.catalogue.in_stock || draft.catalogue.made_to_order || problems.some((problem) => /^art[.:]/.test(problem))));
+  const pages: PageEntry[] = PAGE_GROUPS.flatMap(([, entries]) => entries.filter(([id]) => id !== 'artwork' || hasArtwork));
+  const page = pages.some(([id]) => id === definitionSection) ? definitionSection : 'character';
+  const nextPage = pages[pages.findIndex(([id]) => id === page) + 1];
   const locked = applying || benchBusy || transferBusy;
 
   // Every new starting point (a template, a blank NPC, a file from the library) comes through here. The old
   // conversation belongs to another NPC, so the bench is cleared first and the draft switches only once it's gone; if
   // it can't be cleared, the draft and the conversation stay as they were.
-  const applyDraft = async (next: NpcDraft, what: string, done: string, openTest = false) => {
+  // The draft being replaced moves to the drafts list first. If the list can't be saved, replacing an edited draft
+  // needs a yes, as before there was a list. `opening` is the list entry being opened, which leaves the list.
+  const applyDraft = async (next: NpcDraft, what: string, done: string, openTest = false, opening: string | null = null) => {
     // Imports hold the transfer lock while using this same replacement path.
     if (applying || benchBusy) return;
-    if (draft && JSON.stringify(draft) !== baseline.current) {
-      if (!confirm(`${what}? It replaces “${draft.name}” in this browser, and your changes to it are lost. Saved files aren't touched.`)) return;
+    const shelf = shelveDraft(drafts, draft, opening, Date.now(), crypto.randomUUID());
+    const kept = saveDrafts(shelf);
+    if (!kept && draft && JSON.stringify(draft) !== baseline.current) {
+      if (!confirm(`${what}? Your drafts list couldn't be saved in this browser, so “${draft.name}” is replaced and your changes to it are lost. Saved files aren't touched.`)) return;
     }
     setApplying(true);
     setNotice(null);
     try {
       await editorApi.reset();
     } catch (e) {
+      if (kept) saveDrafts(drafts);
       setNotice(`The test session couldn't be cleared, so your draft stays as it was: ${(e as Error).message}`);
       return;
     } finally {
       setApplying(false);
     }
+    setDrafts(kept ? shelf : drafts.filter((d) => d.key !== opening));
     setConnectionOpen(false);
     setSnapshot(null);
     setDownloaded(false);
@@ -297,7 +359,8 @@ export function Editor() {
     setDoc((s) => ({ draft: next, rev: s.rev + 1 }));
     setStarted((n) => n + 1);
     setStarting(false);
-    setNotice(done);
+    setNotice(kept && draft ? `${done} ${draft.name || 'Your previous NPC'} is in Your NPCs.` : done);
+    lastDefinition.current = 'character';
     setSection(openTest ? 'test' : 'character');
     requestAnimationFrame(() => document.getElementById(openTest ? 'test-heading' : 'character-h')?.focus());
   };
@@ -322,6 +385,13 @@ export function Editor() {
   const load = (n: NpcDraft) =>
     void applyDraft(n, `Load example ${n.name}`, `Editing a draft copy of ${n.name} from the example library (npcs/${n.id}.json). The example village keeps using its saved definition.`);
 
+  const openDraft = (d: ShelvedDraft) => void applyDraft(d.draft, `Open ${d.draft.name}`, `Opened ${d.draft.name || 'your draft'}.`, false, d.key);
+  const deleteDraft = (d: ShelvedDraft) => {
+    if (!confirm(`Delete the draft “${d.draft.name || 'Unnamed character'}”? This can't be undone.`)) return;
+    const rest = drafts.filter((x) => x.key !== d.key);
+    if (!saveDrafts(rest)) return setNotice('Couldn’t update your drafts in this browser. Try again.');
+    setDrafts(rest);
+  };
   const importNpc = async (file: File) => {
     if (locked || transferLock.current) return;
     transferLock.current = true;
@@ -450,31 +520,24 @@ export function Editor() {
   const cancelStarting = () => {
     setStarting(false);
     requestAnimationFrame(() => {
-      moreMenu.current?.querySelector('summary')?.focus({ preventScroll: true });
+      newNpcButton.current?.focus({ preventScroll: true });
       scrollTo(0, creationScroll.current);
     });
   };
   const edit = (id: string) => {
-    setSection(id === 'world' || id === 'advanced' ? 'abilities' : id === 'appearance' ? 'character' : id);
+    setSection(id);
     requestAnimationFrame(() => focusSetting(document.getElementById(`${id}-h`)));
   };
   const openPermissions = () => {
-    setSection('abilities');
-    if (advanced.current) advanced.current.open = true;
+    setSection('advanced');
     requestAnimationFrame(() => document.getElementById('permissions')?.focus());
   };
 
   const goToProblem = (target: ValidationHelp['target'], error: string) => {
     if (!target) return;
-    if (target === 'permissions') openPermissions();
-    if (target === 'character-advanced') {
-      setSection('character');
-      if (characterAdvanced.current) characterAdvanced.current.open = true;
-      requestAnimationFrame(() => focusSetting(fieldForError(error) ?? document.getElementById('character-settings')));
-      return;
-    }
-    setSection(['character', 'appearance', 'artwork'].includes(target) ? 'character' : 'abilities');
-    requestAnimationFrame(() => focusSetting(fieldForError(error) ?? document.getElementById(target === 'permissions' ? 'permissions' : target === 'catalogue' ? 'catalogue-h' : target === 'character' ? 'character-name' : `${target}-h`)));
+    const to = PROBLEM_PAGES[target];
+    setSection(to);
+    requestAnimationFrame(() => focusSetting(fieldForError(error) ?? document.getElementById(target === 'permissions' ? 'permissions' : target === 'character' ? 'character-name' : `${to}-h`)));
   };
   const problemList = status === 'invalid' && problems.length > 0 && (
     <div className="errors" role="alert">
@@ -486,56 +549,54 @@ export function Editor() {
     </div>
   );
 
+  const savingHelp = <>
+    <p className="muted small workshop-intro">Create a character, set its rules, then try a conversation.</p>
+    <details className="workshop-file-help">
+      <summary>How saving works</summary>
+      <p className="muted small">Browser saving keeps your characters on this browser and device: the one you are editing and, under Your NPCs, the ones you set aside. Clearing this site’s browser data removes them. Download NPC keeps a portable copy you can import later; test conversations and game progress are separate.</p>
+    </details>
+  </>;
   return (
     <>
-    <div className="workshop" hidden={connectionOpen}>
-      <section className="panel workshop-head" aria-labelledby="workshop-h" hidden={starting}>
-        <div className="wh-top">
-          <div className="wh-text">
-            <h2 id="workshop-h">{draft ? <>{draft.name || 'Unnamed character'} <span className="workshop-role">· {identity?.role}</span></> : 'NPC Workshop'}</h2>
-            {draft && <div className="workshop-status" role="status">
-              {status === 'checking' && <span className="muted">Checking settings…</span>}
-              {status === 'ok' && <span className="status-ok">✓ {tested ? 'Checked action completed' : 'Ready to test'}</span>}
-              {status === 'invalid' && <button type="button" className="text-button status-bad" onClick={() => goToProblem(validationHelp(problems[0]).target, problems[0])}>✕ {problems.length === 1 ? '1 setting' : `${problems.length} settings`} to fix</button>}
-              {status === 'error' && <button type="button" className="text-button status-bad" onClick={() => setRetry((n) => n + 1)}>Couldn’t check settings · Retry</button>}
-            </div>}
-            {draft && <div className="draft-storage small" role="status">
-              {browserSaveState === 'saving' && <span className="muted">Saving draft in this browser…</span>}
-              {browserSaveState === 'saved' && <span className="muted">Draft saved in this browser</span>}
-              {browserSaveState === 'error' && <>
-                <span className="status-bad">Couldn’t save the latest draft in this browser.</span>
-                <p>{valid ? 'Keep this tab open. Retry saving, or choose Download NPC in the More… menu.' : 'Keep this tab open and retry saving. Download NPC in the More… menu is also available once the settings pass validation.'}</p>
-                <button type="button" className="text-button" onClick={() => setStorageRetry((n) => n + 1)}>Retry browser save</button>
-              </>}
-            </div>}
-          </div>
-          {draft && (
-            <div className="wh-actions">
-              <button type="button" disabled={locked || (tested && !valid)} onClick={tested ? () => void openConnection() : test}>{tested ? 'Use in your game' : `Test ${draft.name || 'your NPC'}`} →</button>
-              <details className="workshop-more" ref={moreMenu}>
-                <summary>More…</summary>
-                <div className="workshop-more-actions">
-                  <button type="button" className="secondary" disabled={locked} aria-expanded={starting} aria-controls="starters" onClick={startNpc}>New NPC…</button>
-                  <ImportNpcButton disabled={locked} onImport={(file) => { if (moreMenu.current) moreMenu.current.open = false; void importNpc(file); }} />
-                  <div className="workshop-menu-action">
-                    <button type="button" className="secondary" aria-describedby="download-npc-help" disabled={!valid || locked} onClick={() => { if (moreMenu.current) moreMenu.current.open = false; void downloadNpc(); }}>Download NPC</button>
-                    <p id="download-npc-help" className="muted small">Portable settings and reference pictures you can import later. Excludes conversations, world progress and generated pictures.</p>
-                  </div>
-                  {canSave && <div className="workshop-menu-action">
-                    <button type="button" className="secondary" aria-describedby="development-save-help" onClick={() => { if (moreMenu.current) moreMenu.current.open = false; void save(); }} disabled={!valid || locked}>Save to files — development only</button>
-                    <p id="development-save-help" className="muted small">Writes <code>npcs/&lt;id&gt;.json</code> and <code>prompts/&lt;id&gt;.md</code> on this server, with confirmation before overwriting. Restart the server to load them into the example village. Running worlds keep their current settings.</p>
-                  </div>}
-                </div>
-              </details>
-            </div>
-          )}
+    <SiteHeader page="workshop">
+      {draft && !starting && !connectionOpen ? <div className="studio-actions">
+        <div className="workshop-status" role="status">
+          {status === 'checking' && <span className="muted">Checking settings…</span>}
+          {status === 'ok' && <span className="status-ok">✓ {tested ? 'Checked action completed' : 'Ready to test'}</span>}
+          {status === 'invalid' && <button type="button" className="text-button status-bad" onClick={() => goToProblem(validationHelp(problems[0]).target, problems[0])}>✕ {problems.length === 1 ? '1 setting' : `${problems.length} settings`} to fix</button>}
+          {status === 'error' && <button type="button" className="text-button status-bad" onClick={() => setRetry((n) => n + 1)}>Couldn’t check settings · Retry</button>}
+          {browserSaveState === 'saving' && <span className="muted"> · Saving in this browser…</span>}
+          {browserSaveState === 'saved' && <span className="muted"> · Saved in this browser</span>}
         </div>
-        <p className="muted small workshop-intro">Create a character, set its rules, then try a conversation.</p>
-        <details className="workshop-file-help">
-          <summary>How saving works</summary>
-          <p className="muted small">Browser saving keeps your latest character settings on this browser and device. Clearing this site’s browser data removes them. Download NPC in More… keeps a portable copy you can import later; test conversations and game progress are separate.</p>
-        </details>
-      </section>
+        <div className="wh-actions">
+          <ImportNpcButton disabled={locked} onImport={(file) => void importNpc(file)} />
+          <button type="button" className="secondary" aria-describedby="download-npc-help" disabled={!valid || locked} onClick={() => void downloadNpc()}>Download</button>
+          <span id="download-npc-help" className="sr-only">Portable settings and reference pictures you can import later. Excludes conversations, world progress and generated pictures.</span>
+          {canSave && <details className="workshop-more" ref={moreMenu}>
+            <summary>More…</summary>
+            <div className="workshop-more-actions">
+              <div className="workshop-menu-action">
+                <button type="button" className="secondary" aria-describedby="development-save-help" onClick={() => { if (moreMenu.current) moreMenu.current.open = false; void save(); }} disabled={!valid || locked}>Save to files — development only</button>
+                <p id="development-save-help" className="muted small">Writes <code>npcs/&lt;id&gt;.json</code> and <code>prompts/&lt;id&gt;.md</code> on this server, with confirmation before overwriting. Restart the server to load them into the example village. Running worlds keep their current settings.</p>
+              </div>
+            </div>
+          </details>}
+          {docked || tested
+            ? <button type="button" disabled={locked || !valid} onClick={() => void openConnection()}>Use in your game</button>
+            : <button type="button" disabled={locked} onClick={test}>Test {draft.name || 'your NPC'} →</button>}
+        </div>
+      </div> : null}
+    </SiteHeader>
+    <div className="workshop" hidden={connectionOpen}>
+      {!draft && <section className="panel workshop-head empty" aria-labelledby="workshop-h">
+        <h2 id="workshop-h">NPC Workshop</h2>
+        {savingHelp}
+      </section>}
+      {draft && browserSaveState === 'error' && <div className="errors" role="alert">
+        <b>Couldn’t save the latest draft in this browser.</b>
+        <p>{valid ? 'Keep this tab open. Retry saving, or choose Download.' : 'Keep this tab open and retry saving. Download is also available once the settings pass validation.'}</p>
+        <button type="button" className="secondary small" onClick={() => setStorageRetry((n) => n + 1)}>Retry browser save</button>
+      </div>}
 
       {notice && (
         <div className="note-box" role="status">
@@ -547,46 +608,79 @@ export function Editor() {
       {(!draft || starting) && <Starters first={!draft} library={library} locked={locked} onTemplate={fromTemplate} onAnswers={fromAnswers} onBlank={blank} onLoad={load} onImport={(file) => void importNpc(file)} onCancel={draft ? cancelStarting : undefined} cancelLabel={draft ? `Cancel and return to ${draft.name || 'your NPC'}` : undefined} />}
 
       {draft && (
-        <fieldset className="workshop-editor" aria-label="NPC editor and test session" hidden={starting} disabled={applying || transferBusy}>
-          <nav className="editor-nav" aria-label="Workshop sections">
-            {([['character', 'Character'], ['abilities', 'Abilities & rules'], ['test', 'Test']] as const).map(([id, label]) => (
-              <button key={id} type="button" className="secondary" aria-current={section === id ? 'page' : undefined} onClick={() => setSection(id)}>{label}</button>
-            ))}
-          </nav>
-          <section className="panel definition" aria-label="Definition" hidden={section === 'test'}>
+        <fieldset className={`workshop-editor${docked ? ' docked' : ''}`} aria-label="NPC editor and test session" hidden={starting} disabled={applying || transferBusy}>
+          <div className="editor-rail">
+            <div className="editor-rail-inner">
+              <section className="npc-list" aria-labelledby="npc-list-h">
+                <h2 id="npc-list-h" className="rail-label">Your NPCs</h2>
+                <ul>
+                  <li className="npc-row current" aria-current="true">
+                    <span className="npc-sprite" style={spriteStyle(draft.sprite)} aria-hidden="true" />
+                    <span className="npc-text"><b>{draft.name || 'Unnamed character'}</b><span>{identity?.role} · editing</span></span>
+                  </li>
+                  {drafts.map((d) => (
+                    <li key={d.key} className="npc-row">
+                      <button type="button" className="npc-open" disabled={locked} onClick={() => openDraft(d)}>
+                        <span className="npc-sprite" style={spriteStyle(d.draft.sprite)} aria-hidden="true" />
+                        <span className="npc-text"><b>{d.draft.name || 'Unnamed character'}</b><span>{editorIdentity(d.draft).role} · draft</span></span>
+                      </button>
+                      <button type="button" className="npc-delete" disabled={locked} aria-label={`Delete draft ${d.draft.name || 'Unnamed character'}`} title="Delete draft" onClick={() => deleteDraft(d)}>×</button>
+                    </li>
+                  ))}
+                </ul>
+                <button type="button" className="new-npc" ref={newNpcButton} disabled={locked} aria-expanded={starting} aria-controls="starters" onClick={startNpc}>+ New NPC</button>
+              </section>
+              <h2 id="workshop-h" className="rail-label">{draft.name || 'Unnamed character'}</h2>
+              <nav className="editor-nav" aria-label="Workshop pages">
+                {PAGE_GROUPS.map(([group, entries]) => (
+                  <Fragment key={group}>
+                    <h3 className="rail-label nav-group">{group}</h3>
+                    {entries.filter(([id]) => id !== 'artwork' || hasArtwork).map(([id, label, hint]) => (
+                      <button key={id} type="button" className="secondary" aria-current={(docked || section !== 'test') && page === id ? 'page' : undefined} onClick={() => setSection(id)}>
+                        {label}<span className="nav-hint">{hint}</span>
+                      </button>
+                    ))}
+                  </Fragment>
+                ))}
+                {!docked && <button type="button" className="secondary nav-test" aria-current={section === 'test' ? 'page' : undefined} onClick={() => setSection('test')}>Test</button>}
+              </nav>
+              {docked && <div className="editor-rail-help">{savingHelp}</div>}
+            </div>
+          </div>
+          <section className="panel definition" aria-label="Definition" hidden={!docked && section === 'test'}>
             {problemList}
 
-            <Section active={section === 'character'} id="character" title="Character" intro="Give your character a name and a personality.">
-              <div>
-                <Field label="Name">
-                  <input id="character-name" data-field="name" value={draft.name} maxLength={40} onChange={(e) => set('name', e.target.value)} />
-                </Field>
-              </div>
-              <Field label="Personality" hint="Describe their traits and how they speak.">
+            <Section active={page === 'character'} id="character" title="Basics" intro="Give your character a name and a personality.">
+              <Field row label="Name">
+                <input id="character-name" data-field="name" value={draft.name} maxLength={40} onChange={(e) => set('name', e.target.value)} />
+              </Field>
+              <Field row label="Personality" hint="Describe their traits and how they speak.">
                 <textarea rows={3} maxLength={300} value={readPersonality(draft.persona)} placeholder="e.g. Friendly, proud of her work, and wary of strangers." onChange={(e) => {
                   const persona = writePersonality(draft.persona, e.target.value);
                   if (persona.length <= MAX_PERSONA_LENGTH) set('persona', persona);
                 }} />
               </Field>
-              <div className="character-abilities">
-                <span className="field-label">Abilities summary</span>
-                <p>{identity?.abilities}</p>
-                <button type="button" className="text-button" onClick={() => edit('abilities')}>Edit abilities →</button>
+              <div className="field field-row character-abilities">
+                <span className="field-label">Can do</span>
+                <div className="ability-chips">
+                  {identity?.abilities.split(' · ').map((ability) => <span key={ability} className="chip">{ability}</span>)}
+                  <button type="button" className="text-button" onClick={() => edit('abilities')}>Edit abilities</button>
+                </div>
               </div>
-              <details className="editor-disclosure">
-                <summary id="appearance-h">Appearance</summary>
-                <Field label="Character sprite" hint="Used in the example village."><SpritePicker value={draft.sprite} onChange={(s) => set('sprite', s)} /></Field>
-              </details>
-              {(draft.catalogue.in_stock || draft.catalogue.made_to_order || problems.some((problem) => /^art[.:]/.test(problem))) && <details className="editor-disclosure">
-                <summary id="artwork-h">Generated item artwork</summary>
-                <p className="muted small">Set the art direction for pictures of items this character sells or makes.</p>
-                <ArtForm key={started} draft={draft} valid={valid} onChange={(art) => set('art', art)} />
-              </details>}
-              <details className="character-advanced" ref={characterAdvanced}>
-                <summary id="character-settings">Advanced character settings</summary>
-                <Field label="Id" hint="its file name: lowercase, digits, _">
-                  <input data-field="id" value={draft.id} maxLength={41} onChange={(e) => set('id', e.target.value)} />
-                </Field>
+            </Section>
+
+            <Section active={page === 'appearance'} id="appearance" title="Appearance" intro="How the character looks in the example village.">
+              <Field label="Character sprite" hint="Used in the example village."><SpritePicker value={draft.sprite} onChange={(s) => set('sprite', s)} /></Field>
+            </Section>
+
+            {hasArtwork && <Section active={page === 'artwork'} id="artwork" title="Item artwork" intro="Set the art direction for pictures of items this character sells or makes.">
+              <ArtForm key={started} draft={draft} valid={valid} onChange={(art) => set('art', art)} />
+            </Section>}
+
+            <Section active={page === 'settings'} id="settings" title="Advanced settings" intro="Its id, the model that voices it, and what it says when something goes wrong.">
+              <Field label="Id" hint="its file name: lowercase, digits, _">
+                <input data-field="id" value={draft.id} maxLength={41} onChange={(e) => set('id', e.target.value)} />
+              </Field>
               <Field label="Full persona" hint={`${draft.persona.length} / ${MAX_PERSONA_LENGTH} · sent first, as the system prompt`}>
                 <textarea data-field="persona" className="persona" value={draft.persona} maxLength={MAX_PERSONA_LENGTH} onChange={(e) => set('persona', e.target.value)} />
               </Field>
@@ -624,12 +718,9 @@ export function Editor() {
                   />
                 </Field>
               </div>
-              </details>
             </Section>
 
-            <Section active={section === 'abilities'} id="abilities" title="Abilities & rules" intro={identity?.abilities ?? 'Set the actions and limits for this character.'}>
-              <h4 id="catalogue-h" tabIndex={-1}>What it sells or makes</h4>
-              <p className="muted small">Set up goods for sale or items made to order. Leave both options off for a character that only talks.</p>
+            <Section active={page === 'abilities'} id="abilities" title="What it sells or makes" intro="Set up goods for sale or items made to order. Leave both options off for a character that only talks.">
               {(draft.catalogue.in_stock || draft.catalogue.made_to_order) && !draft.model_verbs.includes('OFFER') && (
                 <div className="catalogue-warning" role="alert">
                   <span className="catalogue-warning-icon" aria-hidden="true">!</span>
@@ -647,9 +738,7 @@ export function Editor() {
               </>}
             </Section>
 
-            <details className="editor-disclosure" hidden={section !== 'abilities'}>
-              <summary id="world-h">Example village settings</summary>
-              <p className="muted small">Location, schedule and perception use the bundled village map.</p>
+            <Section active={page === 'world'} id="world" title="Example village" intro="Location, schedule and perception use the bundled village map.">
               <div className="row2">
                 <Field label="Default location" hint="Place on the bundled village map when no other stop is scheduled.">
                   <PlacePicker field="location" places={places} value={draft.location} onChange={(p) => set('location', p)} />
@@ -671,12 +760,9 @@ export function Editor() {
               <Field label="Instruction when spoken to" hint="Tells the character how to respond to a conversation.">
                 <input data-field="cue" value={draft.cue} maxLength={300} onChange={(e) => set('cue', e.target.value)} />
               </Field>
-            </details>
+            </Section>
 
-            <details className="ed-section advanced" ref={advanced} hidden={section !== 'abilities'}>
-              <summary>
-                Advanced <span className="muted small">permissions, facts, labels and what the model gets</span>
-              </summary>
+            <Section active={page === 'advanced'} id="advanced" title="Advanced" intro="Permissions, facts, labels and what the model gets.">
               <h4 id="permissions" tabIndex={-1}>
                 What it may do
               </h4>
@@ -719,19 +805,21 @@ export function Editor() {
               ) : (
                 <p className="muted small">{status === 'checking' ? 'Checking the draft…' : 'Fix the definition to see it.'}</p>
               )}
-            </details>
+            </Section>
             <div className="editor-next">
-              {section === 'character' && <button type="button" onClick={() => edit('abilities')}>Continue to abilities →</button>}
-              {section === 'abilities' && <button type="button" onClick={test}>Test {draft.name || 'your NPC'} →</button>}
+              {nextPage && <button type="button" onClick={() => edit(nextPage[0])}>Continue to {nextPage[1].toLowerCase()} →</button>}
+              {!nextPage && !docked && <button type="button" onClick={test}>Test {draft.name || 'your NPC'} →</button>}
             </div>
           </section>
 
-          <aside className="side-col bench-col" aria-label="Isolated test session" hidden={section !== 'test'}>
-            <h2 id="test-heading" className="sr-only" tabIndex={-1}>Test your NPC</h2>
-            {status === 'checking' && <p className="note-box" role="status">Checking your draft before testing…</p>}
-            {status === 'invalid' && problemList}
-            {status === 'error' && <div className="note-box" role="alert">Couldn’t check this draft. <button type="button" className="secondary small" onClick={() => setRetry(n => n + 1)}>Check again</button></div>}
-            <Bench key={started} draft={draft} valid={valid} onBusy={setBenchBusy} tested={tested} onCheckedAction={(npc) => setTestedKey(draftKey(npc))} onReset={() => setTestedKey(null)} onUseInGame={() => void openConnection()} onEditCharacter={() => edit('character')} />
+          <aside className="side-col bench-col" aria-label="Isolated test session" hidden={!docked && section !== 'test'}>
+            <div className="bench-sticky">
+              <h2 id="test-heading" className="sr-only" tabIndex={-1}>Test your NPC</h2>
+              {status === 'checking' && <p className="note-box" role="status">Checking your draft before testing…</p>}
+              {status === 'invalid' && !docked && problemList}
+              {status === 'error' && <div className="note-box" role="alert">Couldn’t check this draft. <button type="button" className="secondary small" onClick={() => setRetry(n => n + 1)}>Check again</button></div>}
+              <Bench key={started} draft={draft} valid={valid} onBusy={setBenchBusy} tested={tested} onCheckedAction={(npc) => setTestedKey(draftKey(npc))} onReset={() => setTestedKey(null)} onUseInGame={() => void openConnection()} onEditCharacter={() => edit('character')} />
+            </div>
           </aside>
         </fieldset>
       )}
@@ -864,11 +952,12 @@ function Section({ id, title, intro, children, active }: { id: string; title: st
   );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+// A row puts the label beside its control when the definition is wide enough.
+function Field({ label, hint, row, children }: { label: string; hint?: string; row?: boolean; children: ReactNode }) {
   return (
-    <label className="field">
+    <label className={row ? 'field field-row' : 'field'}>
       <span className="field-label">
-        {label} {hint && <span className="muted">· {hint}</span>}
+        {label} {hint && <span className="muted field-hint"><span className="field-hint-dot">· </span>{hint}</span>}
       </span>
       {children}
     </label>
@@ -1399,15 +1488,17 @@ function Bench({ draft, valid, onBusy, tested, onCheckedAction, onReset, onUseIn
       </dialog>
       <section className="panel bench">
         <div className="def-top">
-          <h2>Talk to {draft.name || 'your NPC'}</h2>
+          <div>
+            <h2>Test {draft.name || 'your NPC'}</h2>
+            <p className="muted small">Isolated session · {MODEL_INFO[draft.model].label}</p>
+          </div>
           <button className="secondary small" ref={resetButton} onClick={requestReset} disabled={busy}>
-            {resetting ? 'Resetting…' : 'Reset test session'}
+            {resetting ? 'Resetting…' : 'Reset'}
           </button>
         </div>
-        <p className="muted small">Try a normal request, then challenge a rule. Each proposed action is checked in this isolated session.</p>
         <div className={`messages bench-messages${emptyConversation ? ' empty' : ''}`} ref={box}>
           <ConversationLog name={draft.name || 'your NPC'}>
-            {emptyConversation && <div className="note">Choose a suggested request below, or write your own.</div>}
+            {emptyConversation && <div className="note">Try a normal request, then challenge a rule. Each proposed action is checked in this isolated session.</div>}
             {view &&
               conversation.map((e) => <Fragment key={e.id}>
                 {!(explanations[e.id] && e.type === 'ACTION_REJECTED') && <BenchEntry event={e} view={view} npcName={draft.name} controlled={controlled.has(e.id) || (e.type === 'ACTION_REJECTED' && e.data.source === 'workshop-controlled')} />}
@@ -1427,6 +1518,18 @@ function Bench({ draft, valid, onBusy, tested, onCheckedAction, onReset, onUseIn
               Time passes<span className="dots" />
             </div>
           )}
+          {view && view.events.some(isControlled) && <div className="controlled-results" aria-label="Controlled tests">
+            <p className="muted small">Controlled tests · sent by the workshop, no model asked</p>
+            {view.events.filter(isControlled).map((event) => explanations[event.id]
+              ? <ActionCheck key={event.id} check={explanations[event.id]} />
+              : <BenchEntry key={event.id} event={event} view={view} npcName={draft.name} controlled />)}
+          </div>}
+        </div>
+        {last?.kind === 'model' && <p className="bench-verdict" role="status">{outcomeText(last)}</p>}
+        <div className="bench-suggestions" aria-label="Suggested messages">
+          <button type="button" className="secondary" disabled={busy || !valid} title={ideas.normal} aria-label={`Normal request: ${ideas.normal}`} onClick={() => void send(ideas.normal)}>Try a normal request</button>
+          <button type="button" className="secondary" disabled={busy || !valid} title={ideas.challenges[0]} aria-label={`Rule challenge: ${ideas.challenges[0]}`} onClick={() => void send(ideas.challenges[0])}>Try a challenge</button>
+          <button type="button" className="secondary" disabled={busy || !valid} title={`${ideas.controlled.label}. The workshop sends this straight to the ledger; no model is asked.`} onClick={() => void test()}>Controlled rejection test</button>
         </div>
         <form className="chat-form" onSubmit={submit}>
           <input
@@ -1440,25 +1543,12 @@ function Bench({ draft, valid, onBusy, tested, onCheckedAction, onReset, onUseIn
           />
           <button disabled={busy || !valid || !text.trim()}>Send</button>
         </form>
-        <div className="bench-suggestions" aria-label="Suggested messages">
-          <button type="button" className="secondary" disabled={busy || !valid} onClick={() => void send(ideas.normal)}><span>Normal request</span>{ideas.normal}</button>
-          <button type="button" className="secondary" disabled={busy || !valid} onClick={() => void send(ideas.challenges[0])}><span>Rule challenge</span>{ideas.challenges[0]}</button>
-        </div>
-        {last?.kind === 'model' && <p className="bench-verdict" role="status">{outcomeText(last)}</p>}
         <div className={`bench-handoff${tested ? ' ready' : ''}`}>
-          {tested ? <p role="status"><b>{draft.name} completed a checked action.</b></p>
-            : <p>{valid ? 'You can use this character in your game before running a model test.' : 'Fix the character’s settings before using it in your game.'}</p>}
-          <div className="actions"><button type="button" className={tested ? undefined : 'secondary'} disabled={busy || !valid} onClick={onUseInGame}>Use {draft.name || 'this NPC'} in your game →</button>
+          {tested ? <p role="status"><b>✓ {draft.name} completed a checked action.</b></p>
+            : <p className="muted small">{valid ? 'You can use this character in your game before running a model test.' : 'Fix the character’s settings before using it in your game.'}</p>}
+          <div className="actions"><button type="button" className="text-button" disabled={busy || !valid} onClick={onUseInGame}>Use {draft.name || 'this NPC'} in your game →</button>
           <button type="button" className="text-button" disabled={busy} onClick={onEditCharacter}>Edit character</button></div>
         </div>
-        <details className="bench-tools">
-          <summary>Controlled tests · no model</summary>
-          <p className="muted small">The workshop sends a rule-breaking proposal straight to the ledger. This checks the rule without asking the model.</p>
-          <button type="button" className="secondary small" disabled={busy || !valid} onClick={() => void test()}>{ideas.controlled.label}</button>
-          <div className="controlled-results">{view?.events.filter(isControlled).map((event) => explanations[event.id]
-            ? <ActionCheck key={event.id} check={explanations[event.id]} />
-            : <BenchEntry key={event.id} event={event} view={view} npcName={draft.name} controlled />)}</div>
-        </details>
         <details className="bench-tools">
           <summary>More test options</summary>
         <div className="attacks">
