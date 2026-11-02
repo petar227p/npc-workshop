@@ -40,7 +40,7 @@ for (const who of ['keeper', 'cottager', 'farmer', 'bard']) {
     talk = r.world;
     console.log(`  You: ${text}`);
     for (const e of r.events) if (e.type === 'SAID' && e.actor === who) console.log(`  ${n.name}: ${e.data.text}`);
-    if ('outcome' in r && r.outcome !== 'ok') console.log(`  (${r.outcome})`);
+    if ('outcome' in r && r.outcome !== 'acted') console.log(`  (${r.outcome})`);
   }
 }
 console.log(`\nlog: logs/${session}.jsonl`);
