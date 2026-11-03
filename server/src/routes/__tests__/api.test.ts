@@ -105,7 +105,7 @@ describe('api', () => {
     await b.send('/api/tick', { ticks: 1 });
 
     const late = await browser(app).send('/api/tick', { ticks: 1 });
-    expect(late).toMatchObject({ status: 503, json: { error: expect.stringMatching(/forge is full/) }, setCookie: null });
+    expect(late).toMatchObject({ status: 503, json: { error: expect.stringMatching(/server is full/) }, setCookie: null });
 
     t = 31 * 60_000;
     await b.send('/api/tick', { ticks: 1 }); // b is active again; a has been idle 31 minutes

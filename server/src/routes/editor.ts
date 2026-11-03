@@ -84,7 +84,7 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
   const claimTurn = (c: Context<Env>, npc: NpcDefinition): NpcModel | Response => {
     const s = c.get('session');
     if (s.benchTurns >= perSession) {
-      return c.json({ error: `That's all ${perSession} test turns for this visit. The forge is still open.` }, 429);
+      return c.json({ error: `You've used all ${perSession} test turns for this visit. Your draft is still saved in this browser.` }, 429);
     }
     const t = now();
     recent = recent.filter((at) => t - at < 60_000);
