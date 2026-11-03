@@ -2,7 +2,7 @@ import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Editor } from './Editor';
 import { Entrance } from './Entrance';
-import type { Page } from './SiteHeader';
+import { SiteHeader, type Page } from './SiteHeader';
 import { VillagePage } from './VillagePage';
 import './style.css';
 
@@ -34,7 +34,8 @@ function App() {
   }, [page]);
 
   return (
-    <main className={page === 'home' ? 'app' : 'app app-wide'}>
+    <main className={page === 'home' ? 'app app-wide app-home' : 'app app-wide'}>
+      {page === 'home' && <SiteHeader page={page} />}
       <div ref={content} tabIndex={-1} className="page">
         {page === 'home' ? <Entrance /> : page === 'workshop' ? <Editor /> : <VillagePage />}
       </div>

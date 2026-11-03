@@ -14,7 +14,7 @@ NPC Workshop is an authoring and testing tool for game characters powered by lan
 
 Create a character, choose its abilities and limits, and test it in an isolated session. Then export it as a portable file and run it from your own game through an HTTP API. A playable demo village, featuring Brann the blacksmith, shows the full loop: negotiate an order, accept a checked offer, and collect the finished item.
 
-![NPC Workshop home page](docs/screenshot.png)
+![NPC Workshop home page with character configuration, checked actions, and the three creation steps](docs/screenshot.png)
 
 ## Contents
 

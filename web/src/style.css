@@ -237,54 +237,71 @@ button.danger { background: var(--bad); color: #2b1219; }
 .brand:hover { text-decoration: underline; text-underline-offset: 3px; }
 .brand:focus-visible, .entrance a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .page:focus { outline: none; }
-.entrance { max-width: 1040px; margin: 0 auto; padding: 5vh 0 32px; display: flex; flex-direction: column; gap: 32px; }
-.entrance-hero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: center; gap: 40px; }
+/* Home shares the studio's ruled surfaces, pixel headings, and role emblems. */
+.entrance { max-width: 1120px; margin: 0 auto; padding: 32px 32px 40px; }
+.entrance-hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); align-items: center; gap: 64px; }
 .entrance-intro { min-width: 0; }
-.entrance-heading-group { max-width: 17ch; font: 600 clamp(32px, 3.5vw, 44px)/1.12 Inter, system-ui, sans-serif; }
-.entrance-brand { display: block; width: 300px; max-width: 100%; height: auto; margin: 0 auto 24px; position: relative; left: -40px; image-rendering: pixelated; }
-.entrance-intro h1 { max-width: 17ch; font: 600 clamp(32px, 3.5vw, 44px)/1.12 Inter, system-ui, sans-serif; letter-spacing: -.035em; color: var(--text); }
-.entrance-description { margin: 20px 0 24px; max-width: 48ch; font-size: 16px; color: var(--muted); }
+.entrance-brand { display: block; width: 280px; max-width: 100%; height: auto; margin: 0 0 24px; image-rendering: pixelated; }
+.entrance-eyebrow { margin: 0 0 18px; color: var(--muted); font: 11px/1.5 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.entrance-intro h1 { margin: 0; color: var(--text); font: 400 clamp(36px, 4vw, 50px)/1.08 'Pixelify Sans', monospace; letter-spacing: -.025em; }
+.entrance-intro h1 > span { color: var(--accent); }
+.entrance-description { margin: 24px 0; max-width: 47ch; font-size: 15px; line-height: 1.7; color: var(--muted); }
 .entrance-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px 20px; }
-.entrance-build { display: inline-flex; align-items: center; gap: 16px; padding: 11px 18px; background: var(--accent); color: #181818; border-radius: 6px; font-weight: 600; text-decoration: none; }
+.entrance-build { display: inline-flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 44px; padding: 10px 18px; background: var(--accent); color: #181818; border-radius: 5px; font-weight: 600; text-decoration: none; }
 .entrance-build:hover { background: var(--accent-hover); }
-.entrance-demo-link { display: inline-block; color: var(--text); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; border-radius: 3px; }
+.entrance-demo-link { display: inline-block; color: var(--text); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; border-radius: 3px; font-size: 13px; }
 .entrance-demo-link:hover { text-decoration-color: var(--accent); }
-.entrance-preview { min-width: 0; margin: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); overflow-wrap: anywhere; }
-.entrance-preview figcaption { padding: 12px 16px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
-.entrance-config, .entrance-test { padding: 18px; }
-.entrance-preview-label { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
-.entrance-config h2 { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; font: 600 20px/1.3 Inter, system-ui, sans-serif; }
-.entrance-config h2 span { font-size: 13px; font-weight: 400; color: var(--muted); }
-.entrance-config dl { margin: 16px 0 0; display: flex; flex-direction: column; gap: 12px; font-size: 13px; }
-.entrance-config dl > div { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 12px; }
+.entrance-preview { min-width: 0; margin: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--pane); overflow: hidden; overflow-wrap: anywhere; }
+.entrance-preview figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 12px 18px; border-bottom: 1px solid var(--rule); color: var(--muted); font-size: 10px; }
+.entrance-preview figcaption > :first-child { color: var(--text); font: 400 15px/1.2 'Pixelify Sans', monospace; }
+.entrance-config, .entrance-test { padding: 20px; }
+.entrance-preview-label { margin: 0 0 14px; color: var(--muted); font: 10px/1.5 var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+.entrance-character { display: flex; align-items: center; gap: 14px; }
+.entrance-character .role-logo { width: 64px; height: 64px; }
+.entrance-character h2 { margin: 0 0 3px; font-size: 26px; font-weight: 400; }
+.entrance-character > div > span { color: var(--muted); font-size: 12px; }
+.entrance-config dl { margin: 18px 0 0; display: flex; flex-direction: column; font-size: 12px; }
+.entrance-config dl > div { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 10px; padding: 10px 0; border-top: 1px solid var(--rule); }
+.entrance-config dl > div:last-child { padding-bottom: 0; }
 .entrance-config dt { color: var(--muted); }
 .entrance-config dd { margin: 0; }
-.entrance-test { border-top: 1px solid var(--line); background: var(--panel-2); border-radius: 0 0 10px 10px; font-size: 13px; }
-.entrance-test > p { margin: 0 0 12px; }
-.entrance-test .entrance-verdict { display: flex; flex-direction: column; gap: 4px; margin: 0; padding-left: 12px; border-left: 2px solid var(--bad); }
+.entrance-ability { display: inline-block; margin: 0 5px 4px 0; padding: 2px 6px; background: var(--panel-2); border-radius: 3px; font-size: 11px; }
+.entrance-test { border-top: 1px solid var(--line); background: var(--receipt); font-size: 12px; }
+.entrance-proposal { margin: 0 0 16px; }
+.entrance-proposal > span { display: block; margin-bottom: 5px; color: var(--muted); }
+.entrance-test .entrance-verdict { display: flex; flex-direction: column; gap: 5px; margin: 0; padding-left: 12px; border-left: 2px solid var(--bad); }
 .entrance-verdict b { color: var(--bad); font-weight: 600; }
 .entrance-verdict span { color: var(--muted); }
-.entrance-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; list-style: none; margin: 0; padding: 22px 0; border-block: 1px solid var(--line); }
-.entrance-steps li { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
-.entrance-steps li > span { color: var(--muted); font-size: 12px; }
-.entrance-example { display: flex; align-items: center; gap: 24px; padding: 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
-.entrance-example-art { flex: 0 0 104px; align-self: stretch; min-height: 100px; display: grid; place-items: center; border-radius: 6px; background: linear-gradient(#7fb6d6 0 38%, #5a9e4b 38%); }
-.entrance-example-art .portrait { background-color: transparent; }
+.entrance-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); list-style: none; margin: 40px 0 0; padding: 0; border-block: 1px solid var(--receipt-line); background: var(--receipt); }
+.entrance-steps li { display: flex; align-items: center; gap: 18px; min-width: 0; padding: 28px 22px; }
+.entrance-steps li + li { border-left: 1px solid var(--receipt-line); }
+.entrance-steps li > span { flex: 0 0 32px; color: var(--accent); font: 400 56px/1 'Pixelify Sans', monospace; text-align: center; }
+.entrance-steps h2 { margin: 0 0 8px; font-size: 22px; font-weight: 400; line-height: 1.15; }
+.entrance-steps p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.entrance-example { display: flex; align-items: center; gap: 28px; padding: 28px 0 0; }
+.entrance-example-art { flex: 0 0 112px; display: grid; place-items: center; }
+.entrance-example-art .role-logo { width: 112px; height: 112px; }
 .entrance-example-copy { min-width: 0; }
-.entrance-example h2 { font: 600 16px/1.4 Inter, system-ui, sans-serif; }
-.entrance-example p { margin: 0 0 12px; color: var(--muted); max-width: 80ch; }
-@media (max-width: 900px) {
-  .entrance-hero { grid-template-columns: minmax(0, 1fr); gap: 28px; }
-  .entrance-intro h1 { max-width: 24ch; }
-  .entrance-heading-group { max-width: 24ch; }
-}
-@media (max-width: 640px) {
-  .entrance { padding-top: 24px; gap: 24px; }
-  .entrance-brand { width: 248px; left: -24px; }
+.entrance-example .entrance-eyebrow { margin: 0 0 6px; font-size: 10px; }
+.entrance-example h2 { margin: 0 0 6px; font-size: 24px; font-weight: 400; }
+.entrance-example-copy > p:not(.entrance-eyebrow) { margin: 0 0 12px; color: var(--muted); max-width: 74ch; font-size: 13px; line-height: 1.65; }
+@media (max-width: 1000px) {
+  .entrance { padding: 40px 24px; }
+  .entrance-hero { gap: 32px; }
   .entrance-actions { align-items: flex-start; flex-direction: column; }
-  .entrance-steps { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 20px 0; }
-  .entrance-example { align-items: flex-start; gap: 16px; padding: 16px; }
-  .entrance-example-art { flex-basis: 48px; align-self: flex-start; min-height: 64px; }
+}
+@media (max-width: 720px) {
+  .entrance { padding: 32px 20px; }
+  .entrance-hero { grid-template-columns: minmax(0, 1fr); }
+  .entrance-intro h1 { max-width: 22ch; }
+  .entrance-actions { flex-direction: row; align-items: center; }
+  .entrance-description { max-width: 56ch; }
+  .entrance-steps { grid-template-columns: minmax(0, 1fr); margin-top: 32px; }
+  .entrance-steps li { padding: 24px 20px; }
+  .entrance-steps li + li { border-left: 0; border-top: 1px solid var(--receipt-line); }
+  .entrance-example { align-items: flex-start; gap: 16px; }
+  .entrance-example-art { flex-basis: 64px; }
+  .entrance-example-art .role-logo { width: 64px; height: 64px; }
 }
 
 /* NPC workshop */
