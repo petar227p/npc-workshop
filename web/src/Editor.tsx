@@ -716,7 +716,7 @@ export function Editor() {
               <Field label="Id" hint="its file name: lowercase, digits, _">
                 <input data-field="id" value={draft.id} maxLength={41} onChange={(e) => set('id', e.target.value)} />
               </Field>
-              <Field label="Full persona" hint={`${draft.persona.length} / ${MAX_PERSONA_LENGTH} · sent first, as the system prompt`}>
+              <Field label="Full persona" hint={`${draft.persona.length} / ${MAX_PERSONA_LENGTH} · sent first, as the system prompt; the Personality on the Character page is the part between the workshop:personality markers`}>
                 <textarea data-field="persona" className="persona" value={draft.persona} maxLength={MAX_PERSONA_LENGTH} onChange={(e) => set('persona', e.target.value)} />
               </Field>
               <div className="row2">
@@ -1062,40 +1062,75 @@ function Schedule({ places, home, value, onChange }: { places: string[]; home: s
 // What the model and players call each thing it deals in. Only needed when a name isn't a word, such as a game's own
 // item id: the NPC then says "iron sword" while the ledger, the log and the dev API keep the id. A name with no label
 // left in the box is dropped.
+const NAME_PATTERN = /^[a-z][a-z0-9_]{0,40}$/;
+
+// One row per name: the id the ledger and the game use, and the words the NPC and players see for it.
 function Labels({ draft, onChange }: { draft: NpcDraft; onChange: (labels: Record<string, string>) => void }) {
   const { start, catalogue, labels } = draft;
-  const names = [
-    ...new Set([
-      ...Object.keys(catalogue.made_to_order?.items ?? {}),
-      ...Object.keys(catalogue.made_to_order?.materials ?? {}),
-      ...Object.keys(catalogue.in_stock ?? {}),
-      ...Object.keys(start.stock),
-      ...Object.keys(labels),
-    ]),
-  ];
-  const [extra, setExtra] = useState('');
-  const put = (name: string, label: string) => {
+  const dealt = new Set([
+    ...Object.keys(catalogue.made_to_order?.items ?? {}),
+    ...Object.keys(catalogue.made_to_order?.materials ?? {}),
+    ...Object.keys(catalogue.in_stock ?? {}),
+    ...Object.keys(start.stock),
+  ]);
+  // Names added here stay listed while their label is being retyped, even when it is briefly empty.
+  const [added, setAdded] = useState<string[]>([]);
+  const names = [...new Set([...dealt, ...Object.keys(labels), ...added])];
+  const [id, setId] = useState('');
+  const [label, setLabel] = useState('');
+  const idProblem = !id ? '' : !NAME_PATTERN.test(id) ? 'Use lowercase letters, digits and _, starting with a letter.' : names.includes(id) ? 'That id is already listed.' : '';
+  const put = (name: string, value: string) => {
     const { [name]: _old, ...rest } = labels;
-    onChange(label.trim() ? { ...rest, [name]: label } : rest);
+    onChange(value.trim() ? { ...rest, [name]: value } : rest);
+  };
+  const add = (event: FormEvent) => {
+    event.preventDefault();
+    if (!id || idProblem) return;
+    put(id, label.trim() || id.replace(/_/g, ' '));
+    setAdded((list) => [...list, id]);
+    setId('');
+    setLabel('');
+    document.getElementById('label-new-id')?.focus();
+  };
+  const remove = (name: string) => {
+    put(name, '');
+    setAdded((list) => list.filter((n) => n !== name));
   };
   return (
     <div className="field">
-      <span className="field-label">
-        What it calls things <span className="muted">· only for names that aren't words, like a game's item ids; the ledger keeps the name</span>
-      </span>
-      {names.length === 0 && <span className="muted small">It deals in nothing yet.</span>}
-      {names.map((n) => (
-        <div key={n} className="inline">
-          <code className="small">{n}</code>
-          <input data-field={`labels.${n}`} value={labels[n] ?? ''} placeholder={n} maxLength={MAX_LABEL_LENGTH} onChange={(e) => put(n, e.target.value)} aria-label={`What it calls ${n}`} />
-        </div>
-      ))}
-      <div className="inline">
-        <input value={extra} placeholder="another name it may get (itm_wolf_pelt)" onChange={(e) => setExtra(e.target.value.trim())} aria-label="Another name" />
-        <button type="button" className="secondary small" disabled={!/^[a-z][a-z0-9_]{0,40}$/.test(extra) || names.includes(extra)} onClick={() => (put(extra, extra.replace(/_/g, ' ')), setExtra(''))}>
-          Add
-        </button>
-      </div>
+      <p className="muted small">
+        Only needed for ids that aren't words, like a game's item ids. The ledger and your game keep the id; the NPC and players see the label.
+      </p>
+      <table className="labels-table">
+        <thead>
+          <tr><th scope="col">Item id</th><th scope="col">Label the NPC uses</th><th scope="col"><span className="sr-only">Remove</span></th></tr>
+        </thead>
+        <tbody>
+          {names.length === 0 && <tr><td colSpan={3} className="muted small">It deals in nothing yet.</td></tr>}
+          {names.map((n) => (
+            <tr key={n}>
+              <td><code>{n}</code></td>
+              <td>
+                <input data-field={`labels.${n}`} value={labels[n] ?? ''} placeholder={n.replace(/_/g, ' ')} maxLength={MAX_LABEL_LENGTH} onChange={(e) => put(n, e.target.value)} aria-label={`Label for ${n}`} />
+              </td>
+              <td>{!dealt.has(n) && <button type="button" className="secondary small" aria-label={`Remove ${n}`} onClick={() => remove(n)}>Remove</button>}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>
+              <input id="label-new-id" form="label-add" value={id} placeholder="itm_wolf_pelt" maxLength={41} aria-label="New item id" aria-invalid={Boolean(idProblem)} aria-describedby="label-new-help" onChange={(e) => setId(e.target.value.trim())} />
+            </td>
+            <td>
+              <input form="label-add" value={label} placeholder={id ? id.replace(/_/g, ' ') : 'wolf pelt'} maxLength={MAX_LABEL_LENGTH} aria-label="Label for the new item id" onChange={(e) => setLabel(e.target.value)} />
+            </td>
+            <td><button type="submit" form="label-add" className="secondary small" disabled={!id || Boolean(idProblem)}>Add</button></td>
+          </tr>
+        </tfoot>
+      </table>
+      <form id="label-add" onSubmit={add} hidden />
+      <span id="label-new-help" className={idProblem ? 'small labels-error' : 'muted small'}>{idProblem || 'Another id it may get from your game. The label defaults to the id with spaces.'}</span>
     </div>
   );
 }

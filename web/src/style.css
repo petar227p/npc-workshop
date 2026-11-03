@@ -379,6 +379,14 @@ p.small { margin: 0 0 8px; }
 .verbs td { padding: 7px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .verbs th:not(:first-child), .verbs td:not(:first-child) { text-align: center; width: 110px; }
 .verbs code { font-weight: 700; }
+.labels-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.labels-table th { text-align: left; font-size: 11px; color: var(--muted); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.labels-table td { padding: 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.labels-table td:first-child { width: 40%; }
+.labels-table td:last-child { width: 1%; white-space: nowrap; }
+.labels-table input { width: 100%; }
+.labels-table tfoot td { border-bottom: 0; padding-top: 10px; }
+.labels-error { color: var(--bad); }
 input[type='checkbox'] { accent-color: var(--accent); width: 16px; height: 16px; }
 .facts { display: flex; flex-direction: column; gap: 6px; }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; cursor: pointer; }
@@ -533,7 +541,8 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 
 /* Workshop: look and day */
 .sprites { display: flex; flex-wrap: wrap; gap: 4px; }
-.sprite { width: 36px; height: 36px; padding: 0; border: 2px solid transparent; border-radius: 6px; background: var(--panel-2) url(/assets/dungeon/tilemap_packed.png) no-repeat; background-size: 384px 352px; image-rendering: pixelated; }
+/* The tile fills only the 32 px inside the border; painted under it too, the border would show the edges of the neighbouring tiles. */
+.sprite { width: 36px; height: 36px; padding: 0; border: 2px solid transparent; border-radius: 6px; background: var(--panel-2) url(/assets/dungeon/tilemap_packed.png) no-repeat; background-size: 384px 352px; image-rendering: pixelated; background-clip: padding-box; }
 .sprite.on { border-color: var(--accent); }
 .field .inline { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 /* God mode */
