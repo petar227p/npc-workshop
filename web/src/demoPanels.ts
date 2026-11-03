@@ -17,7 +17,6 @@ export type PanelAction =
   | { type: 'tab'; tab: InspectTab }
   | { type: 'follow'; to: HintLink } // a hint's link: open what it's about and point at it
   | { type: 'revealed' }
-  | { type: 'arrived' } // something new is in the player's hands
   | { type: 'partner' }; // the conversation moved to someone else, whose stock is not the one shown
 
 export const NO_PANELS: Panels = { open: null, tab: 'activity', reveal: null };
@@ -46,9 +45,6 @@ export function panelsReducer(s: Panels, a: PanelAction): Panels {
     }
     case 'revealed':
       return { ...s, reveal: null };
-    // Until the Bag has its own arrival cue, an arrival shows the Bag, but never in place of a panel the player opened.
-    case 'arrived':
-      return s.open === null ? { ...s, open: 'bag' } : s;
     case 'partner':
       return s.open === 'stock' ? { ...s, open: null } : s;
   }

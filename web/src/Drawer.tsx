@@ -4,29 +4,53 @@ import { useEffect, useId, useRef, type ReactNode } from 'react';
 // stay usable. It takes focus when it opens, Esc or Close shuts it, and focus goes back to whatever opened it.
 // `data-overlay` tells the village scene that keys pressed in here aren't for walking.
 // opener: the button that opened it, where focus goes back (Safari doesn't focus a clicked button, so focus alone can't say).
-export function Drawer({ title, onClose, opener, children }: { title: string; onClose: () => void; opener?: HTMLElement | null; children: ReactNode }) {
+// open: a drawer can stay mounted while closed (hidden), so what's typed in it is still there when it opens again.
+// className: where it sits; `slot` keeps it inside the village instead of over the right of the page.
+export function Drawer({
+  title,
+  onClose,
+  opener,
+  open = true,
+  id,
+  className,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  opener?: HTMLElement | null;
+  open?: boolean;
+  id?: string;
+  className?: string;
+  children: ReactNode;
+}) {
   const heading = useId();
   const box = useRef<HTMLElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
+  const back = useRef(opener);
+  back.current = opener;
 
   useEffect(() => {
-    const back = opener ?? (document.activeElement as HTMLElement | null);
+    if (!open) return;
+    const to = back.current ?? (document.activeElement as HTMLElement | null);
     box.current?.focus();
     return () => {
-      // Only if focus is still ours: a click elsewhere that closed it has already put focus where it belongs.
-      if (back?.isConnected && (!document.activeElement || document.activeElement === document.body || box.current?.contains(document.activeElement)))
-        back.focus();
+      // Only if focus is still ours (hiding the drawer drops it to the body): a click elsewhere that closed it has
+      // already put focus where it belongs, and another drawer opening in its place takes it next.
+      if (to?.isConnected && (!document.activeElement || document.activeElement === document.body || box.current?.contains(document.activeElement)))
+        to.focus();
     };
-  }, []);
+  }, [open]);
 
   return (
     <aside
-      className="drawer"
+      id={id}
+      className={className ? `drawer ${className}` : 'drawer'}
       role="dialog"
       aria-labelledby={heading}
       ref={box}
       tabIndex={-1}
+      hidden={!open}
       data-overlay
       onKeyDown={(e) => {
         if (e.key !== 'Escape') return;

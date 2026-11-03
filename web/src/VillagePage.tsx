@@ -7,6 +7,7 @@ import { Drawer } from './Drawer';
 import { God } from './God';
 import { Forge, gearCount, Hud, InventoryContent, News, Stock, VillageLog } from './Side';
 import { HelpMenu, HintBar, useHints } from './HintBar';
+import { InspectTabs } from './InspectTabs';
 import { SiteHeader } from './SiteHeader';
 import type { HintLink } from './hints';
 import { Help } from './Tip';
@@ -111,10 +112,8 @@ export function VillagePage() {
     api.state().then(setView, (e: Error) => setError(e.message));
   }, []);
 
-  // Something arrived: show the gear, without taking focus from wherever the player is.
-  useEffect(() => {
-    if (arrivals.gear) panel({ type: 'arrived' });
-  }, [arrivals.gear]);
+  // Something arrived: the Bag's count goes up and the hint offers Show it. The Bag doesn't open on its own: it's a
+  // drawer over the village and would take focus from wherever the player is.
   // Opening Rumours is reading them.
   const { seenHeard } = arrivals;
   useEffect(() => {
@@ -183,8 +182,6 @@ export function VillagePage() {
     setTalkTo(to);
     run(api.give(to, gift));
   };
-  const opener = useRef<HTMLElement | null>(null);
-  const closeStock = useCallback(() => panel({ type: 'close', panel: 'stock' }), []);
   // What a hint's link shows, once the panel it's in has rendered and settled: a task later, so the target gets
   // focus after anything that took it while opening.
   useEffect(() => {
@@ -222,12 +219,20 @@ export function VillagePage() {
       {label}
     </button>
   );
-  // Until the drawers (task 4), the open panel shows under the bar. Every body stays mounted while hidden, so the
-  // log's filter, an unsent report and the Give form keep what they had.
-  const utilityPanel = (p: Panel, title: string, body: ReactNode) => (
-    <section id={`panel-${p}`} className="utility-panel" aria-label={title} hidden={panels.open !== p}>
+  // The panels open in one drawer slot over the village's left side, beside the buttons that open them, so the
+  // conversation stays in view and usable. Each stays mounted while closed: the log's filter, an unsent report and
+  // the Give form keep what they had. Closing puts focus back on the panel's own button.
+  const drawer = (p: Panel, title: string, body: ReactNode) => (
+    <Drawer
+      id={`panel-${p}`}
+      className="slot"
+      title={title}
+      open={panels.open === p}
+      onClose={() => panel({ type: 'close', panel: p })}
+      opener={document.getElementById(`${p}-button`)}
+    >
       {body}
-    </section>
+    </Drawer>
   );
   return (
     <div className="demo-page">
@@ -258,6 +263,44 @@ export function VillagePage() {
             onLink={follow}
             onTurnOff={() => hints.setEnabled(false)}
           />
+          {drawer('bag', 'Bag', <InventoryContent view={view} disabled={busy} onGive={give} />)}
+          {drawer(
+            'rumours',
+            'Rumours',
+            <>
+              <p className="muted small">What’s going around, and who heard it from whom.</p>
+              <News view={view} />
+            </>,
+          )}
+          {drawer(
+            'inspect',
+            'Inspect village',
+            <InspectTabs
+              tab={panels.tab}
+              onTab={(tab) => panel({ type: 'tab', tab })}
+              panels={{
+                activity: (
+                  <>
+                    <p className="muted small">Everything that happened, and what the rules allowed.</p>
+                    <VillageLog view={view} />
+                  </>
+                ),
+                sandbox: <God view={view} disabled={busy} onRead={readNote} onReport={(r) => run(api.report(r))} />,
+              }}
+            />,
+          )}
+          {seller &&
+            drawer(
+              'stock',
+              `${nameOf(view, talkTo)}'s stock`,
+              <>
+                <p className="muted small">
+                  What {nameOf(view, talkTo)} has on hand right now, not counting reserved materials{' '}
+                  <Help about="reserved materials" text="These materials are set aside for accepted orders." />
+                </p>
+                <Stock view={view} shop={talkTo} />
+              </>,
+            )}
         </div>
         <div className="talk-col">
           <Chat
@@ -274,12 +317,11 @@ export function VillagePage() {
             headExtra={
               seller && (
                 <button
+                  id="stock-button"
                   className="secondary small"
                   aria-expanded={panels.open === 'stock'}
-                  onClick={(e) => {
-                    opener.current = e.currentTarget;
-                    panel({ type: 'toggle', panel: 'stock' });
-                  }}
+                  aria-controls="panel-stock"
+                  onClick={() => panel({ type: 'toggle', panel: 'stock' })}
                 >
                   {nameOf(view, talkTo)}'s stock
                 </button>
@@ -314,45 +356,7 @@ export function VillagePage() {
             )}
             {barButton('inspect', 'Inspect village')}
           </nav>
-          {utilityPanel('bag', 'Bag', <InventoryContent view={view} disabled={busy} onGive={give} />)}
-          {utilityPanel(
-            'rumours',
-            'Rumours',
-            <>
-              <p className="muted small">What’s going around, and who heard it from whom.</p>
-              <News view={view} />
-            </>,
-          )}
-          {utilityPanel(
-            'inspect',
-            'Inspect village',
-            <>
-              <div className="inspect-switch" role="group" aria-label="Inspect village">
-                {(['activity', 'sandbox'] as const).map((t) => (
-                  <button key={t} type="button" className="secondary small" aria-pressed={panels.tab === t} onClick={() => panel({ type: 'tab', tab: t })}>
-                    {t === 'activity' ? 'Activity' : 'Sandbox'}
-                  </button>
-                ))}
-              </div>
-              <div hidden={panels.tab !== 'activity'}>
-                <p className="muted small">Everything that happened, and what the rules allowed.</p>
-                <VillageLog view={view} />
-              </div>
-              <div hidden={panels.tab !== 'sandbox'}>
-                <God view={view} disabled={busy} onRead={readNote} onReport={(r) => run(api.report(r))} />
-              </div>
-            </>,
-          )}
         </div>
-        {seller && panels.open === 'stock' && (
-          <Drawer title={`${nameOf(view, talkTo)}'s stock`} onClose={closeStock} opener={opener.current}>
-            <p className="muted small">
-              What {nameOf(view, talkTo)} has on hand right now, not counting reserved materials{' '}
-              <Help about="reserved materials" text="These materials are set aside for accepted orders." />
-            </p>
-            <Stock view={view} shop={talkTo} />
-          </Drawer>
-        )}
       </div>
     </div>
   );

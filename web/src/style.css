@@ -183,6 +183,7 @@ button.danger { background: var(--bad); color: #2b1219; }
 .chat-head > div:not(.portrait):not(.chat-head-extra) { min-width: 0; flex: 1 1 160px; }
 .chat-name select { max-width: 100%; }
 .drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 20; width: min(420px, 100vw); display: flex; flex-direction: column; background: var(--panel); border-left: 1px solid var(--line); box-shadow: -12px 0 32px #0009; }
+.drawer[hidden] { display: none; }
 .drawer:focus { outline: none; }
 .drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 .drawer-head h2 { margin: 0; font-size: 17px; }
@@ -443,8 +444,7 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .talk-col > .error { border-radius: 0; border-width: 1px 0 0; padding: 10px 16px; }
 .demo-page .talk-col > .forge { padding: 12px 16px; border-top: 1px solid var(--rule); }
 .demo-page .forge > h2 { margin: 0 0 10px; font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9a9a9a; }
-/* The utility bar sits on the village's bottom edge: Bag, Rumours and Inspect village, one panel open at a time. Until
-   the drawers, the open panel shows under it. */
+/* The utility bar sits on the village's bottom edge: Bag, Rumours and Inspect village, one panel open at a time. */
 .utility { grid-area: utility; min-width: 0; }
 .utility-bar { display: flex; border-bottom: 1px solid var(--rule); background: var(--panel); }
 .utility-bar > button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; background: none; border: 0; border-right: 1px solid var(--rule); border-radius: 0; color: #c8c8c8; font-weight: 500; box-shadow: inset 0 -2px 0 transparent; }
@@ -453,14 +453,18 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .utility-bar > button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .utility-bar .cue { margin-left: 0; }
 .bar-count { min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--panel-2); color: var(--text); font-size: 12px; font-weight: 600; text-align: center; }
-.utility-panel { padding: 12px 16px 24px; background: #1f1d17; border-bottom: 1px solid #3a3426; }
-.utility-panel .panel { background: none; border: 0; padding: 0; border-radius: 0; }
-.utility-panel .news > h2, .utility-panel .ledger > h2, .utility-panel .god > h2 { display: none; }
-.utility-panel .god > h2 + p { margin-top: 0; }
-.utility-panel .ledger { max-height: 560px; overflow-y: auto; background: inherit; }
-.utility-panel > p:first-child { margin-top: 0; }
-.inspect-switch { display: flex; gap: 6px; margin-bottom: 12px; }
-.inspect-switch [aria-pressed='true'] { border-color: var(--accent); color: var(--accent); }
+.stage { position: relative; }
+/* The drawer slot: over the village's left side, beside the bar buttons that open it, never over the conversation.
+   It doesn't resize the game; long content scrolls inside it. */
+.drawer.slot { position: absolute; top: 0; right: auto; bottom: 0; left: 0; z-index: 5; width: min(420px, 100%); border-left: 0; border-right: 1px solid var(--line); box-shadow: 12px 0 32px #0009; }
+.drawer.slot .ledger { max-height: none; background: none; }
+.drawer.slot .god > h2 { display: none; }
+.drawer.slot .god > h2 + p { margin-top: 0; }
+.inspect-tabs { display: flex; gap: 4px; margin: -4px 0 12px; border-bottom: 1px solid var(--rule); }
+.inspect-tabs [role='tab'] { min-height: 40px; padding: 0 12px; background: none; border: 0; border-radius: 0; box-shadow: inset 0 -2px 0 transparent; color: #c8c8c8; font-weight: 500; }
+.inspect-tabs [role='tab']:hover { color: var(--text); }
+.inspect-tabs [role='tab'][aria-selected='true'] { color: var(--accent); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent); }
+.inspect-tabs [role='tab']:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 @media (min-width: 861px) {
   .demo-page > .top { position: sticky; top: 0; z-index: 15; }
   /* The village fills most of the window, with the hint and the utility bar under it. */

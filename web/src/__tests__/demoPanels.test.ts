@@ -37,11 +37,6 @@ describe('demo panels', () => {
     expect(linkTarget({ kind: 'goods' })).toEqual({ panel: 'bag', id: 'bag-goods' });
   });
 
-  it('an arrival shows the Bag only when nothing else is open', () => {
-    expect(run({ type: 'arrived' }).open).toBe('bag');
-    expect(run({ type: 'toggle', panel: 'inspect' }, { type: 'arrived' }).open).toBe('inspect');
-  });
-
   it('talking to someone else closes the stock, and only the stock', () => {
     expect(run({ type: 'toggle', panel: 'stock' }, { type: 'partner' }).open).toBeNull();
     expect(run({ type: 'toggle', panel: 'rumours' }, { type: 'partner' }).open).toBe('rumours');
