@@ -213,7 +213,6 @@ NPC Workshop was built for the Meta Muse hackathon (November 2026) and is a work
 - Abilities come from the built-in, code-owned verb library.
 - Map-dependent settings (location, schedule, perception, sprites) use the bundled example village.
 - Worlds are held in memory and lost on server restart. Editing a draft does not update running worlds.
-- The Skyrim adapter's API and ledger path is covered by automated tests; the in-game trade and save/load journey has not been verified yet.
 - Engine adapters, durable storage and a global spend budget are not yet implemented.
 
 ## Roadmap
