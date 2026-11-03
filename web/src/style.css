@@ -501,9 +501,27 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
   .demo-layout { grid-template-columns: minmax(0, 1fr); }
   .utility-bar > button { flex: 1 1 0; justify-content: center; padding: 0 8px; }
   .utility-bar > button:last-child { border-right: 0; }
-  .game { height: 55vh; min-height: 220px; }
+  /* Dynamic viewport units, so browser bars (and, where the browser resizes for it, the keyboard) don't hide the
+     composer or a sheet's controls. The vh lines are for browsers without them. */
+  .game { height: 45vh; height: 45dvh; min-height: 200px; }
   .talk-col { border-left: 0; border-top: 1px solid var(--rule); }
-  .demo-page .talk-col .chat-panel { height: 60vh; }
+  .demo-page .talk-col .chat-panel { height: 80vh; height: 80dvh; min-height: 320px; }
+  /* The drawer slot becomes a sheet from the bottom, modal (Drawer's `modal`): its body scrolls, its Close stays. */
+  .drawer.slot { position: fixed; top: auto; right: 0; bottom: 0; left: 0; z-index: 40; width: auto; max-height: 85vh; max-height: 85dvh; border: 0; border-top: 1px solid var(--line); border-radius: 12px 12px 0 0; box-shadow: 0 -12px 32px #0009; padding-bottom: env(safe-area-inset-bottom); }
+  .drawer.slot .drawer-body { min-height: 0; }
+  .drawer-backdrop { position: fixed; inset: 0; z-index: 39; background: #000a; }
+  .drawer-backdrop[hidden] { display: none; }
+  /* Touch targets at least 44 px. The small ? beside a label keeps its look and gets a bigger invisible hit area. */
+  .village-toolbar button:not(.tip-help), .village-toolbar .popover button, .village-toolbar .popover a,
+  .drawer-head button, .inspect-tabs [role='tab'], .chat-head select, .chat-head-extra button,
+  .chat-form input, .chat-form button, .forge-head button, .contract .actions button, .hint button,
+  .log-filters button, .drawer.slot button, .drawer.slot select, .drawer.slot input:not([type='checkbox']) { min-height: 44px; }
+  .drawer-head button, .hint-x { min-width: 44px; }
+  .hint-off, .hint-x, .village-toolbar .popover a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
+  .job > summary { min-height: 44px; }
+  .demo-page > .top .brand, .demo-page > .top .tabs a, .demo-page .demo-build { display: inline-flex; align-items: center; min-height: 44px; }
+  .demo-page .help, .demo-page .tip-help { position: relative; }
+  .demo-page .help::after, .demo-page .tip-help::after { content: ''; position: absolute; inset: -13px; }
 }
 /* A phone: the village toolbar packs tighter so time, gold and its four buttons fit one row. */
 @media (max-width: 640px) {

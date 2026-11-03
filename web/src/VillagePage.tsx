@@ -54,6 +54,21 @@ function useArrivals(view: StateView | null) {
   return { gear, unseen, heard, seenHeard: useCallback(() => setHeard(false), []), seenGear: useCallback(() => setUnseen(false), []) };
 }
 
+// Phone width, where the village stacks above the conversation and its drawers become modal sheets. The same
+// breakpoint as the stylesheet's.
+const NARROW = '(max-width: 860px)';
+function useNarrow() {
+  const [narrow, setNarrow] = useState(() => typeof matchMedia === 'function' && matchMedia(NARROW).matches);
+  useEffect(() => {
+    const m = matchMedia(NARROW);
+    const update = () => setNarrow(m.matches);
+    update();
+    m.addEventListener('change', update);
+    return () => m.removeEventListener('change', update);
+  }, []);
+  return narrow;
+}
+
 // Bring an element into view and put focus on it, with a brief highlight. A disclosure opens, and its summary takes
 // focus (the details element itself can't).
 function reveal(id: string) {
@@ -93,6 +108,7 @@ export function VillagePage() {
   const [error, setError] = useState<string | null>(null);
   const [talkTo, setTalkTo] = useState('smith');
   const [panels, panel] = useReducer(panelsReducer, NO_PANELS);
+  const narrow = useNarrow();
   const chatInput = useRef<HTMLInputElement>(null);
   const arrivals = useArrivals(view);
   // Whether the player has opened a conversation this visit (E, the picker, the message box): the first hint is how to.
@@ -243,7 +259,7 @@ export function VillagePage() {
     </button>
   );
   // The panels open in one drawer slot over the village's left side, beside the buttons that open them, so the
-  // conversation stays in view and usable. Each stays mounted while closed: the log's filter, an unsent report and
+  // conversation stays in view and usable. On a phone the slot is a sheet from the bottom, modal. Each stays mounted while closed: the log's filter, an unsent report and
   // the Give form keep what they had. Closing puts focus back on the panel's own button.
   const drawer = (p: Panel, title: string, body: ReactNode) => (
     <Drawer
@@ -251,6 +267,7 @@ export function VillagePage() {
       className="slot"
       title={title}
       open={panels.open === p}
+      modal={narrow}
       onClose={() => panel({ type: 'close', panel: p })}
       opener={document.getElementById(`${p}-button`)}
     >
