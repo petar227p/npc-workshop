@@ -59,6 +59,23 @@ A turn follows four steps:
 3. **Commit or reject.** Valid actions become events. Invalid ones are logged as `ACTION_REJECTED`; the model gets one retry, then the NPC falls back to a safe line.
 4. **Deliver.** Timed work is delivered by the clock, with stats copied from the accepted offer. The model never writes them.
 
+`npm run ledger-proof` shows this without a model or API key. It sends controlled proposals straight to the ledger (output shortened):
+
+```text
+PASS  1. Valid dagger offer (control)
+      accepted
+PASS  2. Underpriced offer (invalid)
+      rejected: price 1 is below the minimum of 20 (materials 16 + 20% margin)
+PASS  3. Impossible stats (invalid)
+      rejected: damage 500 is above the cap of 10 for a dagger
+PASS  4. Unauthorized early delivery (invalid)
+      rejected: only the clock delivers items, once the work is done
+PASS  5. The clock delivers at the due time (control)
+      delivered once
+
+5 of 5 cases pass.
+```
+
 ## Quick start
 
 ### Prerequisites
