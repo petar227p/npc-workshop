@@ -1,4 +1,4 @@
-import { clockText, type Gift } from '@blacksmith/shared';
+import { clockText, type Gift } from '@npc-workshop/shared';
 import type { World } from '../engine';
 import { describe } from './facts';
 import { nameOf, type Vocabulary } from './news';

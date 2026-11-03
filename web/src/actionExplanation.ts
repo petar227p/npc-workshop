@@ -1,4 +1,4 @@
-import type { BenchResponse, ControlledResponse, EngineEvent, NpcDraft } from '@blacksmith/shared';
+import type { BenchResponse, ControlledResponse, EngineEvent, NpcDraft } from '@npc-workshop/shared';
 
 export type ActionExplanation = {
   eventId: string;

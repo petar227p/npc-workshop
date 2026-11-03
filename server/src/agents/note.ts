@@ -1,4 +1,4 @@
-import { clockText, MAX_HAPPENED_LENGTH, MAX_HOURS_AGO, WorldReportSchema, type WorldReport } from '@blacksmith/shared';
+import { clockText, MAX_HAPPENED_LENGTH, MAX_HOURS_AGO, WorldReportSchema, type WorldReport } from '@npc-workshop/shared';
 import type { NpcModel } from './npc';
 
 // God mode in plain words: the model reads a note ("I killed the troll at the gate, the whole village heard") and

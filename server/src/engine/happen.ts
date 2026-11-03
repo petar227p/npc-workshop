@@ -1,4 +1,4 @@
-import { WorldReportSchema, type WorldReport } from '@blacksmith/shared';
+import { WorldReportSchema, type WorldReport } from '@npc-workshop/shared';
 import type { ZodError } from 'zod';
 import type { EventDraft, Sense } from './events';
 import type { World } from './state';

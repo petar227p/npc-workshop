@@ -1,6 +1,6 @@
-import type { Sighting, StateView, WorldReport } from '@blacksmith/shared';
+import type { Sighting, StateView, WorldReport } from '@npc-workshop/shared';
 // The zod-free module, so the schemas stay out of the bundle.
-import { MAX_HAPPENED_LENGTH, MAX_HOURS_AGO, MAX_NOTE_LENGTH } from '@blacksmith/shared/src/limits';
+import { MAX_HAPPENED_LENGTH, MAX_HOURS_AGO, MAX_NOTE_LENGTH } from '@npc-workshop/shared/src/limits';
 import { useState } from 'react';
 
 // God mode: tell the engine something happened that no verb covers (a boss slain, a fire). A game would report it

@@ -4,7 +4,7 @@ import { createApi } from '../../server/src/routes/api';
 import { mockClient } from '../../server/src/models';
 import { createBridge, transferPlan, type Poll } from './bridge';
 import { localApp } from './local';
-import type { EngineEvent } from '@blacksmith/shared';
+import type { EngineEvent } from '@npc-workshop/shared';
 
 const offer = (price = 15, qty = 1) => JSON.stringify({ action: 'OFFER', say: 'A sound iron dagger.', offer: {
   kind: 'in_stock', good: 'iron dagger', price, qty, remarks: 'Plain iron, no enchantments.',

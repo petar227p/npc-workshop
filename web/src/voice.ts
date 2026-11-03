@@ -1,5 +1,5 @@
 // The zod-free module, so the schemas stay out of the bundle.
-import { MAX_VOICE_SECONDS } from '@blacksmith/shared/src/limits';
+import { MAX_VOICE_SECONDS } from '@npc-workshop/shared/src/limits';
 
 // The mic for the chat box. Muse Voice Transcribe takes only 16-bit PCM mono WAV at 16 or 24 kHz, and the browser's
 // MediaRecorder gives webm/opus, so the samples are taken straight from the mic, brought down to 16 kHz and written

@@ -1,4 +1,4 @@
-import { buildSetup } from '@blacksmith/shared/src/setup';
+import { buildSetup } from '@npc-workshop/shared/src/setup';
 import { describe, expect, it } from 'vitest';
 import { BROWSER_DRAFT_KEY, BROWSER_DRAFTS_KEY, MAX_DRAFTS, readDrafts, saveBrowserDraft, saveDrafts, shelveDraft } from '../browserDraft';
 

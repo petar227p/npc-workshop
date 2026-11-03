@@ -1,6 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { draftKey, type ApiConnection } from '@blacksmith/shared/src/snapshot';
-import type { ModelChoice, NpcDraft, Start } from '@blacksmith/shared';
+import { draftKey, type ApiConnection } from '@npc-workshop/shared/src/snapshot';
+import type { ModelChoice, NpcDraft, Start } from '@npc-workshop/shared';
 import type { NpcModel } from './agents/npc';
 import type { Gallery } from './art';
 import { createEngine, createWorld, senses, type Act, type Report, type Sense, type Sync, type World } from './engine';

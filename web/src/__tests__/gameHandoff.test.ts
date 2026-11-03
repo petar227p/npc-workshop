@@ -1,5 +1,5 @@
-import type { BenchResponse, NpcDraft } from '@blacksmith/shared';
-import { buildSetup } from '@blacksmith/shared/src/setup';
+import type { BenchResponse, NpcDraft } from '@npc-workshop/shared';
+import { buildSetup } from '@npc-workshop/shared/src/setup';
 import { describe, expect, it } from 'vitest';
 import { draftKey, gameExampleCommand, hasCheckedModelAction, hasModelReply } from '../gameHandoff';
 import { createNpcDownload } from '../npcTransfer';

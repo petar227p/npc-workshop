@@ -1,4 +1,4 @@
-import type { ContractView, EngineEvent, NewsView, StateView } from '@blacksmith/shared';
+import type { ContractView, EngineEvent, NewsView, StateView } from '@npc-workshop/shared';
 import { describe, expect, it } from 'vitest';
 import { dismissedIn, nextBaseline, selectHint, SMITH_EXAMPLES, type HintInput } from '../hints';
 

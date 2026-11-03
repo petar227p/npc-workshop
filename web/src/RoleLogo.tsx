@@ -1,5 +1,5 @@
-import type { NpcDraft } from '@blacksmith/shared';
-import type { SetupRole, Teller } from '@blacksmith/shared/src/setup';
+import type { NpcDraft } from '@npc-workshop/shared';
+import type { SetupRole, Teller } from '@npc-workshop/shared/src/setup';
 import { editorIdentity } from './editorPresentation';
 
 export type RoleLogoId = 'merchant' | 'craftsperson' | 'villager' | 'storyteller' | 'guard' | 'smith' | 'cottager' | 'crier' | 'farmer' | 'keeper' | 'bard';

@@ -1,4 +1,4 @@
-import { MAX_SAY_LENGTH } from '@blacksmith/shared';
+import { MAX_SAY_LENGTH } from '@npc-workshop/shared';
 import type { Act, ActOptions, EngineEvent, World } from '../engine';
 import type { ChatClient, ChatMessage, ReasoningEffort, Usage } from '../models';
 import { act as villageAct, type NpcDefinition } from '../npcs';

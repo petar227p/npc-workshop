@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import type { ApiResult, ApiState, ApiWorldCreated, EngineEvent } from '@blacksmith/shared';
-import { ObservedInventorySchema } from '@blacksmith/shared';
+import type { ApiResult, ApiState, ApiWorldCreated, EngineEvent } from '@npc-workshop/shared';
+import { ObservedInventorySchema } from '@npc-workshop/shared';
 import { brann, ITEM } from './npc';
 
 const count = z.number().int().min(0).max(1_000_000);

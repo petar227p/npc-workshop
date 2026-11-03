@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MAX_NPC_BUNDLE_BYTES } from '@blacksmith/shared/src/limits';
-import { buildSetup, supportedSetups } from '@blacksmith/shared/src/setup';
-import type { NpcDraft, PreviewResponse } from '@blacksmith/shared';
+import { MAX_NPC_BUNDLE_BYTES } from '@npc-workshop/shared/src/limits';
+import { buildSetup, supportedSetups } from '@npc-workshop/shared/src/setup';
+import type { NpcDraft, PreviewResponse } from '@npc-workshop/shared';
 import { createNpcDownload, prepareNpcImport } from '../npcTransfer';
 
 const draft = () => buildSetup({ role: 'guard', name: 'Portable Ada', news: 'tells' }).draft;

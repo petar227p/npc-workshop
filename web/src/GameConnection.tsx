@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { MODEL_INFO } from '@blacksmith/shared/src/npc-info';
-import { abilitiesOf, type Ability } from '@blacksmith/shared/src/setup';
+import { MODEL_INFO } from '@npc-workshop/shared/src/npc-info';
+import { abilitiesOf, type Ability } from '@npc-workshop/shared/src/setup';
 
 const ABILITY_NAMES: Record<Ability, string> = { talk: 'Conversation', gesture: 'Gestures', sell: 'Selling goods', craft: 'Crafting', grant: 'Free items', knows: 'Knows news', tell: 'Sharing news', retell: 'Retelling news', announce: 'Announcements', signal: 'Game signals', give: 'Gifts' };
 import { gameExampleCommand, type HandoffSnapshot } from './gameHandoff';

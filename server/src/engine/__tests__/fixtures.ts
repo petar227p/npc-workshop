@@ -1,4 +1,4 @@
-import type { Catalogue, Start } from '@blacksmith/shared';
+import type { Catalogue, Start } from '@npc-workshop/shared';
 import { verbs, type Actor } from '../index';
 
 // The engine's own actors, so engine tests don't depend on the village's NPC files. Same numbers as Brann's.

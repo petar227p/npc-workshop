@@ -4,7 +4,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { createBridge, nativeFailure, NativePoll } from './bridge';
 import { ZodError } from 'zod';
 import { spikePoll } from './spike';
-import { MAX_INVENTORY_BODY_BYTES } from '@blacksmith/shared';
+import { MAX_INVENTORY_BODY_BYTES } from '@npc-workshop/shared';
 
 export function localApp(bridge: ReturnType<typeof createBridge>, port = 8788) {
   const app = new Hono();

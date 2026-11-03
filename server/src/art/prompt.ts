@@ -1,4 +1,4 @@
-import type { MadeToOrderTerms, NpcArt } from '@blacksmith/shared';
+import type { MadeToOrderTerms, NpcArt } from '@npc-workshop/shared';
 
 // The picture is of the contract the ledger accepted, not of what anyone said: the prompt is built by code from
 // its terms. The style words make Muse Image draw pixel art on a plain background, which the sprite step needs.

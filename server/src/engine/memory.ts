@@ -1,4 +1,4 @@
-import type { EngineEvent, EventType, News } from '@blacksmith/shared';
+import type { EngineEvent, EventType, News } from '@npc-workshop/shared';
 import type { World } from './state';
 
 // What an NPC knows, read straight from the log: nothing is stored apart from it, so a memory can't be planted.

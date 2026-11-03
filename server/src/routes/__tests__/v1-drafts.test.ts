@@ -1,4 +1,4 @@
-import { MAX_WORLD_CREATE_BYTES, MAX_WORLD_DEFINITIONS, NpcDraftSchema, type ApiEvents, type ApiNpc, type ApiResult, type ApiState, type ApiWorldCreated, type NpcDraft } from '@blacksmith/shared';
+import { MAX_WORLD_CREATE_BYTES, MAX_WORLD_DEFINITIONS, NpcDraftSchema, type ApiEvents, type ApiNpc, type ApiResult, type ApiState, type ApiWorldCreated, type NpcDraft } from '@npc-workshop/shared';
 import { describe, expect, it, vi } from 'vitest';
 import { mockClient, type ChatClient, type ChatRequest } from '../../models';
 import { NPCS, readDraft } from '../../npcs';

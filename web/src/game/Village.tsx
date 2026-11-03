@@ -1,18 +1,20 @@
-import type { StateView } from '@blacksmith/shared';
+import type { StateView } from '@npc-workshop/shared';
 import Phaser from 'phaser';
 import { useEffect, useRef } from 'react';
 import { withRole } from '../roles';
 import { VillageScene } from './VillageScene';
 
-// The Phaser village beside the React panels. React hands it every new view; it calls back when the player
-// presses E next to someone or clicks them.
-export function Village({ view, onTalk }: { view: StateView; onTalk: (npcId: string) => void }) {
+// The Phaser village beside the React panels. React hands it every new view and who the conversation is with (marked
+// at their feet); it calls back when the player presses E next to someone or clicks them.
+export function Village({ view, onTalk, selected }: { view: StateView; onTalk: (npcId: string) => void; selected: string }) {
   const host = useRef<HTMLDivElement>(null);
   const scene = useRef<VillageScene | null>(null);
   const talk = useRef(onTalk);
   talk.current = onTalk;
   const latest = useRef(view);
   latest.current = view;
+  const chosen = useRef(selected);
+  chosen.current = selected;
 
   useEffect(() => {
     let game: Phaser.Game | null = null;
@@ -45,6 +47,7 @@ export function Village({ view, onTalk }: { view: StateView; onTalk: (npcId: str
       });
       observer.observe(el);
       s.setView(latest.current);
+      s.setSelected(chosen.current);
       scene.current = s;
       if (import.meta.env.DEV) Object.assign(window, { game });
     });
@@ -59,6 +62,9 @@ export function Village({ view, onTalk }: { view: StateView; onTalk: (npcId: str
   useEffect(() => {
     scene.current?.setView(view);
   }, [view]);
+  useEffect(() => {
+    scene.current?.setSelected(selected);
+  }, [selected]);
 
   return (
     <div

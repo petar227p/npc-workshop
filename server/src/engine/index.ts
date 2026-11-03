@@ -1,4 +1,4 @@
-import type { Action } from '@blacksmith/shared';
+import type { Action } from '@npc-workshop/shared';
 import type { ZodError, ZodType } from 'zod';
 import { commit, type EngineEvent, type Sense } from './events';
 import { reported } from './happen';

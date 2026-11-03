@@ -1,5 +1,5 @@
-import type { ApiConnection, NpcDraft } from '@blacksmith/shared';
-import { draftKey } from '@blacksmith/shared/src/snapshot';
+import type { ApiConnection, NpcDraft } from '@npc-workshop/shared';
+import { draftKey } from '@npc-workshop/shared/src/snapshot';
 
 export type Verification = { state: 'not_connected' | 'created' | 'reply' | 'unavailable' | 'mismatch'; message: string };
 export const NOT_CONNECTED: Verification = { state: 'not_connected', message: 'Enter the world ID and token from the example’s local verification page.' };

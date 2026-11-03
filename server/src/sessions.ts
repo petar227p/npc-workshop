@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { DEFAULT_SPRITE, type ContractView, type KnowerView, type ModelChoice, type NewsView, type StateView } from '@blacksmith/shared';
+import { DEFAULT_SPRITE, type ContractView, type KnowerView, type ModelChoice, type NewsView, type StateView } from '@npc-workshop/shared';
 import type { NpcModel } from './agents/npc';
 import { artView, type Gallery } from './art';
 import { availableStock, memoriesOf, placeAt, type World } from './engine';

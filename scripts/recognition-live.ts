@@ -1,6 +1,6 @@
 // Live check of recognition through retelling: Edda sees the stranger (the player) slay a troll, and the news goes
 // Edda → Wren → Tobin → Pell, one telling each. Then the player talks to all four through the real models.
-// npx tsx scripts/recognition-live.ts
+// npm run recognition-live
 import type { World } from '../server/src/engine';
 import { playerSays, skipTime } from '../server/src/game';
 import { createModel } from '../server/src/models';

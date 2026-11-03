@@ -11,7 +11,7 @@ import {
   type PreviewResponse,
   type SaveResponse,
   type SketchResponse,
-} from '@blacksmith/shared';
+} from '@npc-workshop/shared';
 import type { Context, Hono } from 'hono';
 import { z } from 'zod';
 import { npcTurn, type Attempt, type NpcModel } from '../agents/npc';

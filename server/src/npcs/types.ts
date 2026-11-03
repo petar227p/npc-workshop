@@ -1,4 +1,4 @@
-import { NPC_ID_PATTERN, type EffortChoice, type ModelChoice, type NpcArt, type Trigger } from '@blacksmith/shared';
+import { NPC_ID_PATTERN, type EffortChoice, type ModelChoice, type NpcArt, type Trigger } from '@npc-workshop/shared';
 import type { Actor, World } from '../engine';
 import { flatSchema, type FlatVerb } from '../agents/flat';
 

@@ -1,4 +1,4 @@
-import { hourOf, type ScheduleEntry } from '@blacksmith/shared';
+import { hourOf, type ScheduleEntry } from '@npc-workshop/shared';
 import type { Actor } from './validator';
 
 // Where each actor is at any tick. Code owns it: the browser only walks people toward the place it's told,
