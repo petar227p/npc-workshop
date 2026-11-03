@@ -67,6 +67,9 @@ export function createApi(deps: ApiDeps) {
   const studio = createStudio(deps.art);
   const app = new Hono<Env>();
 
+  // What someone opening the API port in a browser sees.
+  app.get('/', (c) => c.json({ name: 'NPC Workshop API', health: '/api/health', npcs: '/api/v1/npcs', docs: 'https://github.com/petar227p/npc-workshop/blob/main/docs/api.md' }));
+  app.notFound((c) => c.json({ error: 'not found' }, 404));
   app.get('/api/health', (c) => c.json({ ok: true }));
 
   const tooLarge = (c: Context) => c.json({ error: 'request too large' }, 413);

@@ -4,14 +4,14 @@ This JavaScript example reads a Workshop `.npc.json` bundle, creates an API worl
 
 ## Setup and run
 
-Use Node 26 (the version tested by this repository). From the repository root:
+Use Node 24 or later. From the repository root:
 
 ```bash
 npm install
 npm run dev
 ```
 
-If the NPC server is already running, keep using it. Live replies require the key for the NPC's selected model on that server: `MODEL_API_KEY` for Muse Spark or `BASETEN_API_KEY` for Muse Spark Open; see the root [setup instructions](../../README.md#quick-start). The example needs no provider key. It uses the API directly and does not need development file saving.
+If the NPC server is already running, keep using it. Live replies require the key for the NPC's selected model on that server: `MODEL_API_KEY` for Muse Spark, and `BASETEN_API_KEY` for Muse Spark Open (without it, those NPCs run on Muse Spark); see the root [setup instructions](../../README.md#quick-start). The example needs no provider key. It uses the API directly and does not need development file saving.
 
 In [Workshop](http://localhost:5174/#/workshop), create/test a character and choose **Use in your game**. Its first step downloads the character; its second step lets you copy this command with your server URL and file path. **Download NPC** is also available directly in the toolbar. In a second terminal, change to this repository's root and run:
 

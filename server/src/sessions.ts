@@ -122,7 +122,7 @@ export function createSessionStore(limits: SessionLimits = {}) {
     {
       fromIp: 'Too many new games from your address. Try again in a minute.',
       overall: 'Too many new visitors right now. Try again in a minute.',
-      full: 'The forge is full. Try again later.',
+      full: 'The server is full right now. Try again later.',
     },
   );
 

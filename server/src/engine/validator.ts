@@ -105,7 +105,7 @@ function checkInStock(world: World, self: Actor, t: InStockTerms): string | null
   const have = own(availableStock(world, self.id), t.good) ?? 0;
   if (t.qty > have) return `needs ${t.qty} ${t.good}, only ${have} in stock`;
   const floor = good.min_price * t.qty;
-  if (t.price < floor) return `price ${t.price} is below the minimum of ${floor} (${t.qty} × ${good.min_price})`;
+  if (t.price < floor) return `price ${t.price} is below the minimum of ${floor} (${t.qty} at ${good.min_price} gold each)`;
   return null;
 }
 

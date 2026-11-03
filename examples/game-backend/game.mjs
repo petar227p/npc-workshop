@@ -177,7 +177,7 @@ const help = `Usage: npm run game-example -- --server http://localhost:8787 --bu
   --message "..."     Override the normal request generated from this NPC's abilities.
   --challenge "..."   Override its generated rule challenge (both messages are sent).
   --interactive       Then keep the same world: type messages, /accept ID, /tick HOURS, /events, /verify, /quit.
-  --help              Show this help. Node 26 and npm install in this repository are required.`;
+  --help              Show this help. Node 24 or later and npm install in this repository are required.`;
 
 /** @param {string[]} argv @param {Output} [log] */
 export async function main(argv, log = console.log) {

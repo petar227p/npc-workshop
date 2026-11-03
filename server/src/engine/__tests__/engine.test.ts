@@ -339,7 +339,7 @@ describe('in-stock sales', () => {
     expect(sell(world(), { good: 'lantern' }).reason).toMatch(/'lantern' isn't for sale here; merchant sells from stock: torch, rope/);
     expect(sell(world(), { good: 'toString' }).reason).toMatch(/'toString' isn't for sale here/);
     expect(sell(world(), { good: 'rope', qty: 3, price: 12 }).reason).toMatch(/needs 3 rope, only 2 in stock/);
-    expect(sell(world(), { price: 5 }).reason).toMatch(/price 5 is below the minimum of 6 \(3 × 2\)/);
+    expect(sell(world(), { price: 5 }).reason).toMatch(/price 5 is below the minimum of 6 \(3 at 2 gold each\)/);
     expect(sell(world(), { price: 6 }).ok).toBe(true);
   });
 

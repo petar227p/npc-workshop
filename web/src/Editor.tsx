@@ -737,7 +737,7 @@ export function Editor() {
               <div className="row2">
                 {/* The explanations sit behind a ? so both selects line up; a ? inside a <label> would take its clicks. */}
                 <div className="field">
-                  <span className="field-label field-label-help"><label htmlFor="draft-model">Voiced by</label> <Help about="Voiced by" text={MODEL_INFO[draft.model].description} /></span>
+                  <span className="field-label field-label-help"><label htmlFor="draft-model">Model</label> <Help about="Model" text={MODEL_INFO[draft.model].description} /></span>
                   <select id="draft-model" data-field="model" value={draft.model} onChange={(e) => set('model', e.target.value as NpcDraft['model'])}>
                     {MODEL_CHOICES.map((m) => (
                       <option key={m} value={m}>
@@ -1570,7 +1570,7 @@ function Bench({ draft, valid, checking, onBusy, tested, onCheckedAction, onRese
               onChange={(e) => setText(e.target.value)}
               maxLength={MAX_SAY_LENGTH}
               id="bench-input"
-              placeholder={checking ? '' : valid ? 'Talk to the draft…' : 'Waiting for a valid draft'}
+              placeholder={checking ? '' : valid ? `Say something to ${draft.name || 'your NPC'}…` : 'Waiting for a valid draft'}
               aria-label="Message to the draft NPC"
               disabled={!valid}
             />

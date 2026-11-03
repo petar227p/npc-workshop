@@ -21,7 +21,7 @@ describe('checked action explanations', () => {
     const response = await bench<ControlledResponse>(draft, [], 'controlled');
     expect(controlledExplanations(draft, response)).toEqual([expect.objectContaining({
       source: 'Controlled proposal · workshop · no model', proposal: 'Offer: 1 × candle · 19 gold',
-      rule: 'price 19 is below the minimum of 20 (1 × 20)', accepted: false, state: 'Gold, stock and contracts unchanged.',
+      rule: 'price 19 is below the minimum of 20 (1 at 20 gold each)', accepted: false, state: 'Gold, stock and contracts unchanged.',
     })]);
   });
 

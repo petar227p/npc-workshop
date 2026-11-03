@@ -115,12 +115,35 @@ describe('createModels', () => {
     expect(timeout.mock.calls.map(([ms]) => ms)).toEqual([20_000, 20_000]);
   });
 
+  it('without a Baseten key a Spark Open NPC runs on Muse Spark through Meta, and says so once', async () => {
+    vi.stubEnv('MODEL_API_KEY', 'k');
+    vi.stubEnv('BASETEN_API_KEY', '');
+    vi.stubEnv('SMITH_MODEL', 'spark-id');
+    vi.stubEnv('REPLAY', '');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const f = fakeFetch([new Error('ECONNRESET'), new Error('ECONNRESET')]);
+    vi.stubGlobal('fetch', f.fn);
+
+    const open = createModel(session, 'muse_spark_open');
+    createModel(session, 'muse_spark_open');
+    expect(open.model).toBe('spark-id');
+    await expect(open.client.chat(req)).rejects.toThrow(/meta request failed: ECONNRESET/);
+    expect(f.calls[0].url).toBe('https://api.meta.ai/v1/chat/completions');
+    expect(warn.mock.calls.length).toBeLessThanOrEqual(1); // an earlier test in this run may already have said it
+  });
+
+  it('with neither key a Spark Open NPC is unavailable', () => {
+    vi.stubEnv('MODEL_API_KEY', '');
+    vi.stubEnv('BASETEN_API_KEY', '');
+    vi.stubEnv('REPLAY', '');
+    expect(() => createModel(session, 'muse_spark_open')).toThrow(/BASETEN_API_KEY is not set/);
+  });
+
   it('each model choice needs only its own key, and a Spark Open NPC gets the same turn limits', async () => {
     vi.stubEnv('MODEL_API_KEY', 'k');
     vi.stubEnv('BASETEN_API_KEY', '');
     vi.stubEnv('REPLAY', '');
     expect(createModel(session, 'muse_spark').model).toBeTruthy();
-    expect(() => createModel(session, 'muse_spark_open')).toThrow(/BASETEN_API_KEY is not set/);
 
     vi.stubEnv('MODEL_API_KEY', '');
     vi.stubEnv('BASETEN_API_KEY', 'k');

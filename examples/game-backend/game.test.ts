@@ -54,7 +54,7 @@ describe('runnable game backend example', () => {
     expect(s.requests[0].authorization).toBeNull();
     expect(s.requests.slice(1).every((r) => r.authorization === `Bearer ${s.tokens[0]}`)).toBe(true);
     expect(s.requests[1].body).toMatchObject({ npc: 'portable_ada', text: expect.stringContaining('gate pass') });
-    expect(s.requests[2].body).toMatchObject({ text: expect.stringContaining('5 × gate pass') });
+    expect(s.requests[2].body).toMatchObject({ text: expect.stringContaining('5 gate passes') });
     expect(s.output.join('\n')).toContain('Checked offer c_001: 1 × gate pass, 0 gold');
     expect(s.output.join('\n')).toContain('Ledger rejected OFFER:');
     expect(s.output.join('\n')).toContain('Fallback: no model proposal passed');

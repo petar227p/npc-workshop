@@ -32,7 +32,7 @@ export function Entrance() {
           <div className="entrance-test">
             <p className="entrance-preview-label">Isolated test session</p>
             <p className="entrance-proposal"><span>Model proposes</span>Sell a torch for 1 gold.</p>
-            <p className="entrance-verdict"><b>× &nbsp; Code check: rejected</b><span>Price is below the configured minimum.</span></p>
+            <p className="entrance-verdict"><b>× &nbsp; Ledger check: rejected</b><span>Price is below the configured minimum.</span></p>
           </div>
         </figure>
       </section>
@@ -56,6 +56,11 @@ export function Entrance() {
           <a className="entrance-demo-link" href="#/village">Open demo in the example village <span aria-hidden="true">→</span></a>
         </div>
       </section>
+
+      <footer className="entrance-footer">
+        <a href="https://github.com/petar227p/npc-workshop">GitHub</a>
+        <a href="https://github.com/petar227p/npc-workshop/blob/main/docs/api.md">API docs</a>
+      </footer>
     </div>
   );
 }
