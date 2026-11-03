@@ -1,5 +1,5 @@
 import type { ContractView, EngineEvent, Gift, ItemArt, KnowerView, MadeToOrderView, StateView } from '@blacksmith/shared';
-import { useCallback, useId, useState, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { Popover } from './Drawer';
 import { sourceChain } from './knowledge';
 import { Tip } from './Tip';
@@ -127,37 +127,6 @@ export function Stock({ view, shop: id }: { view: StateView; shop: string }) {
           </li>
         ))}
       </ul>
-    </section>
-  );
-}
-
-// Folded to a one-line summary until opened; the village opens it when something arrives.
-export function Inventory({
-  view,
-  disabled,
-  onGive,
-  open,
-  onToggle,
-}: {
-  view: StateView;
-  disabled: boolean;
-  onGive: (to: string, gift: Gift) => void;
-  open: boolean;
-  onToggle: () => void;
-}) {
-  const count = gearCount(view);
-  const body = useId();
-  return (
-    <section className="panel inventory">
-      <button id="gear" className="panel-toggle" aria-expanded={open} aria-controls={body} onClick={onToggle}>
-        <span className="title">Your gear</span>
-        <span className="muted small">{count === 0 ? 'empty' : count === 1 ? '1 thing' : `${count} things`}</span>
-      </button>
-      {open && (
-        <div id={body} className="inventory-body">
-          <InventoryContent view={view} disabled={disabled} onGive={onGive} />
-        </div>
-      )}
     </section>
   );
 }

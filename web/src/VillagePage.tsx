@@ -2,10 +2,10 @@ import type { ActionResponse, Gift, StateView } from '@blacksmith/shared';
 import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState, type ReactNode } from 'react';
 import { api } from './api';
 import { Chat, nameOf, type Pending } from './Chat';
-import { NO_PANELS, panelsReducer, type InspectTab, type Panel } from './demoPanels';
+import { NO_PANELS, panelsReducer, type Panel } from './demoPanels';
 import { Drawer } from './Drawer';
 import { God } from './God';
-import { Forge, Hud, Inventory, News, Stock, VillageLog } from './Side';
+import { Forge, gearCount, Hud, InventoryContent, News, Stock, VillageLog } from './Side';
 import { HelpMenu, HintBar, useHints } from './HintBar';
 import { SiteHeader } from './SiteHeader';
 import type { HintLink } from './hints';
@@ -64,15 +64,15 @@ function reveal(id: string) {
 
 // After an action, keyboard focus stays where the player was: the button used is disabled while the village is busy
 // (which drops focus), and may be gone once it's done (Wait until ready, with the work). Back on it if it's still
-// there; if not, on Your gear after the forge's last job (that's where the work went), else on +1 hour.
+// there; if not, on the Bag button after the forge's last job (that's where the work went), else on +1 hour.
 function keepFocus(from: HTMLElement | null) {
   if (!from || from === document.body) return;
   setTimeout(() => {
     if (document.activeElement && document.activeElement !== document.body) return;
     if (from.isConnected && !(from as HTMLButtonElement).disabled) return from.focus();
     const visible = (el: Element | null): el is HTMLElement => el instanceof HTMLElement && el.offsetParent !== null;
-    const gear = document.getElementById('gear');
-    if (from.closest('.forge') && visible(gear)) return gear.focus();
+    const bag = document.getElementById('bag-button');
+    if (from.closest('.forge') && visible(bag)) return bag.focus();
     [...document.querySelectorAll('[data-focus-home]')].find(visible)?.focus();
   });
 }
@@ -215,23 +215,20 @@ export function VillagePage() {
     );
   const busy = pending !== null || waiting;
   const seller = view.shops.some((s) => s.id === talkTo);
-  // One panel at a time (demoPanels); Village log and Sandbox tools are Inspect village's two sections.
-  const tool = (id: string, p: Panel, tab: InspectTab | undefined, name: ReactNode, hint: string, body: ReactNode) => {
-    const open = panels.open === p && (tab === undefined || panels.tab === tab);
-    return (
-      <div className={open ? 'tool open' : 'tool'}>
-        <button aria-expanded={open} aria-controls={`tool-${id}`} onClick={() => panel({ type: 'toggle', panel: p, tab })}>
-          <span className="tool-name">{name}</span>
-          <span className="tool-hint">{hint}</span>
-        </button>
-        {/* Kept while folded, so a half-typed report and the log's filter are still there when it opens again. */}
-        <div id={`tool-${id}`} className="tool-body" hidden={!open}>
-          {body}
-        </div>
-      </div>
-    );
-  };
-
+  const gear = gearCount(view);
+  // The utility bar's buttons: one panel at a time (demoPanels).
+  const barButton = (p: Panel, label: ReactNode) => (
+    <button id={`${p}-button`} aria-expanded={panels.open === p} aria-controls={`panel-${p}`} onClick={() => panel({ type: 'toggle', panel: p })}>
+      {label}
+    </button>
+  );
+  // Until the drawers (task 4), the open panel shows under the bar. Every body stays mounted while hidden, so the
+  // log's filter, an unsent report and the Give form keep what they had.
+  const utilityPanel = (p: Panel, title: string, body: ReactNode) => (
+    <section id={`panel-${p}`} className="utility-panel" aria-label={title} hidden={panels.open !== p}>
+      {body}
+    </section>
+  );
   return (
     <div className="demo-page">
       {/* Time and gold in the bar, where the workshop keeps its draft's state: always in view, at every width. */}
@@ -247,8 +244,8 @@ export function VillagePage() {
           {buildLink}
         </div>
       </SiteHeader>
-      {/* A wide screen: the village large on the left with the tools in three columns under it, and the conversation
-          on the right, in view while the tools scroll. A narrow one stacks them: village, conversation, tools. */}
+      {/* A wide screen: the village large on the left with its utility bar under it, and the conversation on the right.
+          A narrow one stacks them: village, conversation, utility bar. */}
       <div className="demo-layout">
         <div className="stage">
           <Suspense fallback={<div className="game" />}>
@@ -295,31 +292,58 @@ export function VillagePage() {
             </div>
           )}
           <Forge view={view} disabled={busy} onSkip={(n) => run(api.tick(n))} />
-          <Inventory view={view} disabled={busy} onGive={give} open={panels.open === 'bag'} onToggle={() => panel({ type: 'toggle', panel: 'bag' })} />
         </div>
-          <nav className="tools" aria-labelledby="tools-label">
-            <h2 id="tools-label" className="rail-label">Village tools</h2>
-            {tool(
-              'knowledge',
+        <div className="utility">
+          <nav className="utility-bar" aria-label="Village tools">
+            {barButton(
+              'bag',
+              <>
+                Bag
+                <span className="bar-count">
+                  {gear}
+                  <span className="sr-only">{gear === 1 ? ' thing' : ' things'}</span>
+                </span>
+              </>,
+            )}
+            {barButton(
               'rumours',
-              undefined,
               <>
                 Rumours
                 {arrivals.heard && panels.open !== 'rumours' && <span className="cue">new</span>}
               </>,
-              'What’s going around, and who heard it from whom',
-              <News view={view} />,
             )}
-            {tool('events', 'inspect', 'activity', 'Village log', 'Everything that happened, and what the rules allowed', <VillageLog view={view} />)}
-            {tool(
-              'sandbox',
-              'inspect',
-              'sandbox',
-              'Sandbox tools',
-              'Tell the village something happened that no action covers',
-              <God view={view} disabled={busy} onRead={readNote} onReport={(r) => run(api.report(r))} />,
-            )}
+            {barButton('inspect', 'Inspect village')}
           </nav>
+          {utilityPanel('bag', 'Bag', <InventoryContent view={view} disabled={busy} onGive={give} />)}
+          {utilityPanel(
+            'rumours',
+            'Rumours',
+            <>
+              <p className="muted small">What’s going around, and who heard it from whom.</p>
+              <News view={view} />
+            </>,
+          )}
+          {utilityPanel(
+            'inspect',
+            'Inspect village',
+            <>
+              <div className="inspect-switch" role="group" aria-label="Inspect village">
+                {(['activity', 'sandbox'] as const).map((t) => (
+                  <button key={t} type="button" className="secondary small" aria-pressed={panels.tab === t} onClick={() => panel({ type: 'tab', tab: t })}>
+                    {t === 'activity' ? 'Activity' : 'Sandbox'}
+                  </button>
+                ))}
+              </div>
+              <div hidden={panels.tab !== 'activity'}>
+                <p className="muted small">Everything that happened, and what the rules allowed.</p>
+                <VillageLog view={view} />
+              </div>
+              <div hidden={panels.tab !== 'sandbox'}>
+                <God view={view} disabled={busy} onRead={readNote} onReport={(r) => run(api.report(r))} />
+              </div>
+            </>,
+          )}
+        </div>
         {seller && panels.open === 'stock' && (
           <Drawer title={`${nameOf(view, talkTo)}'s stock`} onClose={closeStock} opener={opener.current}>
             <p className="muted small">
