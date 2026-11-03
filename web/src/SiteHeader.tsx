@@ -2,7 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 
 export type Page = 'home' | 'village' | 'workshop';
 
-// The bar above every page but home. The workshop puts its draft's state and actions on the right, and its panes
+// The shared page bar. The workshop puts its draft's state and actions on the right, and its panes
 // stick below the bar, so the bar's height is kept in --top-h.
 export function SiteHeader({ page, children }: { page: Page; children?: ReactNode }) {
   const bar = useRef<HTMLElement>(null);
