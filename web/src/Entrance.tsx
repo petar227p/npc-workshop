@@ -56,6 +56,11 @@ export function Entrance() {
           <a className="entrance-demo-link" href="#/village">Open demo in the example village <span aria-hidden="true">→</span></a>
         </div>
       </section>
+
+      <footer className="entrance-footer">
+        <a href="https://github.com/petar227p/npc-workshop">GitHub</a>
+        <a href="https://github.com/petar227p/npc-workshop/blob/main/docs/api.md">API docs</a>
+      </footer>
     </div>
   );
 }
