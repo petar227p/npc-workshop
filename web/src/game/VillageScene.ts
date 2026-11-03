@@ -53,6 +53,8 @@ export class VillageScene extends Phaser.Scene {
   private nextClang = 0;
   private hovered: { id: string; text: Phaser.GameObjects.Text; until: number } | null = null;
   private pressed: string | null = null; // the villager a click started on: it talks only if it ends there too
+  private selected: string | null = null; // whoever the chat is with: a ring at their feet
+  private marker!: Phaser.GameObjects.Ellipse;
 
   constructor(private hooks: SceneHooks) {
     super('village');
@@ -85,6 +87,8 @@ export class VillageScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, w, h);
 
     this.prompt = this.makeText('E  talk', '#2a1a05', '#e8a547').setVisible(false);
+    // Under the selected villager's feet, under them but over the ground: still, so it's the same with reduced motion.
+    this.marker = this.add.ellipse(0, 0, TILE + 2, 6, 0xffc329, 0.35).setStrokeStyle(1, 0xffc329).setVisible(false);
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, w, h);
@@ -146,6 +150,11 @@ export class VillageScene extends Phaser.Scene {
   private snap(v: number) {
     const z = this.cameras.main.zoom;
     return Math.round(v * z) / z;
+  }
+
+  // Whoever the conversation beside the canvas is with, however it was chosen (click, E or the picker).
+  setSelected(id: string | null) {
+    this.selected = id;
   }
 
   // Called with every view the server sends. The first one only places people; later ones play what's new.
@@ -423,6 +432,10 @@ export class VillageScene extends Phaser.Scene {
     };
     for (const p of this.people.values()) p.bubble = place(p.bubble, p.x, p.y);
     this.playerBubble = place(this.playerBubble, this.player.x, this.player.y);
+
+    const chosen = this.selected ? this.people.get(this.selected) : undefined;
+    this.marker.setVisible(!!chosen);
+    if (chosen) this.marker.setPosition(this.snap(chosen.x), this.snap(chosen.y + TILE / 2)).setDepth(chosen.y - 0.5);
 
     if (this.hovered) {
       const p = this.people.get(this.hovered.id);

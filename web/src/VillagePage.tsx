@@ -31,6 +31,7 @@ const heardKeys = (view: StateView) => new Set(view.news.flatMap((n) => n.knower
 function useArrivals(view: StateView | null) {
   const last = useRef<StateView | null>(null);
   const [gear, setGear] = useState(0); // counts up when something new is in the player's hands
+  const [unseen, setUnseen] = useState(false); // something arrived since the Bag was last opened
   const [heard, setHeard] = useState(false); // someone learned of an event secondhand since Rumours was last opened
   useEffect(() => {
     if (!view) return;
@@ -42,12 +43,15 @@ function useArrivals(view: StateView | null) {
     const items = new Set(before.items.map((i) => i.item_id));
     const more = view.items.some((i) => !items.has(i.item_id)) || Object.entries(view.goods).some(([g, n]) => n > (before.goods[g] ?? 0));
     if (more) setGear((n) => n + 1);
+    // A new game has nothing new in it yet, so the cue goes with the old world.
+    if (prev.world_id !== view.world_id) setUnseen(more);
+    else if (more) setUnseen(true);
     const known = heardKeys(before);
     const newHeard = [...heardKeys(view)].some((k) => !known.has(k));
     if (prev.world_id !== view.world_id) setHeard(newHeard);
     else if (newHeard) setHeard(true);
   }, [view]);
-  return { gear, heard, seenHeard: useCallback(() => setHeard(false), []) };
+  return { gear, unseen, heard, seenHeard: useCallback(() => setHeard(false), []), seenGear: useCallback(() => setUnseen(false), []) };
 }
 
 // Bring an element into view and put focus on it, with a brief highlight. A disclosure opens, and its summary takes
@@ -116,13 +120,22 @@ export function VillagePage() {
     api.state().then(setView, (e: Error) => setError(e.message));
   }, []);
 
-  // Something arrived: the Bag's count goes up and the hint offers Show it. The Bag doesn't open on its own: it's a
-  // drawer over the village and would take focus from wherever the player is.
-  // Opening Rumours is reading them.
-  const { seenHeard } = arrivals;
+  // Something arrived: the Bag's count goes up, its button glows briefly and says "new" until the Bag is opened, and the
+  // hint offers Show it. The chat's handover line says what it was, so nothing more is announced. The Bag doesn't open
+  // on its own: it's a drawer over the village and would take focus from wherever the player is.
+  const [glow, setGlow] = useState(false);
+  useEffect(() => {
+    if (!arrivals.gear) return;
+    setGlow(true);
+    const timer = setTimeout(() => setGlow(false), 1600);
+    return () => clearTimeout(timer);
+  }, [arrivals.gear]);
+  // Opening Rumours is reading them; opening the Bag is seeing what arrived.
+  const { seenHeard, seenGear } = arrivals;
   useEffect(() => {
     if (panels.open === 'rumours') seenHeard();
-  }, [panels.open, seenHeard]);
+    if (panels.open === 'bag') seenGear();
+  }, [panels.open, seenHeard, seenGear]);
 
   // A picture takes 10–30 s after work starts. Poll just the pictures until none is still being drawn.
   const drawing = Object.values(view?.art ?? {}).some((a) => a.status === 'rendering');
@@ -218,8 +231,14 @@ export function VillagePage() {
   const seller = view.shops.some((s) => s.id === talkTo);
   const gear = gearCount(view);
   // The utility bar's buttons: one panel at a time (demoPanels).
-  const barButton = (p: Panel, label: ReactNode) => (
-    <button id={`${p}-button`} aria-expanded={panels.open === p} aria-controls={`panel-${p}`} onClick={() => panel({ type: 'toggle', panel: p })}>
+  const barButton = (p: Panel, label: ReactNode, className?: string) => (
+    <button
+      id={`${p}-button`}
+      className={className}
+      aria-expanded={panels.open === p}
+      aria-controls={`panel-${p}`}
+      onClick={() => panel({ type: 'toggle', panel: p })}
+    >
       {label}
     </button>
   );
@@ -260,7 +279,7 @@ export function VillagePage() {
           </div>
           <div className="stage">
             <Suspense fallback={<div className="game" />}>
-              <Village view={view} onTalk={talk} />
+              <Village view={view} onTalk={talk} selected={talkTo} />
             </Suspense>
             <HintBar
               hint={hints.hint}
@@ -318,7 +337,9 @@ export function VillagePage() {
                     {gear}
                     <span className="sr-only">{gear === 1 ? ' thing' : ' things'}</span>
                   </span>
+                  {arrivals.unseen && panels.open !== 'bag' && <span className="cue">new</span>}
                 </>,
+                glow ? 'arrived' : undefined,
               )}
               {barButton(
                 'rumours',
