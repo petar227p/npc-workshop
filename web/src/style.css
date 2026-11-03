@@ -372,6 +372,7 @@ input[type='radio'] { accent-color: var(--accent); width: 16px; height: 16px; }
 .field input:focus-visible, .field textarea:focus-visible, .inline select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .persona { min-height: 220px; resize: vertical; font: 12.5px/1.5 ui-monospace, Menlo, monospace; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field-label-help { display: flex; align-items: center; gap: 6px; }
 .small { font-size: 12px; }
 p.small { margin: 0 0 8px; }
 .verbs { width: 100%; border-collapse: collapse; font-size: 13px; }

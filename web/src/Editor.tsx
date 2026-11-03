@@ -39,6 +39,7 @@ import { GameConnection } from './GameConnection';
 import { draftKey, hasCheckedModelAction, type HandoffSnapshot } from './gameHandoff';
 import { WORKSHOP_PAGES, PROBLEM_PAGES } from './workshopPages';
 import { editorIdentity } from './editorPresentation';
+import { Help } from './Tip';
 import { ConversationLog } from './ConversationLog';
 import { BROWSER_DRAFT_KEY, readDrafts, saveBrowserDraft, saveDrafts, shelveDraft, type ShelvedDraft } from './browserDraft';
 import { SiteHeader } from './SiteHeader';
@@ -729,24 +730,27 @@ export function Editor() {
                 <textarea data-field="persona" className="persona" value={draft.persona} maxLength={MAX_PERSONA_LENGTH} onChange={(e) => set('persona', e.target.value)} />
               </Field>
               <div className="row2">
-                <Field label="Voiced by" hint={MODEL_INFO[draft.model].description}>
-                  <select data-field="model" value={draft.model} onChange={(e) => set('model', e.target.value as NpcDraft['model'])}>
+                {/* The explanations sit behind a ? so both selects line up; a ? inside a <label> would take its clicks. */}
+                <div className="field">
+                  <span className="field-label field-label-help"><label htmlFor="draft-model">Voiced by</label> <Help about="Voiced by" text={MODEL_INFO[draft.model].description} /></span>
+                  <select id="draft-model" data-field="model" value={draft.model} onChange={(e) => set('model', e.target.value as NpcDraft['model'])}>
                     {MODEL_CHOICES.map((m) => (
                       <option key={m} value={m}>
                         {MODEL_INFO[m].label}
                       </option>
                     ))}
                   </select>
-                </Field>
-                <Field label="Thinking" hint={EFFORT_INFO[draft.effort].description}>
-                  <select data-field="effort" value={draft.effort} onChange={(e) => set('effort', e.target.value as NpcDraft['effort'])}>
+                </div>
+                <div className="field">
+                  <span className="field-label field-label-help"><label htmlFor="draft-effort">Thinking</label> <Help about="Thinking" text={EFFORT_INFO[draft.effort].description} /></span>
+                  <select id="draft-effort" data-field="effort" value={draft.effort} onChange={(e) => set('effort', e.target.value as NpcDraft['effort'])}>
                     {EFFORT_CHOICES.map((m) => (
                       <option key={m} value={m}>
                         {EFFORT_INFO[m].label}
                       </option>
                     ))}
                   </select>
-                </Field>
+                </div>
               </div>
               <h4>If something goes wrong</h4>
               <div className="row2">
