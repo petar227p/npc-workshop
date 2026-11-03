@@ -555,13 +555,26 @@ export function Editor() {
     <>
     <SiteHeader page="workshop">
       {draft && !starting && !connectionOpen ? <div className="studio-actions">
-        <div className="workshop-status" role="status">
-          {status === 'checking' && <span className="muted">Checking settings…</span>}
-          {status === 'ok' && <span className="status-ok">✓ {tested ? 'Checked action completed' : 'Ready to test'}</span>}
-          {status === 'invalid' && <button type="button" className="text-button status-bad" onClick={() => goToProblem(validationHelp(problems[0]).target, problems[0])}>✕ {problems.length === 1 ? '1 setting' : `${problems.length} settings`} to fix</button>}
-          {status === 'error' && <button type="button" className="text-button status-bad" onClick={() => setRetry((n) => n + 1)}>Couldn’t check settings · Retry</button>}
-          {browserSaveState === 'saving' && <span className="muted"> · Saving in this browser…</span>}
-          {browserSaveState === 'saved' && <span className="muted"> · Saved in this browser</span>}
+        {/* Who is being edited, whether the server accepts its settings, and whether this browser has kept it: the
+            last two are separate, so a draft can be saved here and still need fixing, or valid and not yet saved. */}
+        <div className="workshop-identity">
+          <RoleLogo role={roleLogoForDraft(draft)} className="workshop-identity-logo" />
+          <div className="workshop-identity-text">
+            <h2 id="workshop-h" title={draft.name || 'Unnamed character'}><span className="sr-only">Now editing </span>{draft.name || 'Unnamed character'}<span className="workshop-identity-role"> · {identity?.role}</span></h2>
+            <div className="workshop-status" role="status">
+              <span className="workshop-status-part">
+                {status === 'checking' && <span className="muted">Checking settings…</span>}
+                {status === 'ok' && <span className="status-ok">✓ {tested ? 'Checked action completed' : 'Ready to test'}</span>}
+                {status === 'invalid' && <button type="button" className="text-button status-bad" onClick={() => goToProblem(validationHelp(problems[0]).target, problems[0])}>✕ {problems.length === 1 ? '1 setting' : `${problems.length} settings`} to fix</button>}
+                {status === 'error' && <button type="button" className="text-button status-bad" onClick={() => setRetry((n) => n + 1)}>Couldn’t check settings · Retry</button>}
+              </span>
+              <span className="workshop-status-part">
+                {browserSaveState === 'saving' && <span className="muted">Saving in this browser…</span>}
+                {browserSaveState === 'saved' && <span className="muted">Saved in this browser</span>}
+                {browserSaveState === 'error' && <button type="button" className="text-button status-bad" onClick={() => setStorageRetry((n) => n + 1)}>Not saved in this browser · Retry</button>}
+              </span>
+            </div>
+          </div>
         </div>
         <div className="wh-actions">
           <ImportNpcButton disabled={locked} onImport={(file) => void importNpc(file)} />
@@ -578,7 +591,7 @@ export function Editor() {
           </details>}
           {docked || tested
             ? <button type="button" disabled={locked || !valid} onClick={() => void openConnection()}>Use in your game</button>
-            : <button type="button" disabled={locked} onClick={test}>Test {draft.name || 'your NPC'} →</button>}
+            : <button type="button" disabled={locked} onClick={test}>Test NPC →</button>}
         </div>
       </div> : null}
     </SiteHeader>
@@ -625,10 +638,6 @@ export function Editor() {
                 </ul>
                 <button type="button" className="new-npc" ref={newNpcButton} disabled={locked} aria-expanded={starting} aria-controls="starters" onClick={startNpc}>+ New NPC</button>
               </section>
-              <h2 id="workshop-h" className="rail-current">
-                <RoleLogo role={roleLogoForDraft(draft)} className="rail-current-logo" />
-                <span><small>Now editing</small>{draft.name || 'Unnamed character'}</span>
-              </h2>
               <nav className="editor-nav" aria-label="Workshop pages">
                 {WORKSHOP_PAGES.map(([id, label, hint]) => (
                   <button key={id} type="button" className="secondary" aria-current={(docked || section !== 'test') && page === id ? 'page' : undefined} onClick={() => setSection(id)}>

@@ -677,6 +677,17 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .studio-top .tabs { margin-left: 0; }
 .studio-actions { flex: 1 1 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 16px; min-width: 0; }
 .studio-actions .workshop-status { font-size: 13px; }
+.workshop-identity { display: flex; align-items: center; gap: 10px; flex: 1 1 240px; min-width: 0; margin-right: auto; }
+.workshop-identity-logo { width: 36px; height: 36px; flex-shrink: 0; }
+.workshop-identity-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.workshop-identity h2 { margin: 0; font: 400 19px/1.15 'Pixelify Sans', monospace; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.workshop-identity-role { font: 500 12px/1 Inter, system-ui, sans-serif; color: var(--muted); }
+.workshop-status { display: flex; flex-wrap: wrap; gap: 2px 0; }
+.workshop-status-part + .workshop-status-part::before { content: '·'; margin: 0 6px; color: var(--muted); }
+@media (max-width: 600px) {
+  .workshop-status { flex-direction: column; }
+  .workshop-status-part + .workshop-status-part::before { content: none; }
+}
 .studio-actions button { min-height: 36px; }
 .studio-actions button.secondary, .studio-actions .workshop-more > summary { background: transparent; border: 1px solid #383838; }
 .studio-actions .workshop-more > summary { display: grid; place-items: center; min-height: 36px; box-sizing: border-box; }
@@ -740,10 +751,6 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 
 /* Your NPCs: the draft being edited, the ones set aside, and a way to start another. */
 .rail-label { margin: 0; padding: 0 16px 8px; font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9a9a9a; overflow-wrap: anywhere; }
-.rail-current { display: flex; align-items: center; gap: 12px; margin: 16px 0 4px; padding: 16px; border-top: 1px solid var(--line); font: 400 22px/1.15 'Pixelify Sans', monospace; color: var(--accent); min-width: 0; }
-.rail-current > span { display: flex; flex-direction: column; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
-.rail-current small { font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9a9a9a; }
-.rail-current-logo { width: 48px; height: 48px; }
 .npc-list ul { list-style: none; margin: 0; padding: 0; }
 .npc-row { display: flex; align-items: center; min-width: 0; }
 .npc-row.current { gap: 10px; padding: 8px 16px 8px 14px; background: #1f1f1f; border-left: 2px solid var(--accent); }
