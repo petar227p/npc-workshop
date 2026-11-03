@@ -1,4 +1,4 @@
-import { MAX_HAPPENED_LENGTH, type ActionResponse, type ArtResponse, type ReadNoteResponse, type StateView } from '@blacksmith/shared';
+import { MAX_HAPPENED_LENGTH, type ActionResponse, type ArtResponse, type ReadNoteResponse, type StateView } from '@npc-workshop/shared';
 import { PNG } from 'pngjs';
 import { describe, expect, it, vi } from 'vitest';
 import { mockClient, mockImageClient, type ChatClient } from '../../models';

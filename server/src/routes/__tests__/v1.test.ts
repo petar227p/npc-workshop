@@ -1,4 +1,4 @@
-import type { ApiEvents, ApiNpc, ApiResult, ApiState, ApiWorldCreated } from '@blacksmith/shared';
+import type { ApiEvents, ApiNpc, ApiResult, ApiState, ApiWorldCreated } from '@npc-workshop/shared';
 import { PNG } from 'pngjs';
 import { describe, expect, it, vi } from 'vitest';
 import { mockClient, mockImageClient, type ChatClient } from '../../models';

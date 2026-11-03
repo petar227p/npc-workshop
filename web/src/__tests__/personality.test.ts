@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { markSetupPersonality, readPersonality, writePersonality } from '../personality';
-import { buildSetup } from '@blacksmith/shared/src/setup';
+import { buildSetup } from '@npc-workshop/shared/src/setup';
 
 describe('personality notes', () => {
   it('preserves existing instructions when adding, changing and clearing notes', () => {

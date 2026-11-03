@@ -1,6 +1,6 @@
-import type { BenchAttempt, BenchResponse, EngineEvent, NpcDraft, PreviewResponse, StateView } from '@blacksmith/shared';
+import type { BenchAttempt, BenchResponse, EngineEvent, NpcDraft, PreviewResponse, StateView } from '@npc-workshop/shared';
 // The zod-free modules, so the schemas stay out of the bundle.
-import { MAX_LABEL_LENGTH, MAX_SAY_LENGTH, MAX_SIGNAL_TEXT, MAX_SIGNALS } from '@blacksmith/shared/src/limits';
+import { MAX_LABEL_LENGTH, MAX_SAY_LENGTH, MAX_SIGNAL_TEXT, MAX_SIGNALS } from '@npc-workshop/shared/src/limits';
 import {
   DEFAULT_SPRITE,
   EFFORT_CHOICES,
@@ -20,9 +20,9 @@ import {
   type ModelVerb,
   type ScheduleEntry,
   type Trigger,
-} from '@blacksmith/shared/src/npc-info';
-import { benchIdeas } from '@blacksmith/shared/src/handoff';
-import { freshNpcId, type SetupResult } from '@blacksmith/shared/src/setup';
+} from '@npc-workshop/shared/src/npc-info';
+import { benchIdeas } from '@npc-workshop/shared/src/handoff';
+import { freshNpcId, type SetupResult } from '@npc-workshop/shared/src/setup';
 import { Fragment, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { clockText, editorApi } from './api';
 import { outcomeText } from './benchVerdict';

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Contract, ItemArt, NpcArt } from '@blacksmith/shared';
+import type { Contract, ItemArt, NpcArt } from '@npc-workshop/shared';
 import type { ImageClient, ImageStrength } from '../models/image';
 import { KENNEY_PALETTE } from './palette';
 import { artPrompt, drawPrompt } from './prompt';

@@ -1,4 +1,4 @@
-import type { TranscribeResponse } from '@blacksmith/shared';
+import type { TranscribeResponse } from '@npc-workshop/shared';
 import { describe, expect, it } from 'vitest';
 import { mockClient, mockTranscriber } from '../../models';
 import { ModelError } from '../../models/types';

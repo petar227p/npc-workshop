@@ -1,4 +1,4 @@
-import type { ContractView, EngineEvent, Gift, ItemArt, KnowerView, MadeToOrderView, StateView } from '@blacksmith/shared';
+import type { ContractView, EngineEvent, Gift, ItemArt, KnowerView, MadeToOrderView, StateView } from '@npc-workshop/shared';
 import { useCallback, useId, useState, type ReactNode } from 'react';
 import { Popover } from './Drawer';
 import { sourceChain } from './knowledge';

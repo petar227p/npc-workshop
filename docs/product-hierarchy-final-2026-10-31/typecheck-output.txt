@@ -1,3 +1,0 @@
-
-> typecheck
-> tsc -p shared && tsc -p server && tsc -p web && tsc -p scripts

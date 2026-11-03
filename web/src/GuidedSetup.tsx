@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { buildSetup, MAX_SETUP_NAME, MAX_PERSONALITY, type SetupRole, type Teller, type SetupResult } from '@blacksmith/shared/src/setup';
-import { benchIdeas } from '@blacksmith/shared/src/handoff';
-import { MAX_PERSONA_LENGTH } from '@blacksmith/shared/src/npc-info';
+import { buildSetup, MAX_SETUP_NAME, MAX_PERSONALITY, type SetupRole, type Teller, type SetupResult } from '@npc-workshop/shared/src/setup';
+import { benchIdeas } from '@npc-workshop/shared/src/handoff';
+import { MAX_PERSONA_LENGTH } from '@npc-workshop/shared/src/npc-info';
 import { markSetupPersonality } from './personality';
 import { RoleLogo, ROLE_OPTIONS, type RoleOption } from './RoleLogo';
 

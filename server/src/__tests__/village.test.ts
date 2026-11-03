@@ -1,4 +1,4 @@
-import { findPath, isWalkable, placeNamed, spotsIn } from '@blacksmith/shared';
+import { findPath, isWalkable, placeNamed, spotsIn } from '@npc-workshop/shared';
 import { describe, expect, it } from 'vitest';
 import { NPC_FILES } from '../npcs';
 import { VILLAGE } from '../village';

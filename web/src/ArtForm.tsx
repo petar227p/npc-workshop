@@ -1,6 +1,6 @@
-import type { NpcArt, NpcDraft, SketchResponse } from '@blacksmith/shared';
+import type { NpcArt, NpcDraft, SketchResponse } from '@npc-workshop/shared';
 // The zod-free module, so the schemas stay out of the bundle.
-import { MAX_ART_STYLE, MAX_REFERENCE_BYTES, MAX_REFERENCES, MAX_SKETCH_SUBJECT } from '@blacksmith/shared/src/npc-info';
+import { MAX_ART_STYLE, MAX_REFERENCE_BYTES, MAX_REFERENCES, MAX_SKETCH_SUBJECT } from '@npc-workshop/shared/src/npc-info';
 import { useRef, useState, type DragEvent } from 'react';
 import { editorApi } from './api';
 

@@ -1,4 +1,4 @@
-import type { ActionResponse, Gift, StateView } from '@blacksmith/shared';
+import type { ActionResponse, Gift, StateView } from '@npc-workshop/shared';
 import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState, type ReactNode } from 'react';
 import { api } from './api';
 import { Chat, nameOf, type Pending } from './Chat';

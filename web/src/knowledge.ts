@@ -1,4 +1,4 @@
-import type { EngineEvent, KnowerView, StateView } from '@blacksmith/shared';
+import type { EngineEvent, KnowerView, StateView } from '@npc-workshop/shared';
 
 // How a villager came to know an event, traced back through the log the view carries. Every step is a recorded
 // telling, picked by the engine's own rule (engine/memory.ts memoriesOf): someone knows an event the surest way they

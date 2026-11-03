@@ -1,4 +1,4 @@
-import type { ModelChoice } from '@blacksmith/shared';
+import type { ModelChoice } from '@npc-workshop/shared';
 import { loadEnv, REPO_ROOT } from '../config/env';
 import { createClient } from './client';
 import { createImageClient, type ImageClient } from './image';

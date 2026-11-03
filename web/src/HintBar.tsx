@@ -1,4 +1,4 @@
-import type { StateView } from '@blacksmith/shared';
+import type { StateView } from '@npc-workshop/shared';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Popover } from './Drawer';
 import { dismissedIn, nextBaseline, selectHint, type Baseline, type Hint, type HintLink, type WorldGuidance } from './hints';

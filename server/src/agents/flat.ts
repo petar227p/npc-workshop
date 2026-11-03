@@ -1,4 +1,4 @@
-import { MAX_EMOTE_LENGTH, MAX_NEWS_LENGTH, MAX_SAY_LENGTH, type Catalogue, type MadeToOrder, type OfferKind, type Verb } from '@blacksmith/shared';
+import { MAX_EMOTE_LENGTH, MAX_NEWS_LENGTH, MAX_SAY_LENGTH, type Catalogue, type MadeToOrder, type OfferKind, type Verb } from '@npc-workshop/shared';
 
 // Meta's strict mode forbids a root anyOf, so a model answers in one flat object: the verb, the spoken line,
 // and the union of the fields its verbs use (nullable). Each verb here says which fields it reads and how

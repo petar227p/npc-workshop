@@ -2,21 +2,6 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "village",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "--prefix",
-        "prototype",
-        "run",
-        "dev",
-        "--",
-        "--port",
-        "5173",
-        "--strictPort"
-      ],
-      "port": 5173
-    },
-    {
       "name": "app",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

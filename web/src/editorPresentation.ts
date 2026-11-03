@@ -1,5 +1,5 @@
-import type { NpcDraft } from '@blacksmith/shared';
-import { abilitiesOf, type Ability } from '@blacksmith/shared/src/setup';
+import type { NpcDraft } from '@npc-workshop/shared';
+import { abilitiesOf, type Ability } from '@npc-workshop/shared/src/setup';
 
 const SUMMARY: Record<Ability, string> = {
   talk: 'Talks in character', gesture: 'Uses gestures', sell: 'Sells stocked goods and bargains',

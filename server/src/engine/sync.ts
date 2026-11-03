@@ -1,4 +1,4 @@
-import { InventorySyncSchema, type Change } from '@blacksmith/shared';
+import { InventorySyncSchema, type Change } from '@npc-workshop/shared';
 import type { ZodError } from 'zod';
 import type { EventDraft } from './events';
 import { WORLD } from './happen';

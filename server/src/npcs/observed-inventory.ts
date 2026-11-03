@@ -1,4 +1,4 @@
-import type { ObservedInventory } from '@blacksmith/shared';
+import type { ObservedInventory } from '@npc-workshop/shared';
 import type { NpcDefinition } from './types';
 
 // Scoped to this turn, including repair attempts. Never retained in persona/history or

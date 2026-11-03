@@ -1,4 +1,4 @@
-import type { Trigger } from '@blacksmith/shared';
+import type { Trigger } from '@npc-workshop/shared';
 import type { EventDraft } from './events';
 import { memoriesOf, newsFor, passedOnBy } from './memory';
 import type { World } from './state';

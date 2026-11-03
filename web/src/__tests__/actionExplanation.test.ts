@@ -1,5 +1,5 @@
-import type { BenchResponse, ControlledResponse, NpcDraft } from '@blacksmith/shared';
-import { buildSetup, SETUP_ROLES } from '@blacksmith/shared/src/setup';
+import type { BenchResponse, ControlledResponse, NpcDraft } from '@npc-workshop/shared';
+import { buildSetup, SETUP_ROLES } from '@npc-workshop/shared/src/setup';
 import { describe, expect, it } from 'vitest';
 import { createApi } from '../../../server/src/routes/api';
 import { mockClient } from '../../../server/src/models';

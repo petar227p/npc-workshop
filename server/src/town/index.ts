@@ -1,4 +1,4 @@
-import type { ModelChoice, Trigger } from '@blacksmith/shared';
+import type { ModelChoice, Trigger } from '@npc-workshop/shared';
 import { npcTurn, type Attempt, type NpcModel, type TurnResult } from '../agents/npc';
 import { commit, hasNews, lastFired, meeting, timedTrigger, triggerFired, type Act, type EngineEvent, type Meeting, type World } from '../engine';
 import type { NpcDefinition } from '../npcs/types';

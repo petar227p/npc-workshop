@@ -1,7 +1,7 @@
-import type { EngineEvent } from '@blacksmith/shared';
+import type { EngineEvent } from '@npc-workshop/shared';
 import type { World } from './state';
 
-export type { EngineEvent, EventType } from '@blacksmith/shared';
+export type { EngineEvent, EventType } from '@npc-workshop/shared';
 
 // The event log is the source of truth: the world is whatever `apply` makes of it, and `replay` rebuilds it.
 // `apply` trusts its input. Checking belongs to validator.ts and clock.ts, which only ever produce legal events.

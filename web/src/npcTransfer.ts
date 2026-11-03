@@ -1,6 +1,6 @@
-import type { NpcDraft, PreviewResponse } from '@blacksmith/shared';
-import { NpcBundleSchema, parseNpcBundle } from '@blacksmith/shared/src/integration';
-import { MAX_NPC_BUNDLE_BYTES } from '@blacksmith/shared/src/limits';
+import type { NpcDraft, PreviewResponse } from '@npc-workshop/shared';
+import { NpcBundleSchema, parseNpcBundle } from '@npc-workshop/shared/src/integration';
+import { MAX_NPC_BUNDLE_BYTES } from '@npc-workshop/shared/src/limits';
 
 type Failure = { ok: false; errors: string[] };
 type NpcFile = Pick<File, 'size' | 'text'>;

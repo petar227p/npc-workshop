@@ -21,7 +21,7 @@ npm run game-example -- \
   --bundle "$HOME/Downloads/your_npc.npc.json"
 ```
 
-Replace the bundle path with the file you downloaded. `--server` is required and must be the NPC server's HTTP(S) origin, without `/api/v1`, credentials or query parameters. Use the same server as Workshop, or another server running this repository's current API. You do not copy the bundle into `npcs/`, save it to development files or restart the server.
+Replace the bundle path with the file you downloaded. `--server` is required and must be the NPC server's HTTP(S) origin, without `/api/v1`, credentials or query parameters. Use the same server as Workshop, or another server running this repository's current API. You do not copy the bundle into `npcs/`, save it to development files or restart the server. To try the example without exporting your own NPC, use the sample bundle [`examples/npcs/portable_ada.npc.json`](../npcs/portable_ada.npc.json).
 
 The default normal message and challenge come from the same ability-aware suggestions as Workshop. To choose your own:
 
@@ -93,10 +93,6 @@ A run creates a new world and sends two messages, normally using two model calls
 
 Each world owns its configuration snapshot. Edit/re-export and run again to use new settings. The bundle restores starting configuration and stock, not existing offers, current inventory, history or generated item pictures. The example uses the bundled village's places, schedule clock and perception rules. Engine adapters and durable worlds are later work.
 
-## Scripted verification example
-
-A reproducible run using the actual Workshop browser export, a local HTTP server and **scripted model proposals** is recorded in [Task 4 verification](../../docs/workshop-game-integration-task-4/README.md). It demonstrates a valid pass offer, rejected over-stock challenge, acceptance and a declared signal, followed by event replay without duplicate handling. This is API/ledger evidence, not live-provider evidence or a claim that every model will choose those replies.
-
 ## Verify the connection in Workshop
 
 1. Run with `--interactive`, type `/verify` and open the printed local URL. No token is in that URL or terminal output.
@@ -106,5 +102,3 @@ A reproducible run using the actual Workshop browser export, a local HTTP server
 The form calls authenticated `GET /api/v1/worlds/:id/connection`. The response includes each NPC’s complete normalized configuration hash, first reply event/time and latest say outcome; it does not return tokens, persona or dialogue. It is historical evidence of a successful reply, not a promise of ongoing provider health. A later outage is reported alongside existing evidence. Checks are bounded to six reads per submission, three seconds apart after each response, with ten-second request timeouts and manual retry. Wrong credentials, missing worlds and snapshot mismatches stop automatic checks early.
 
 Workshop stores entered credentials only in component memory, never in browser storage, URLs or analytics. Leaving the flow, clearing credentials, importing/replacing the character, or changing the server/snapshot removes them and aborts pending reads. A configuration mismatch asks you to download and run the correct copy. A missing world after restart or eviction requires a new example run and new credentials. The imported file still restores the same configuration; it does not restore old runtime progress.
-
-See [Task 6 implementation](../../docs/workshop-game-integration-task-6/README.md) and [Task 7 end-to-end evidence](../../docs/workshop-game-integration-task-7/README.md). Tests and screenshots there use explicitly scripted model responses. Live-provider verification, deployment and a human newcomer walkthrough were not performed.

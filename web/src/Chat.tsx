@@ -1,7 +1,7 @@
-import type { ContractView, EngineEvent, StateView } from '@blacksmith/shared';
+import type { ContractView, EngineEvent, StateView } from '@npc-workshop/shared';
 // The zod-free module, so the schemas stay out of the bundle.
-import { MAX_SAY_LENGTH } from '@blacksmith/shared/src/limits';
-import { MODEL_INFO } from '@blacksmith/shared/src/npc-info';
+import { MAX_SAY_LENGTH } from '@npc-workshop/shared/src/limits';
+import { MODEL_INFO } from '@npc-workshop/shared/src/npc-info';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
 import { api, clockText } from './api';
 import { withRole } from './roles';

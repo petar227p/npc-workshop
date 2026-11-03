@@ -1,4 +1,4 @@
-import type { ActionResponse, ArtResponse, BenchResponse, ControlledResponse, EditorLibrary, Gift, NpcDraft, PreviewResponse, ReadNoteResponse, SaveResponse, SketchResponse, StateView, TranscribeResponse, WorldReport } from '@blacksmith/shared';
+import type { ActionResponse, ArtResponse, BenchResponse, ControlledResponse, EditorLibrary, Gift, NpcDraft, PreviewResponse, ReadNoteResponse, SaveResponse, SketchResponse, StateView, TranscribeResponse, WorldReport } from '@npc-workshop/shared';
 
 export class ApiError extends Error {}
 
@@ -51,4 +51,4 @@ export const editorApi = {
 };
 
 // The zod-free module, so the schemas stay out of the bundle. The NPCs' clock fact uses the same text.
-export { clockText } from '@blacksmith/shared/src/clock';
+export { clockText } from '@npc-workshop/shared/src/clock';

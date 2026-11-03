@@ -4,13 +4,13 @@ import { resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { benchIdeas, MAX_NPC_BUNDLE_BYTES, MAX_SAY_LENGTH, parseNpcBundle } from '@blacksmith/shared';
+import { benchIdeas, MAX_NPC_BUNDLE_BYTES, MAX_SAY_LENGTH, parseNpcBundle } from '@npc-workshop/shared';
 import { verificationPage } from './verification.mjs';
 
-/** @typedef {import('@blacksmith/shared').NpcDraft} NpcDraft */
-/** @typedef {import('@blacksmith/shared').EngineEvent} EngineEvent */
-/** @typedef {import('@blacksmith/shared').ApiResult} ApiResult */
-/** @typedef {import('@blacksmith/shared').ApiWorldCreated} ApiWorldCreated */
+/** @typedef {import('@npc-workshop/shared').NpcDraft} NpcDraft */
+/** @typedef {import('@npc-workshop/shared').EngineEvent} EngineEvent */
+/** @typedef {import('@npc-workshop/shared').ApiResult} ApiResult */
+/** @typedef {import('@npc-workshop/shared').ApiWorldCreated} ApiWorldCreated */
 /** @typedef {(line: string) => void} Output */
 /** @typedef {Extract<EngineEvent, { type: 'SIGNALED' }>} SignalEvent */
 
@@ -161,7 +161,7 @@ export async function connectGame({ server, npc, log = console.log, fetcher = fe
     async replayEvents() {
       let since = '';
       for (let page = 0; page < 20; page++) {
-        /** @type {import('@blacksmith/shared').ApiEvents} */
+        /** @type {import('@npc-workshop/shared').ApiEvents} */
         const data = await request(`${path}/events?limit=500${since ? `&since=${encodeURIComponent(since)}` : ''}`);
         consume(data.events);
         if (!data.more) { log('Event log caught up; already handled event IDs were skipped.'); return; }

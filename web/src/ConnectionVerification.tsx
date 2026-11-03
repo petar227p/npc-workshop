@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { NpcDraft } from '@blacksmith/shared';
+import type { NpcDraft } from '@npc-workshop/shared';
 import { connectionState, NOT_CONNECTED, pollConnection, readConnection, snapshotHash, type Verification } from './connectionStatus';
 
 const LABELS = { not_connected: 'Not connected', created: 'World created', reply: 'First reply received', unavailable: 'Unavailable or expired', mismatch: 'Configuration mismatch' };

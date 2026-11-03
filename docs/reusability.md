@@ -23,7 +23,7 @@ An LLM plays the character; it only *proposes* an action as JSON. Plain code che
 3. **Trade in the shared types.** `STATS` is damage / weight / durability, so a made-to-order item is always weapon-shaped. Fact blocks are a closed enum, all about trade.
 4. **Literals.** `'player'`, `'village'` and `'clock'` are defaults inside rules; `buildNpc` checks places against the village map by default; `game.ts` uses a global `act` and `smith`.
 5. **Time.** One tick is one hour; schedules use hours 0–23.
-6. **Delivery.** A Hono server with cookie sessions and player-shaped routes (`/api/say`, `/api/accept`); private `@blacksmith/*` workspaces run with `tsx`. No host-agnostic protocol yet.
+6. **Delivery.** A Hono server with cookie sessions and player-shaped routes (`/api/say`, `/api/accept`); private `@npc-workshop/*` workspaces run with `tsx`. No host-agnostic protocol yet.
 7. **Speed.** About 4 s per turn on Muse Spark at low effort: fine for shops and quest givers, too slow for combat barks. `apply` clones the world per event, so a very long log replays in quadratic time.
 
 ## As a mod for an existing game
