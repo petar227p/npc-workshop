@@ -175,7 +175,7 @@ Muse Spark and Muse Spark Open always reason, so the clients send a low `reasoni
 |---|---|
 | `npm run dev` | Start the web app and API server |
 | `npm test` | Run the Vitest suite (engine, API, guided setup, UI helpers) |
-| `npm run typecheck` | Typecheck shared, server, web, scripts and examples |
+| `npm run typecheck` | Typecheck shared, server, web, scripts, eval and examples |
 | `npm run ledger-proof` | Feed controlled inputs (no model) and verify the ledger refuses invalid ones unchanged |
 | `npm run exploit-suite` | Attack each village NPC with live models and check the world after every attempt (~25 minutes) |
 | `npm run smith-demo` | Scripted live session: order, accept, delivery, then an absurd request and an injection attempt |
