@@ -1666,22 +1666,36 @@ function pretty(content: string): string {
   }
 }
 
+// The ledger's verdict on one proposal, attached under what it checked: the verdict and the proposal (and, when it is
+// rejected, the rule that refused it) stay in view; the full receipt opens beneath.
 function ActionCheck({ check }: { check: ActionExplanation }) {
-  return <section className={`action-check ${check.accepted ? 'accepted' : 'rejected'}`} aria-label={check.source}>
-    <p className="action-check-source">{check.source}</p>
-    <dl className="action-check-flow">
-      <div><dt>Proposal</dt><dd>{check.proposal}</dd></div>
-      <div><dt>Applicable rule</dt><dd>{check.rule}</dd></div>
-      <div className="action-check-verdict"><dt>Verdict</dt><dd>{check.accepted ? '✓ Accepted' : '✕ Rejected'}</dd></div>
-      <div><dt>Resulting state</dt><dd>{check.state}</dd></div>
-    </dl>
+  return <section className={`action-check ${check.accepted ? 'accepted' : 'rejected'}`} aria-label={`Ledger check: ${check.source}`}>
+    <details>
+      <summary>
+        <span className="action-check-line">{check.accepted ? '✓ Ledger accepted' : '✕ Ledger rejected'}</span>
+        <span className="action-check-proposal">{check.proposal}</span>
+        <span className="action-check-more" aria-hidden="true">Details</span>
+        {!check.accepted && <span className="action-check-reason">{check.rule}</span>}
+      </summary>
+      <div className="action-check-receipt">
+        <p className="action-check-source">{check.source}</p>
+        <dl className="action-check-flow">
+          <div><dt>Proposal</dt><dd>{check.proposal}</dd></div>
+          <div><dt>Applicable rule</dt><dd>{check.rule}</dd></div>
+          <div className="action-check-verdict"><dt>Verdict</dt><dd>{check.accepted ? '✓ Accepted' : '✕ Rejected'}</dd></div>
+          <div><dt>Resulting state</dt><dd>{check.state}</dd></div>
+        </dl>
+      </div>
+    </details>
   </section>;
 }
 
 function BenchEntry({ event: e, view, npcName, controlled }: { event: EngineEvent; view: StateView; npcName: string; controlled: boolean }) {
   switch (e.type) {
     case 'SAID':
-      return <div className={`msg ${e.actor === 'player' ? 'you' : 'npc'}`}><span className="sr-only">{e.actor === 'player' ? 'You' : npcName}: </span>{e.data.text}</div>;
+      // As in the example village: the NPC's lines carry its name, yours don't.
+      if (e.actor === 'player') return <div className="msg you"><span className="sr-only">You: </span>{e.data.text}</div>;
+      return <div className="msg npc"><span className="who">{npcName || 'Your NPC'}</span>{e.data.text}</div>;
     case 'CONTRACT_PROPOSED': {
       const c = view.contracts.find((x) => x.contract_id === e.data.contract.contract_id);
       return c ? <ContractCard c={c} gold={view.gold} disabled /> : null;
@@ -1689,6 +1703,7 @@ function BenchEntry({ event: e, view, npcName, controlled }: { event: EngineEven
     case 'EMOTED':
       return (
         <div className="msg npc emote">
+          <span className="who">{npcName || 'Your NPC'}</span>
           <i>{e.data.text}</i>
         </div>
       );

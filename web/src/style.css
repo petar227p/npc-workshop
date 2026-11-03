@@ -19,6 +19,7 @@
   --receipt: #161512;
   --receipt-line: #4a4740;
   --mono: ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace;
+  --bubble-you: #44351d; /* the player's lines, in the demo and the workshop test alike */
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -55,7 +56,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .conversation-log { display: flex; flex-direction: column; gap: 8px; }
 .msg { padding: 7px 10px; border-radius: 8px; max-width: 85%; white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg.npc { background: var(--panel-2); align-self: flex-start; }
-.msg.you { background: #44351d; align-self: flex-end; }
+.msg.you { background: var(--bubble-you); align-self: flex-end; }
 .msg.thinking { color: var(--muted); font-style: italic; }
 .msg.emote { background: none; color: var(--muted); padding-top: 2px; padding-bottom: 2px; }
 .dots::after { content: ''; animation: dots 1.2s steps(4) infinite; }
@@ -617,7 +618,6 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .bench-tools { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
 .bench-tools > summary, .bench-details > summary { color: var(--text); }
 .bench-tools[open] > summary, .bench-details[open] > summary { margin-bottom: 8px; }
-.bench-verdict { padding: 8px 10px; background: var(--panel-2); border-radius: 6px; font-size: 13px; }
 .action-check { flex: none; padding: 10px; border: 1px solid var(--line); border-left: 3px solid var(--ok); border-radius: 6px; background: var(--bg); font-size: 12px; overflow-wrap: anywhere; }
 .action-check.rejected { border-left-color: var(--bad); }
 .action-check-source { margin: 0 0 8px; color: var(--accent); font-size: 11px; font-weight: 600; }
@@ -851,8 +851,22 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .app-wide .bench-handoff.ready { border-top-color: var(--ok); }
 .app-wide .game-connection { padding: 24px 16px 48px; }
 
-/* Ledger receipts: every checked proposal reads like a line in the ledger, not another chat bubble. */
-.action-check { padding: 10px 12px; background: var(--receipt); border: 0; border-block: 1px dashed var(--receipt-line); border-radius: 0; font: 12px/1.55 var(--mono); color: #d6d3cc; }
+/* Ledger checks: a short verdict line hugging what it checked, never another chat bubble; the receipt opens beneath. */
+.action-check { margin-top: -4px; padding: 0; background: none; border: 0; border-left: 2px solid var(--ok); border-radius: 0; font: 13px/1.45 Inter, system-ui, sans-serif; color: var(--text); }
+.action-check.rejected { border-left-color: var(--bad); }
+.action-check summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 4px 10px; cursor: pointer; list-style: none; border-radius: 0 6px 6px 0; }
+.action-check summary::-webkit-details-marker { display: none; }
+.action-check summary:hover { background: #1b1b1b; }
+.action-check summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.action-check-line { font-weight: 600; color: var(--ok); white-space: nowrap; }
+.rejected .action-check-line { color: var(--bad); }
+.action-check-proposal { flex: 1 1 0; min-width: 0; color: #d4d4d4; overflow-wrap: anywhere; }
+.action-check-more { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.action-check-more::after { content: ' ▸'; }
+.action-check details[open] .action-check-more::after { content: ' ▾'; }
+.action-check-reason { flex-basis: 100%; color: #f6c7c4; font-size: 12px; overflow-wrap: anywhere; }
+.action-check-receipt { margin: 2px 0 2px 10px; padding: 8px 12px; background: var(--receipt); border-block: 1px dashed var(--receipt-line); font: 12px/1.55 var(--mono); color: #d6d3cc; }
+@media (max-width: 860px) { .action-check summary { min-height: 44px; align-content: center; } }
 .action-check-source { display: flex; flex-wrap: wrap; gap: 6px; font-family: var(--mono); letter-spacing: .02em; }
 .action-check-source::before { content: 'LEDGER ·'; color: var(--muted); }
 .action-check-flow { grid-template-columns: minmax(0, 1fr); gap: 3px; }
@@ -860,7 +874,8 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .action-check-flow > div + div { border: 0; padding: 0; }
 .action-check-flow dt { margin: 0; padding-top: 1px; font-size: 10.5px; color: #9a968c; }
 .action-check-verdict dd { font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-.bench .note.bad, .bench-verdict { align-self: stretch; padding: 8px 12px; background: var(--receipt); border-block: 1px dashed var(--receipt-line); border-radius: 0; font: 12px/1.55 var(--mono); text-align: left; }
+.bench .note.bad { align-self: stretch; padding: 4px 10px; background: none; border: 0; border-left: 2px solid var(--bad); border-radius: 0; font: 13px/1.45 Inter, system-ui, sans-serif; color: #f6c7c4; text-align: left; }
+.bench-verdict { margin: 0; padding: 4px 10px; background: none; border-left: 2px solid var(--line); border-radius: 0; font-size: 13px; color: var(--muted); }
 .attempt { font-size: 13px; }
 .attempt-head b { font-family: var(--mono); font-size: 12px; letter-spacing: .04em; }
 .app-wide .definition > .ed-section + .editor-disclosure { margin-top: 20px; border-top: 1px solid var(--rule); }
