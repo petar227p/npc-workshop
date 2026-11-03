@@ -19,7 +19,6 @@ import { cors } from 'hono/cors';
 import { z } from 'zod';
 import type { NpcModel } from '../agents/npc';
 import { ART_FILE, artView, type Studio } from '../art';
-import { placeAt } from '../engine';
 import { answers, passTime, playerAccepts, playerGives, playerSays, playerSpeaks, worldReports } from '../game';
 import type { ImageClient } from '../models/image';
 import { NPC_DRAFTS, NPCS, type NpcDefinition } from '../npcs';
@@ -288,7 +287,7 @@ export function createV1(deps: V1Deps) {
     const model = modelFor(w, npc.model);
     if (!model) {
       w.connection.find((n) => n.id === npc.id)!.last_say = 'unavailable';
-      return c.json({ error: `${npc.name} isn't at the ${placeAt(npc, w.world.tick).replace(/_/g, ' ')} right now. Try again later.` }, 503);
+      return c.json({ error: `${npc.name} can't answer: no model key is set on this server. Add MODEL_API_KEY to its .env and restart it.` }, 503);
     }
     w.busy = npc.name;
     try {

@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/petar227p/npc-workshop/actions/workflows/ci.yml/badge.svg)](https://github.com/petar227p/npc-workshop/actions/workflows/ci.yml)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
-![Node 26](https://img.shields.io/badge/node-26-339933.svg)
+![Node 24+](https://img.shields.io/badge/node-24%2B-339933.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6.svg)
 ![Meta Muse Hackathon 2026](https://img.shields.io/badge/Meta%20Muse%20Hackathon-Nov%202026-0866FF.svg)
 
@@ -63,7 +63,7 @@ A turn follows four steps:
 
 ### Prerequisites
 
-- Node.js 26 (earlier versions are untested)
+- Node.js 24 or later (CI runs 26; the test suite also passes on 24)
 - A Meta Model API key and/or a Baseten API key for live conversations (optional for exploring the editor)
 
 ### Install and run
@@ -87,8 +87,8 @@ The server starts without keys: templates, the questionnaire and validation work
 
 | Variable | Required for |
 |---|---|
-| `MODEL_API_KEY` | Muse Spark conversations (Brann), item art and voice transcription |
-| `BASETEN_API_KEY` | Muse Spark Open conversations (villagers, gossip) |
+| `MODEL_API_KEY` | Muse Spark conversations (Brann), item art and voice transcription. Enough on its own: every NPC works with just this key |
+| `BASETEN_API_KEY` | Muse Spark Open conversations (villagers, gossip). Without it, those NPCs run on Muse Spark through the Meta Model API, and the server logs a line saying so |
 | `SMITH_MODEL`, `VILLAGER_MODEL`, `IMAGE_MODEL`, `TRANSCRIBE_MODEL` | Overriding the default models |
 | `PORT` | API port (default `8787`) |
 | `REPLAY` | Replaying a recorded JSONL log instead of calling the APIs |
@@ -97,7 +97,7 @@ See [`.env.example`](.env.example) for the full list, including production setti
 
 ## Create and test an NPC
 
-1. **Start a draft.** In Workshop, choose **Create your NPC**, a role template, **Help me choose**, **Blank NPC** or **Import NPC**. Named library entries are editable examples.
+1. **Start a draft.** In Workshop, choose a role template, **Help me choose**, **Copy an example**, **Blank NPC** or **Import NPC**. Named library entries are editable examples.
 2. **Configure it.** Set the personality and abilities, then adjust catalogue limits, signals or automatic behavior. Drafts are saved in your browser and validated by the server.
 3. **Test it.** Once the preview is valid, choose **Test your NPC** and try a normal conversation and a challenge. The controlled rejection test runs separately from the model.
 4. **Download it.** **Download NPC** saves a portable `<id>.npc.json` (up to 2 MiB) containing the character settings, persona and reference pictures. Conversations, world progress and generated item art are not included.
@@ -213,12 +213,12 @@ NPC Workshop was built for the Meta Muse hackathon (November 2026) and is a work
 - Abilities come from the built-in, code-owned verb library.
 - Map-dependent settings (location, schedule, perception, sprites) use the bundled example village.
 - Worlds are held in memory and lost on server restart. Editing a draft does not update running worlds.
-- Engine adapters, durable storage and a global spend budget are not yet implemented.
+- The Skyrim adapter is the only engine integration so far, and it is experimental. Durable storage and a global spend budget are not yet implemented.
 
 ## Roadmap
 
 - Separate authoring and runtime concerns, and support game-specific world configuration beyond the bundled village.
-- Engine adapters, and adding definitions to an existing world.
+- More engine adapters, and adding definitions to an existing world.
 - A recorded comparison of a raw LLM against the ledger.
 - A non-game NPC (a parts-supplier quote desk) on the same engine.
 - Newcomer user studies, deployment and a global spend budget.
@@ -226,5 +226,7 @@ NPC Workshop was built for the Meta Muse hackathon (November 2026) and is a work
 ## License and credits
 
 Released under the [MIT License](LICENSE). Copyright © 2026 Petar Penovic.
+
+The MIT License covers this repository only. No model weights are included; Muse Spark Open is under the separate Muse Model License, a custom license that is not OSI-approved.
 
 Pixel art in the demo village is from [Kenney](https://kenney.nl) (Tiny Town and Tiny Dungeon, CC0).

@@ -8,7 +8,7 @@ Is there already a product or library where developers define NPCs that think wi
 
 ## Short answer
 
-The **idea** is not new: "the model proposes, game code validates" is the pattern write-ups and papers recommend. What we didn't find is a **packaged, reusable library** that combines all of it for several NPCs: per-NPC verbs with validation rules, an authoritative event log with replay, strict-schema output, and perception/gossip. The gap is real but narrow, so a pitch has to name exactly that combination and not just "AI NPCs".
+The **idea** is not new: "the model proposes, game code validates" is the pattern write-ups and papers recommend. What we didn't find is a **packaged, reusable library** that combines all of it for several NPCs: per-NPC verbs with validation rules, an authoritative event log with replay, strict-schema output, and perception/gossip. The gap is real but narrow: it is that exact combination, not "AI NPCs" in general.
 
 ## What exists
 
@@ -41,9 +41,3 @@ The **idea** is not new: "the model proposes, game code validates" is the patter
 5. Recording and replay of model calls for offline development and CI.
 
 None of the projects above ships all five. Convai and Inworld leave 1–2 to the developer; AI Town and Generative Agents ports have 4-ish without 1–2; the paper has 1–2 for a single agent.
-
-## Risks for the pitch
-
-- "AI NPC framework" sounds crowded, so lead with "NPCs that can't cheat" and show it with injection attempts.
-- Convai's actions or a weekend of glue code could look "good enough" to a judge; the demo has to show what breaks without the validator.
-- A framework is hard to judge without a game, so the playable village still matters.

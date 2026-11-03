@@ -6,7 +6,7 @@ All routes are under `/api/v1` on the API port (`:8787` in development).
 
 ## Creating a world from a downloaded NPC
 
-Download an NPC from Workshop, then send its bundle's `npc` configuration as `{ definitions: [bundle.npc] }` to `POST /api/v1/worlds` from your backend. The server validates the draft and creates a new world without writing registry files or restarting. Each world owns a snapshot of its configuration, so later edits affect only newly created worlds. See the [request contract](workshop-game-integration-contract.md#draft-based-world-creation-contract) and [implementation evidence](workshop-game-integration-task-3/README.md).
+Download an NPC from Workshop, then send its bundle's `npc` configuration as `{ definitions: [bundle.npc] }` to `POST /api/v1/worlds` from your backend. The server validates the draft and creates a new world without writing registry files or restarting. Each world owns a snapshot of its configuration, so later edits affect only newly created worlds.
 
 Keep the returned token on your game's backend. The local verification flow briefly copies it into Workshop memory; never put it in URLs, analytics, logs, committed files or a distributed game client. Serve Workshop on localhost or HTTPS so the browser can compute snapshot hashes.
 
@@ -18,7 +18,7 @@ Run the example from the repository root while the NPC server is running:
 npm run game-example -- --server http://localhost:8787 --bundle "$HOME/Downloads/your_npc.npc.json"
 ```
 
-It keeps the token in memory and consumes checked events once. Add `--interactive` to continue the same world with messages, `/accept ID`, `/tick HOURS`, `/events` and `/verify`. See [setup, signal handling and recovery](../examples/game-backend/README.md) and [the scripted verification transcript](workshop-game-integration-task-4/transcript.txt).
+It keeps the token in memory and consumes checked events once. Add `--interactive` to continue the same world with messages, `/accept ID`, `/tick HOURS`, `/events` and `/verify`. See [setup, signal handling and recovery](../examples/game-backend/README.md).
 
 ### Using registry NPCs instead
 
@@ -26,7 +26,7 @@ It keeps the token in memory and consumes checked events once. Add `--interactiv
 
 ### Connection verification
 
-Workshop's **Use in your game** screen compares a SHA-256 fingerprint of the complete normalized draft with private, server-side evidence of an external reply. World creation, Workshop bench calls and timer activity do not count as a reply. Verification polls only after you enter credentials, at most six times per submission, with manual retry. See the [complete journey verification](workshop-game-integration-task-7/README.md).
+Workshop's **Use in your game** screen compares a SHA-256 fingerprint of the complete normalized draft with private, server-side evidence of an external reply. World creation, Workshop bench calls and timer activity do not count as a reply. Verification polls only after you enter credentials, at most six times per submission, with manual retry.
 
 ## Quick example
 
@@ -55,6 +55,7 @@ curl -s -X POST $W/tick   -H "$AUTH" -H 'content-type: application/json' -d '{"h
 | `GET …/worlds/:id` | | Current world state: tick, the player's gold, goods, items and offers, NPC positions and news. |
 | `GET …/worlds/:id/connection` | | Authenticated snapshot hashes, the first committed external spoken reply per NPC, the latest say outcome, busy state and remaining calls. Contains no token or conversation text. |
 | `GET …/worlds/:id/events?since=<event id>&limit=` | | Events after `since`, up to 500, with `more` set if others remain. |
+| `POST …/worlds/:id/catalogue` | `{ npc, goods: [{ id, label, min_price }…] }` | Replaces what a stock-selling NPC may sell in this world, using 1–128 goods from your game. Only your authenticated game can call this; the model cannot. Not available for NPCs that make items to order. |
 | `POST …/worlds/:id/say` | `{ npc, text }` | The player speaks; the NPC answers through the ledger. |
 | `POST …/worlds/:id/accept` | `{ contract_id }` | The player accepts an offer: gold moves and work starts. |
 | `POST …/worlds/:id/give` | `{ to, gift }` | The player hands over gold, goods or an item. |
@@ -110,7 +111,7 @@ To protect a public server:
 | Events per world | 5,000 |
 | Worlds in memory | 200 (only worlds idle for 30 minutes are evicted) |
 | New worlds | 5 per minute per address, 20 per minute overall |
-| Action request body | 16 KiB |
+| Action request body | 16 KiB (`catalogue`: 128 KiB) |
 | World-creation request body | 4 MiB |
 | Custom draft | 2 MiB each (picture-heavy casts may reach the combined limit sooner) |
 

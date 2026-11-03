@@ -91,7 +91,7 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
     if (recent.length >= perMinute) return c.json({ error: 'The workshop is busy right now. Try again in a minute.' }, 429);
 
     const model = deps.modelFor(s, npc.model);
-    if (!model) return c.json({ error: `${MODEL_INFO[npc.model].label} isn't available right now. Try again later.` }, 503);
+    if (!model) return c.json({ error: `${MODEL_INFO[npc.model].label} can't run: no model key is set. Add MODEL_API_KEY to .env and restart the server.` }, 503);
     recent.push(t);
     s.benchTurns += 1;
     return model;
@@ -223,7 +223,7 @@ export function mountEditor(app: Hono<Env>, deps: Deps) {
     recentSketches = recentSketches.filter((at) => t - at < 60_000);
     if (recentSketches.length >= sketchesPerMinute) return c.json({ error: 'The workshop is busy right now. Try again in a minute.' }, 429);
     const artist = deps.artistFor(s);
-    if (!artist) return c.json({ error: "Muse Image isn't available right now. Try again later." }, 503);
+    if (!artist) return c.json({ error: "Muse Image can't run: no model key is set. Add MODEL_API_KEY to .env and restart the server." }, 503);
     recentSketches.push(t);
     s.sketches += 1;
     s.sketching = true;

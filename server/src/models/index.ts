@@ -22,11 +22,19 @@ const TURN_LIMITS = { timeoutMs: 20_000, maxAttempts: 2 };
 // Batch scripts nobody waits on (the exploit suite) can be patient instead: ~1 min of backoff rides out a per-minute limit.
 export const BATCH_LIMITS = { timeoutMs: 60_000, maxAttempts: 8 };
 
+let warnedFallback = false; // the Baseten fallback is said once per server run, not once per session
+
 // One model choice's client from env, each call recorded to logs/<session>.jsonl. REPLAY=<file> plays a recorded
 // log instead. Only that choice's key is needed, so an NPC on Muse Spark works without a Baseten key and back.
+// One Meta key is enough for every NPC: without a Baseten key, Muse Spark Open NPCs run on Muse Spark.
 export function createModel(session: string, choice: ModelChoice, limits: { timeoutMs: number; maxAttempts: number } = TURN_LIMITS): ModelClient {
   const env = loadEnv();
-  const spark = choice === 'muse_spark';
+  const fallback = choice === 'muse_spark_open' && !env.REPLAY && !env.BASETEN_API_KEY && !!env.MODEL_API_KEY;
+  if (fallback && !warnedFallback) {
+    warnedFallback = true;
+    console.warn('BASETEN_API_KEY is not set: Muse Spark Open NPCs will run on Muse Spark through the Meta Model API');
+  }
+  const spark = choice === 'muse_spark' || fallback;
   const model = spark ? (env.SMITH_MODEL ?? 'muse-spark-1.3-contributor') : (env.VILLAGER_MODEL ?? 'meta-models/muse-spark-open-1026');
   const provider = spark ? 'meta' : 'baseten';
 

@@ -18,7 +18,7 @@ An LLM plays the character; it only *proposes* an action as JSON. Plain code che
 
 ## What ties it to this game
 
-1. **Closed verb set.** `VERBS`, `ACTION_SCHEMAS`, the `EngineEvent` union, the `apply` switch, `LEDGER_VERBS` / `MODEL_VERBS`, the `LEDGER` map in `npcs/load.ts`, the flat verbs and the history renderer are hardcoded. Adding `ATTACK` or `OPEN_GATE` touches about 10 places across `shared`, `server` and `web`.
+1. **Closed verb set.** `VERBS`, `ACTION_SCHEMAS`, the `EngineEvent` union, the `apply` switch, `LEDGER_VERBS` / `MODEL_VERBS`, the `LEDGER` map in `server/src/npcs/load.ts`, the flat verbs and the history renderer are hardcoded. Adding `ATTACK` or `OPEN_GATE` touches about 10 places across `shared`, `server` and `web`.
 2. **Fixed world shape.** `World` is gold, stock, contracts and items. There is no slot for HP, reputation, quest flags or faction standing.
 3. **Trade in the shared types.** `STATS` is damage / weight / durability, so a made-to-order item is always weapon-shaped. Fact blocks are a closed enum, all about trade.
 4. **Literals.** `'player'`, `'village'` and `'clock'` are defaults inside rules; `buildNpc` checks places against the village map by default; `game.ts` uses a global `act` and `smith`.
@@ -45,7 +45,7 @@ Made-to-order items with free stats also need a game that can spawn custom items
 
 A good fit: here the ledger *is* the authority, so the sync problem disappears. A JS/TS game (Phaser, as in the demo village) uses it directly. Godot, Unity or Unreal use it as a backend; the engine is about 600 lines of pure logic and could be ported, but model calls belong on a server anyway to keep keys private. The server is already authoritative, so multiplayer gets cheat-proof NPCs without extra work.
 
-## Path to a reusable toolkit (after the hackathon)
+## Path to a reusable toolkit
 
 1. **Registries** for verbs, events and fact blocks: one `defineVerb({ schema, rule, apply, flat, describe })`, so a verb lives in one place.
 2. **Pluggable world state:** modules add their own slice and reducer; trade becomes the first module.
@@ -53,7 +53,3 @@ A good fit: here the ledger *is* the authority, so the sync problem disappears. 
 4. **Packages:** `core` (engine), `agent` (turn, schema, models), `trade`, `server`, `workshop`.
 5. **Host protocol:** stateless `POST /turn { npc, snapshot, input } → events` plus WebSocket, with the external-authority mode for mods.
 6. **Snapshots** so replay stays linear.
-
-## For the pitch
-
-Honest claim: *"The model-proposes, code-decides loop and the agent layer are engine-agnostic; trade is the first rule set."* The parts-supplier quote desk (PLAN.md, Nov 1) is the cheapest proof that it isn't only for games. Avoid "any dev can drop it into any game today": the verb set is closed until step 1 above lands.

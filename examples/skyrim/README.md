@@ -16,7 +16,7 @@
 
 This is the first Skyrim adapter implementation. The local text page sends conversations and explicit offer acceptance through the existing `/api/v1` world API. Papyrus applies checked stock sales to the actual player and Brann inventories. The scope is one new blacksmith, plain vanilla iron daggers, gold, negotiation and refusals. No voice, crafting timers, generated weapon stats, engine commands from dialogue, or vanilla merchant replacement.
 
-**Status: adapter tested; scripts and ESP built and installed; HTTP DLL load confirmed.** The in-game HTTP round trip, actor placement, real trade and save/load checklist still need verification. Later records below supersede earlier missing-tool statements; those are retained as inspection history.
+**Status: adapter tested; scripts and ESP built and installed; HTTP DLL load confirmed.** A real in-game stock trade was recorded on 2026-11-03: two Iron Daggers and a Belted Tunic, with the gold and items shown in the native inventory. The save/load checklist still needs verification. Later records below supersede earlier missing-tool statements; those are retained as inspection history.
 
 ## Current first-play steps
 

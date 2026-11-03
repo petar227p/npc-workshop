@@ -286,7 +286,7 @@ describe('dev api (/api/v1)', () => {
         },
       });
       const w = await newWorld(['merchant']);
-      expect(await w.send('/say', { npc: 'merchant', text: 'Torches?' })).toMatchObject({ status: 503, json: { error: "Mira isn't at the market right now. Try again later." } });
+      expect(await w.send('/say', { npc: 'merchant', text: 'Torches?' })).toMatchObject({ status: 503, json: { error: "Mira can't answer: no model key is set on this server. Add MODEL_API_KEY to its .env and restart it." } });
       expect((await w.send<ApiState>('')).json).toMatchObject({ last_event_id: null, calls_left: 150 });
       logged.mockRestore();
     });

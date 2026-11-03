@@ -76,7 +76,7 @@ export function GameConnection({ snapshot, downloaded, stale, valid, busy, curre
         <li className="panel connection-step">
           <span className="step-number" aria-hidden="true">2</span>
           <div><h3>Run the example</h3>
-            <p>On your local machine or game backend, open this repository’s folder in a terminal. Use Node 26 and run <code>npm install</code> once. Keep the NPC server running with the selected model’s provider key.</p>
+            <p>On your local machine or game backend, open this repository’s folder in a terminal. Use Node 24 or later and run <code>npm install</code> once. Keep the NPC server running with the selected model’s provider key.</p>
             <div className="connection-fields">
               <label>Server URL<input value={server} onChange={(e) => { setServer(e.target.value); setCopy(null); }} type="url" spellCheck={false} aria-describedby="server-url-help" /></label>
               <label>NPC file path<input value={file} onChange={(e) => { setFile(e.target.value); setCopy(null); }} spellCheck={false} aria-describedby="npc-path-help" /></label>
