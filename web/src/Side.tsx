@@ -145,8 +145,7 @@ export function Inventory({
   open: boolean;
   onToggle: () => void;
 }) {
-  const goods = Object.entries(view.goods).filter(([, n]) => n > 0);
-  const count = view.items.length + goods.reduce((sum, [, n]) => sum + n, 0);
+  const count = gearCount(view);
   const body = useId();
   return (
     <section className="panel inventory">
@@ -156,32 +155,48 @@ export function Inventory({
       </button>
       {open && (
         <div id={body} className="inventory-body">
-          {view.items.length === 0 && goods.length === 0 && <div className="muted">Nothing yet but your purse.</div>}
-          {goods.length > 0 && (
-            <ul className="stock">
-              {goods.map(([g, n]) => (
-                <li key={g}>
-                  <span>{goodName(g)}</span>
-                  <b>{n}</b>
-                </li>
-              ))}
-            </ul>
-          )}
-          {view.items.map((i) => (
-            <div key={i.item_id} id={`item-${i.item_id}`} tabIndex={-1} className="item">
-              <ItemPicture name={i.item_name} art={view.art[i.contract_id]} />
-              <div>
-                <div className="title">{i.item_name}</div>
-                <div className="muted">
-                  dmg {i.stats.damage} · wt {i.stats.weight} · dur {i.stats.durability}
-                </div>
-              </div>
-            </div>
-          ))}
-          <GiveForm view={view} goods={goods.map(([g]) => g)} disabled={disabled} onGive={onGive} />
+          <InventoryContent view={view} disabled={disabled} onGive={onGive} />
         </div>
       )}
     </section>
+  );
+}
+
+const heldGoods = (view: StateView) => Object.entries(view.goods).filter(([, n]) => n > 0);
+
+// How many things the player holds: each item, and every unit of goods.
+export const gearCount = (view: StateView) => view.items.length + heldGoods(view).reduce((sum, [, n]) => sum + n, 0);
+
+// What the player holds and the Give form, without a heading or toggle of its own, so a disclosure or a drawer can
+// hold it. Hint links point at `bag-goods` and `item-<id>`.
+export function InventoryContent({ view, disabled, onGive }: { view: StateView; disabled: boolean; onGive: (to: string, gift: Gift) => void }) {
+  const goods = heldGoods(view);
+  return (
+    <>
+      {view.items.length === 0 && goods.length === 0 && <div className="muted">Nothing yet but your purse.</div>}
+      {goods.length > 0 && (
+        <ul id="bag-goods" tabIndex={-1} className="stock">
+          {goods.map(([g, n]) => (
+            <li key={g}>
+              <span>{goodName(g)}</span>
+              <b>{n}</b>
+            </li>
+          ))}
+        </ul>
+      )}
+      {view.items.map((i) => (
+        <div key={i.item_id} id={`item-${i.item_id}`} tabIndex={-1} className="item">
+          <ItemPicture name={i.item_name} art={view.art[i.contract_id]} />
+          <div>
+            <div className="title">{i.item_name}</div>
+            <div className="muted">
+              dmg {i.stats.damage} · wt {i.stats.weight} · dur {i.stats.durability}
+            </div>
+          </div>
+        </div>
+      ))}
+      <GiveForm view={view} goods={goods.map(([g]) => g)} disabled={disabled} onGive={onGive} />
+    </>
   );
 }
 

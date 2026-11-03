@@ -1,7 +1,8 @@
 import type { ActionResponse, Gift, StateView } from '@blacksmith/shared';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState, type ReactNode } from 'react';
 import { api } from './api';
 import { Chat, nameOf, type Pending } from './Chat';
+import { NO_PANELS, panelsReducer, type InspectTab, type Panel } from './demoPanels';
 import { Drawer } from './Drawer';
 import { God } from './God';
 import { Forge, Hud, Inventory, News, Stock, VillageLog } from './Side';
@@ -13,7 +14,6 @@ import { Help } from './Tip';
 // Phaser is most of the bundle, so the village loads on its own and the workshop doesn't wait for it.
 const Village = lazy(() => import('./game/Village').then((m) => ({ default: m.Village })));
 
-type Tool = 'knowledge' | 'events' | 'sandbox';
 
 // What the demo is built with, and the way back to building one: on the right of the bar, after the village controls.
 const buildLink = (
@@ -83,9 +83,7 @@ export function VillagePage() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [talkTo, setTalkTo] = useState('smith');
-  const [tools, setTools] = useState<ReadonlySet<Tool>>(new Set());
-  const [stockOpen, setStockOpen] = useState(false);
-  const [gearOpen, setGearOpen] = useState(false);
+  const [panels, panel] = useReducer(panelsReducer, NO_PANELS);
   const chatInput = useRef<HTMLInputElement>(null);
   const arrivals = useArrivals(view);
   // Whether the player has opened a conversation this visit (E, the picker, the message box): the first hint is how to.
@@ -113,10 +111,15 @@ export function VillagePage() {
     api.state().then(setView, (e: Error) => setError(e.message));
   }, []);
 
-  // Something arrived: unfold the gear so it shows, without taking focus from wherever the player is.
+  // Something arrived: show the gear, without taking focus from wherever the player is.
   useEffect(() => {
-    if (arrivals.gear) setGearOpen(true);
+    if (arrivals.gear) panel({ type: 'arrived' });
   }, [arrivals.gear]);
+  // Opening Rumours is reading them.
+  const { seenHeard } = arrivals;
+  useEffect(() => {
+    if (panels.open === 'rumours') seenHeard();
+  }, [panels.open, seenHeard]);
 
   // A picture takes 10–30 s after work starts. Poll just the pictures until none is still being drawn.
   const drawing = Object.values(view?.art ?? {}).some((a) => a.status === 'rendering');
@@ -180,42 +183,26 @@ export function VillagePage() {
     setTalkTo(to);
     run(api.give(to, gift));
   };
-  // The village tools fold open in the rail, each on its own, so the village and the chat stay in view beside them.
-  const openTool = (t: Tool, open: boolean) => {
-    if (t === 'knowledge' && open) arrivals.seenHeard();
-    setTools((ts) => {
-      const next = new Set(ts);
-      if (open) next.add(t);
-      else next.delete(t);
-      return next;
-    });
-  };
   const opener = useRef<HTMLElement | null>(null);
-  const closeStock = useCallback(() => setStockOpen(false), []);
-  // What a hint's link shows, once the section it's in has rendered and settled: a task later, so the target gets
+  const closeStock = useCallback(() => panel({ type: 'close', panel: 'stock' }), []);
+  // What a hint's link shows, once the panel it's in has rendered and settled: a task later, so the target gets
   // focus after anything that took it while opening.
-  const [revealing, setRevealing] = useState<string | null>(null);
   useEffect(() => {
-    if (!revealing) return;
+    const target = panels.reveal;
+    if (!target) return;
     const timer = setTimeout(() => {
-      reveal(revealing);
-      setRevealing(null);
+      reveal(target);
+      panel({ type: 'revealed' });
     });
     return () => clearTimeout(timer);
-  }, [revealing]);
+  }, [panels.reveal]);
   // A hint's link: show the thing it's about. Following it is as good as reading it, so the hint goes.
   const follow = (to: HintLink, h: Parameters<typeof hints.dismiss>[0]) => {
     hints.dismiss(h);
-    if (to.kind === 'news') {
-      openTool('knowledge', true);
-      setRevealing(`know-${to.event_id}-${to.knower}`);
-    } else {
-      setGearOpen(true);
-      setRevealing(to.kind === 'item' ? `item-${to.id}` : 'gear');
-    }
+    panel({ type: 'follow', to });
   };
   // Another seller's stock, or none: the stock drawer belongs to whoever the chat is with.
-  useEffect(() => setStockOpen(false), [talkTo]);
+  useEffect(() => panel({ type: 'partner' }), [talkTo]);
 
   if (!view)
     return (
@@ -228,18 +215,22 @@ export function VillagePage() {
     );
   const busy = pending !== null || waiting;
   const seller = view.shops.some((s) => s.id === talkTo);
-  const tool = (t: Tool, name: ReactNode, hint: string, body: ReactNode) => (
-    <div className={tools.has(t) ? 'tool open' : 'tool'}>
-      <button aria-expanded={tools.has(t)} aria-controls={`tool-${t}`} onClick={() => openTool(t, !tools.has(t))}>
-        <span className="tool-name">{name}</span>
-        <span className="tool-hint">{hint}</span>
-      </button>
-      {/* Kept while folded, so a half-typed report is still there when it opens again. */}
-      <div id={`tool-${t}`} className="tool-body" hidden={!tools.has(t)}>
-        {body}
+  // One panel at a time (demoPanels); Village log and Sandbox tools are Inspect village's two sections.
+  const tool = (id: string, p: Panel, tab: InspectTab | undefined, name: ReactNode, hint: string, body: ReactNode) => {
+    const open = panels.open === p && (tab === undefined || panels.tab === tab);
+    return (
+      <div className={open ? 'tool open' : 'tool'}>
+        <button aria-expanded={open} aria-controls={`tool-${id}`} onClick={() => panel({ type: 'toggle', panel: p, tab })}>
+          <span className="tool-name">{name}</span>
+          <span className="tool-hint">{hint}</span>
+        </button>
+        {/* Kept while folded, so a half-typed report and the log's filter are still there when it opens again. */}
+        <div id={`tool-${id}`} className="tool-body" hidden={!open}>
+          {body}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="demo-page">
@@ -287,10 +278,10 @@ export function VillagePage() {
               seller && (
                 <button
                   className="secondary small"
-                  aria-expanded={stockOpen}
+                  aria-expanded={panels.open === 'stock'}
                   onClick={(e) => {
                     opener.current = e.currentTarget;
-                    setStockOpen((o) => !o);
+                    panel({ type: 'toggle', panel: 'stock' });
                   }}
                 >
                   {nameOf(view, talkTo)}'s stock
@@ -304,28 +295,32 @@ export function VillagePage() {
             </div>
           )}
           <Forge view={view} disabled={busy} onSkip={(n) => run(api.tick(n))} />
-          <Inventory view={view} disabled={busy} onGive={give} open={gearOpen} onToggle={() => setGearOpen((o) => !o)} />
+          <Inventory view={view} disabled={busy} onGive={give} open={panels.open === 'bag'} onToggle={() => panel({ type: 'toggle', panel: 'bag' })} />
         </div>
           <nav className="tools" aria-labelledby="tools-label">
             <h2 id="tools-label" className="rail-label">Village tools</h2>
             {tool(
               'knowledge',
+              'rumours',
+              undefined,
               <>
                 Rumours
-                {arrivals.heard && !tools.has('knowledge') && <span className="cue">new</span>}
+                {arrivals.heard && panels.open !== 'rumours' && <span className="cue">new</span>}
               </>,
               'What’s going around, and who heard it from whom',
               <News view={view} />,
             )}
-            {tool('events', 'Village log', 'Everything that happened, and what the rules allowed', <VillageLog view={view} />)}
+            {tool('events', 'inspect', 'activity', 'Village log', 'Everything that happened, and what the rules allowed', <VillageLog view={view} />)}
             {tool(
+              'sandbox',
+              'inspect',
               'sandbox',
               'Sandbox tools',
               'Tell the village something happened that no action covers',
               <God view={view} disabled={busy} onRead={readNote} onReport={(r) => run(api.report(r))} />,
             )}
           </nav>
-        {seller && stockOpen && (
+        {seller && panels.open === 'stock' && (
           <Drawer title={`${nameOf(view, talkTo)}'s stock`} onClose={closeStock} opener={opener.current}>
             <p className="muted small">
               What {nameOf(view, talkTo)} has on hand right now, not counting reserved materials{' '}
