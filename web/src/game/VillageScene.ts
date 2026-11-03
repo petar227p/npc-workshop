@@ -87,8 +87,9 @@ export class VillageScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, w, h);
 
     this.prompt = this.makeText('E  talk', '#2a1a05', '#e8a547').setVisible(false);
-    // Under the selected villager's feet, under them but over the ground: still, so it's the same with reduced motion.
-    this.marker = this.add.ellipse(0, 0, TILE + 2, 6, 0xffc329, 0.35).setStrokeStyle(1, 0xffc329).setVisible(false);
+    // A green ring at the selected villager's feet, under them but over the ground: still, so it's the same with reduced
+    // motion.
+    this.marker = this.add.ellipse(0, 0, TILE + 2, 6, 0x4ade80, 0.4).setStrokeStyle(1, 0x22c55e).setVisible(false);
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, w, h);
