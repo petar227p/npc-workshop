@@ -794,10 +794,6 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .npc-text span { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .new-npc { display: block; width: calc(100% - 32px); margin: 8px 16px 20px; min-height: 36px; background: transparent; border: 1px dashed #4a4a4a; color: #d0d0d0; }
 .new-npc:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
-.nav-group { padding-top: 14px; }
-.docked .editor-nav .nav-group { padding: 16px 16px 6px; }
-.docked .editor-nav .nav-group:first-child { padding-top: 4px; }
-.workshop-editor:not(.docked) .nav-group { flex-basis: 100%; padding: 8px 0 0; }
 .workshop-editor:not(.docked) .nav-test { margin-top: 8px; }
 /* Narrow: the list is a strip above the tabs. */
 .workshop-editor:not(.docked) .npc-list { margin-bottom: 14px; }

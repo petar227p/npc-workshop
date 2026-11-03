@@ -37,6 +37,7 @@ import { ContractCard, gaveText, speechFirst } from './Chat';
 import { ImportNpcButton } from './ImportNpcButton';
 import { GameConnection } from './GameConnection';
 import { draftKey, hasCheckedModelAction, type HandoffSnapshot } from './gameHandoff';
+import { WORKSHOP_PAGES, PROBLEM_PAGES } from './workshopPages';
 import { editorIdentity } from './editorPresentation';
 import { ConversationLog } from './ConversationLog';
 import { BROWSER_DRAFT_KEY, readDrafts, saveBrowserDraft, saveDrafts, shelveDraft, type ShelvedDraft } from './browserDraft';
@@ -69,28 +70,6 @@ const BLANK: NpcDraft = {
   triggers: [{ kind: 'on_spoken_to' }],
   cue: "Reply to the customer's last words.",
   fallbacks: { rejected: 'Hm. Ask me again.', unavailable: "I'm busy. Come back in a moment." },
-};
-
-// Every rail entry is a page of its own, in the rail's groups. 'test' is a page only on a narrow screen, where the
-// test session doesn't sit beside the definition.
-const PAGE_GROUPS = [
-  ['Character', [
-    ['character', 'Basics', 'Name, personality, what it can do'],
-    ['appearance', 'Appearance', 'Its sprite in the village'],
-    ['artwork', 'Item artwork', 'Pictures of what it sells'],
-    ['settings', 'Advanced settings', 'Id, model, fallbacks'],
-  ]],
-  ['Abilities & rules', [
-    ['abilities', 'What it sells', 'Catalogue, prices, stock'],
-    ['world', 'Example village', 'Place, schedule, timers'],
-    ['advanced', 'Advanced', 'Permissions, facts, labels'],
-  ]],
-] as const;
-type PageEntry = (typeof PAGE_GROUPS)[number][1][number];
-
-const PROBLEM_PAGES: Record<NonNullable<ValidationHelp['target']>, string> = {
-  character: 'character', appearance: 'appearance', artwork: 'artwork', 'character-advanced': 'settings',
-  catalogue: 'abilities', abilities: 'abilities', world: 'world', permissions: 'advanced',
 };
 
 function useMedia(query: string): boolean {
@@ -325,9 +304,8 @@ export function Editor() {
   // This draft's problems. While a newer edit is being checked the last ones stay, dimmed.
   const problems = check && 'result' in check && !check.result.ok ? check.result.errors : [];
   const hasArtwork = Boolean(draft && (draft.catalogue.in_stock || draft.catalogue.made_to_order || problems.some((problem) => /^art[.:]/.test(problem))));
-  const pages: PageEntry[] = PAGE_GROUPS.flatMap(([, entries]) => entries.filter(([id]) => id !== 'artwork' || hasArtwork));
-  const page = pages.some(([id]) => id === definitionSection) ? definitionSection : 'character';
-  const nextPage = pages[pages.findIndex(([id]) => id === page) + 1];
+  const page = WORKSHOP_PAGES.some(([id]) => id === definitionSection) ? definitionSection : 'character';
+  const nextPage = WORKSHOP_PAGES[WORKSHOP_PAGES.findIndex(([id]) => id === page) + 1];
   const locked = applying || benchBusy || transferBusy;
 
   // Every new starting point (a template, a blank NPC, a file from the library) comes through here. The old
@@ -554,7 +532,7 @@ export function Editor() {
     if (!target) return;
     const to = PROBLEM_PAGES[target];
     setSection(to);
-    requestAnimationFrame(() => focusSetting(fieldForError(error) ?? document.getElementById(target === 'permissions' ? 'permissions' : target === 'character' ? 'character-name' : `${to}-h`)));
+    requestAnimationFrame(() => focusSetting(fieldForError(error) ?? document.getElementById(target === 'permissions' ? 'permissions' : target === 'character' ? 'character-name' : target === 'appearance' || target === 'artwork' ? `${target}-h` : target === 'character-advanced' ? 'settings-h' : `${to}-h`)));
   };
   const problemList = status === 'invalid' && problems.length > 0 && (
     <div className="errors" role="alert">
@@ -652,15 +630,10 @@ export function Editor() {
                 <span><small>Now editing</small>{draft.name || 'Unnamed character'}</span>
               </h2>
               <nav className="editor-nav" aria-label="Workshop pages">
-                {PAGE_GROUPS.map(([group, entries]) => (
-                  <Fragment key={group}>
-                    <h3 className="rail-label nav-group">{group}</h3>
-                    {entries.filter(([id]) => id !== 'artwork' || hasArtwork).map(([id, label, hint]) => (
-                      <button key={id} type="button" className="secondary" aria-current={(docked || section !== 'test') && page === id ? 'page' : undefined} onClick={() => setSection(id)}>
-                        {label}<span className="nav-hint">{hint}</span>
-                      </button>
-                    ))}
-                  </Fragment>
+                {WORKSHOP_PAGES.map(([id, label, hint]) => (
+                  <button key={id} type="button" className="secondary" aria-current={(docked || section !== 'test') && page === id ? 'page' : undefined} onClick={() => setSection(id)}>
+                    {label}<span className="nav-hint">{hint}</span>
+                  </button>
                 ))}
                 {!docked && <button type="button" className="secondary nav-test" aria-current={section === 'test' ? 'page' : undefined} onClick={() => setSection('test')}>Test</button>}
               </nav>
@@ -670,7 +643,7 @@ export function Editor() {
           <section className="panel definition" aria-label="Definition" hidden={!docked && section === 'test'}>
             {problemList}
 
-            <Section active={page === 'character'} id="character" title="Basics" intro="Give your character a name and a personality.">
+            <Section active={page === 'character'} id="character" title="Character" intro="Give your character a name, a personality and a look.">
               <Field row label="Name">
                 <input id="character-name" data-field="name" value={draft.name} maxLength={40} onChange={(e) => set('name', e.target.value)} />
               </Field>
@@ -687,17 +660,59 @@ export function Editor() {
                   <button type="button" className="text-button" onClick={() => edit('abilities')}>Edit abilities</button>
                 </div>
               </div>
+              <h4 id="appearance-h" tabIndex={-1}>Appearance</h4>
+              <Field label="Character sprite" hint="How the character looks in the example village."><SpritePicker value={draft.sprite} onChange={(s) => set('sprite', s)} /></Field>
             </Section>
 
-            <Section active={page === 'appearance'} id="appearance" title="Appearance" intro="How the character looks in the example village.">
-              <Field label="Character sprite" hint="Used in the example village."><SpritePicker value={draft.sprite} onChange={(s) => set('sprite', s)} /></Field>
+            <Section active={page === 'abilities'} id="abilities" title="Abilities" intro="Set up goods for sale or items made to order. Leave both options off for a character that only talks.">
+              {(draft.catalogue.in_stock || draft.catalogue.made_to_order) && !draft.model_verbs.includes('OFFER') && (
+                <div className="catalogue-warning" role="alert">
+                  <span className="catalogue-warning-icon" aria-hidden="true">!</span>
+                  <div>
+                    <strong>This character cannot offer its listed items</strong>
+                    <p>Enable OFFER under Advanced, or turn off both catalogue options below.</p>
+                    <button type="button" className="secondary small" onClick={openPermissions}>Review OFFER permissions →</button>
+                  </div>
+                </div>
+              )}
+              <CatalogueForm value={draft} onChange={({ catalogue, start }) => setDraft((d) => ({ ...d, catalogue, start }))} />
+              {hasArtwork && <>
+                <h4 id="artwork-h" tabIndex={-1}>Item artwork</h4>
+                <p className="muted small">Set the art direction for pictures of items this character sells or makes.</p>
+                <ArtForm key={started} draft={draft} valid={valid} onChange={(art) => set('art', art)} />
+              </>}
+              {draft.verbs.includes('SIGNAL') && <>
+                <h4 id="signals-h" tabIndex={-1}>What it can ask the game for</h4>
+                <Signals value={draft.signals} onChange={(signals) => set('signals', signals)} />
+              </>}
             </Section>
 
-            {hasArtwork && <Section active={page === 'artwork'} id="artwork" title="Item artwork" intro="Set the art direction for pictures of items this character sells or makes.">
-              <ArtForm key={started} draft={draft} valid={valid} onChange={(art) => set('art', art)} />
-            </Section>}
+            <Section active={page === 'world'} id="world" title="World" intro="Location, schedule and perception use the bundled village map.">
+              <div className="row2">
+                <Field label="Default location" hint="Place on the bundled village map when no other stop is scheduled.">
+                  <PlacePicker field="location" places={places} value={draft.location} onChange={(p) => set('location', p)} />
+                </Field>
+                <Field label="Perception radius" hint="Distance in tiles on the bundled village map.">
+                  <input
+                    data-field="perception_radius"
+                    type="number"
+                    min={0}
+                    max={20}
+                    value={draft.perception_radius}
+                    onChange={(e) => set('perception_radius', Number.parseInt(e.target.value || '0', 10))}
+                  />
+                </Field>
+              </div>
+              <Schedule places={places} home={draft.location} value={draft.schedule} onChange={(s) => set('schedule', s)} />
+              <h4>When it acts</h4>
+              <Triggers triggers={draft.triggers} onChange={(triggers) => set('triggers', triggers)} />
+              <Field label="Instruction when spoken to" hint="Tells the character how to respond to a conversation.">
+                <input data-field="cue" value={draft.cue} maxLength={300} onChange={(e) => set('cue', e.target.value)} />
+              </Field>
+            </Section>
 
-            <Section active={page === 'settings'} id="settings" title="Advanced settings" intro="Its id, the model that voices it, and what it says when something goes wrong.">
+            <Section active={page === 'advanced'} id="advanced" title="Advanced" intro="The character’s id and model, what it says when something goes wrong, its permissions, facts, labels and what the model gets.">
+              <h4 id="settings-h" tabIndex={-1}>Character settings</h4>
               <Field label="Id" hint="its file name: lowercase, digits, _">
                 <input data-field="id" value={draft.id} maxLength={41} onChange={(e) => set('id', e.target.value)} />
               </Field>
@@ -738,51 +753,6 @@ export function Editor() {
                   />
                 </Field>
               </div>
-            </Section>
-
-            <Section active={page === 'abilities'} id="abilities" title="What it sells or makes" intro="Set up goods for sale or items made to order. Leave both options off for a character that only talks.">
-              {(draft.catalogue.in_stock || draft.catalogue.made_to_order) && !draft.model_verbs.includes('OFFER') && (
-                <div className="catalogue-warning" role="alert">
-                  <span className="catalogue-warning-icon" aria-hidden="true">!</span>
-                  <div>
-                    <strong>This character cannot offer its listed items</strong>
-                    <p>Enable OFFER under Advanced, or turn off both catalogue options below.</p>
-                    <button type="button" className="secondary small" onClick={openPermissions}>Review OFFER permissions →</button>
-                  </div>
-                </div>
-              )}
-              <CatalogueForm value={draft} onChange={({ catalogue, start }) => setDraft((d) => ({ ...d, catalogue, start }))} />
-              {draft.verbs.includes('SIGNAL') && <>
-                <h4 id="signals-h" tabIndex={-1}>What it can ask the game for</h4>
-                <Signals value={draft.signals} onChange={(signals) => set('signals', signals)} />
-              </>}
-            </Section>
-
-            <Section active={page === 'world'} id="world" title="Example village" intro="Location, schedule and perception use the bundled village map.">
-              <div className="row2">
-                <Field label="Default location" hint="Place on the bundled village map when no other stop is scheduled.">
-                  <PlacePicker field="location" places={places} value={draft.location} onChange={(p) => set('location', p)} />
-                </Field>
-                <Field label="Perception radius" hint="Distance in tiles on the bundled village map.">
-                  <input
-                    data-field="perception_radius"
-                    type="number"
-                    min={0}
-                    max={20}
-                    value={draft.perception_radius}
-                    onChange={(e) => set('perception_radius', Number.parseInt(e.target.value || '0', 10))}
-                  />
-                </Field>
-              </div>
-              <Schedule places={places} home={draft.location} value={draft.schedule} onChange={(s) => set('schedule', s)} />
-              <h4>When it acts</h4>
-              <Triggers triggers={draft.triggers} onChange={(triggers) => set('triggers', triggers)} />
-              <Field label="Instruction when spoken to" hint="Tells the character how to respond to a conversation.">
-                <input data-field="cue" value={draft.cue} maxLength={300} onChange={(e) => set('cue', e.target.value)} />
-              </Field>
-            </Section>
-
-            <Section active={page === 'advanced'} id="advanced" title="Advanced" intro="Permissions, facts, labels and what the model gets.">
               <h4 id="permissions" tabIndex={-1}>
                 What it may do
               </h4>
