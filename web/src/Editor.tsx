@@ -40,7 +40,7 @@ import { draftKey, hasCheckedModelAction, type HandoffSnapshot } from './gameHan
 import { WORKSHOP_PAGES, PROBLEM_PAGES } from './workshopPages';
 import { editorIdentity } from './editorPresentation';
 import { Help } from './Tip';
-import { ConversationLog } from './ConversationLog';
+import { ConversationLog, newLineScroll } from './ConversationLog';
 import { BROWSER_DRAFT_KEY, readDrafts, saveBrowserDraft, saveDrafts, shelveDraft, type ShelvedDraft } from './browserDraft';
 import { SiteHeader } from './SiteHeader';
 import { RoleLogo, roleLogoForDraft, ROLE_OPTIONS, type RoleOption } from './RoleLogo';
@@ -453,8 +453,10 @@ export function Editor() {
   };
   const closeConnection = () => {
     setConnectionOpen(false);
+    // The header's actions are rebuilt when the connection page closes, so its button is a new one by then.
     requestAnimationFrame(() => {
-      returnTo.current.element?.focus({ preventScroll: true });
+      const opener = returnTo.current.element;
+      (opener?.isConnected ? opener : document.querySelector<HTMLElement>('[data-handoff-opener]'))?.focus({ preventScroll: true });
       scrollTo(0, returnTo.current.scroll);
     });
   };
@@ -591,7 +593,7 @@ export function Editor() {
             </div>
           </details>}
           {docked || tested
-            ? <button type="button" disabled={locked || !valid} onClick={() => void openConnection()}>Use in your game</button>
+            ? <button type="button" data-handoff-opener disabled={locked || !valid} onClick={() => void openConnection()}>Use in your game</button>
             : <button type="button" disabled={locked} onClick={test}>Test NPC →</button>}
         </div>
       </div> : null}
@@ -1380,7 +1382,7 @@ function Bench({ draft, valid, checking, onBusy, tested, onCheckedAction, onRese
   useEffect(() => onBusy(busy), [busy, onBusy]);
 
   useEffect(() => {
-    box.current?.scrollTo({ top: box.current.scrollHeight, behavior: 'smooth' });
+    box.current?.scrollTo({ top: box.current.scrollHeight, behavior: newLineScroll() });
   }, [view?.events.length, pending]);
 
   const timed = draft.triggers.some((t) => t.kind === 'every_hours');

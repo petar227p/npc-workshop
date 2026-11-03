@@ -205,10 +205,14 @@ export function VillagePage() {
     }
   };
 
+  // False only when the line never reached the village (a network or server failure), so the box can offer it again;
+  // a line the ledger refused was still said.
   const say = async (text: string) => {
     setPending({ text, npc: talkTo });
-    await run(api.say(text, talkTo));
+    let reached = true;
+    await run(api.say(text, talkTo).catch((e: unknown) => { reached = false; throw e; }));
     setPending(null);
+    return reached;
   };
   // Giving opens the chat with whoever it's for: what happened (taken, or handed back) is a note in that chat only.
   const give = (to: string, gift: Gift) => {

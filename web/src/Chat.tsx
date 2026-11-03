@@ -5,7 +5,7 @@ import { MODEL_INFO } from '@blacksmith/shared/src/npc-info';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
 import { api, clockText } from './api';
 import { withRole } from './roles';
-import { ConversationLog } from './ConversationLog';
+import { ConversationLog, newLineScroll } from './ConversationLog';
 import { canRecord, record, type Recording } from './voice';
 
 export type Pending = { text: string; npc: string }; // the player's line while that NPC is thinking
@@ -15,7 +15,7 @@ type Props = {
   talkTo: string; // the NPC the next line goes to; the chat shows only the conversation with it
   onTalkTo: (npc: string) => void;
   pending: Pending | null;
-  onSay: (text: string) => void;
+  onSay: (text: string) => Promise<boolean>; // false: it never got there, so it goes back in the box
   onAccept: (contractId: string) => void;
   inputRef?: RefObject<HTMLInputElement>; // the village focuses it when the player walks up to someone
   onError?: (message: string | null) => void; // where the mic's trouble is shown
@@ -47,7 +47,7 @@ export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRe
 
   // On the newest line, not the count: once the log is past the view's cap, a line can arrive as an old one drops out.
   useEffect(() => {
-    box.current?.scrollTo({ top: box.current.scrollHeight, behavior: 'smooth' });
+    box.current?.scrollTo({ top: box.current.scrollHeight, behavior: newLineScroll() });
   }, [lines.at(-1)?.id, pending]);
   // Another NPC's chat starts at its latest line, without scrolling through.
   useEffect(() => {
@@ -59,7 +59,8 @@ export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRe
     const t = text.trim();
     if (!t || thinking) return;
     setText('');
-    onSay(t);
+    // Unless something new has been typed meanwhile.
+    void onSay(t).then((reached) => { if (!reached) setText((now) => (now.trim() ? now : t)); });
   };
 
   return (
