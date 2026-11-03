@@ -1,4 +1,4 @@
-import type { EngineEvent, KnowerView, StateView } from '@blacksmith/shared';
+import type { EngineEvent, KnowerView, StateView } from '@npc-workshop/shared';
 import { describe, expect, it } from 'vitest';
 import { sourceChain } from '../knowledge';
 

@@ -1,4 +1,4 @@
-import type { EngineEvent, StateView } from '@blacksmith/shared';
+import type { EngineEvent, StateView } from '@npc-workshop/shared';
 
 // The village's one contextual hint, picked from what the ledger actually shows. Pure, so the choice is testable: no
 // hint is ever made up for show (no delivery, telling or offer that isn't in the view), and the page only decides

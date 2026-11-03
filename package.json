@@ -1,5 +1,8 @@
 {
-  "name": "blacksmith",
+  "name": "npc-workshop",
+  "version": "0.1.0",
+  "description": "Authoring and testing tool for LLM-driven game NPCs whose actions are checked by a deterministic ledger.",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -17,11 +20,9 @@
     "smith-demo": "tsx scripts/smith-demo.ts",
     "latency-test": "tsx scripts/latency-test.ts",
     "make-map": "tsx scripts/make-map.ts",
-    "reply-time": "tsx scripts/reply-time.ts",
-    "rival-convai": "tsx scripts/rival-convai.ts",
-    "rival-chat": "tsx scripts/rival-chat.ts",
     "exploit-suite": "tsx scripts/exploit-suite.ts",
-    "ledger-proof": "tsx scripts/ledger-proof.ts"
+    "ledger-proof": "tsx scripts/ledger-proof.ts",
+    "recognition-live": "tsx scripts/recognition-live.ts"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

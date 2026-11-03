@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { centreOf, placeNamed, readVillage, type TiledMap, type Village } from '@blacksmith/shared';
+import { centreOf, placeNamed, readVillage, type TiledMap, type Village } from '@npc-workshop/shared';
 import { REPO_ROOT } from './config/env';
 
 // The village map the browser draws (a Tiled export). The server reads it for the named places NPCs can be at.

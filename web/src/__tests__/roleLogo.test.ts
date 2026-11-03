@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
-import type { NpcDraft } from '@blacksmith/shared';
-import { buildSetup } from '@blacksmith/shared/src/setup';
+import type { NpcDraft } from '@npc-workshop/shared';
+import { buildSetup } from '@npc-workshop/shared/src/setup';
 import { describe, expect, it } from 'vitest';
 import { ROLE_OPTIONS, roleLogoForDraft } from '../RoleLogo';
 

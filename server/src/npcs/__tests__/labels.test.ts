@@ -1,4 +1,4 @@
-import type { NpcDraft } from '@blacksmith/shared';
+import type { NpcDraft } from '@npc-workshop/shared';
 import { describe, expect, it } from 'vitest';
 import { npcTurn } from '../../agents/npc';
 import { createEngine, createWorld } from '../../engine';

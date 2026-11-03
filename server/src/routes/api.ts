@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { MAX_INVENTORY_BODY_BYTES, MAX_NOTE_LENGTH, MAX_REFERENCE_BYTES, MAX_REFERENCES, MAX_SAY_LENGTH, MAX_VOICE_SECONDS, MAX_WORLD_CREATE_BYTES, type ActionResponse, type ArtResponse, type ModelChoice, type ReadNoteResponse, type StateView, type TranscribeResponse } from '@blacksmith/shared';
+import { MAX_INVENTORY_BODY_BYTES, MAX_NOTE_LENGTH, MAX_REFERENCE_BYTES, MAX_REFERENCES, MAX_SAY_LENGTH, MAX_VOICE_SECONDS, MAX_WORLD_CREATE_BYTES, type ActionResponse, type ArtResponse, type ModelChoice, type ReadNoteResponse, type StateView, type TranscribeResponse } from '@npc-workshop/shared';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';

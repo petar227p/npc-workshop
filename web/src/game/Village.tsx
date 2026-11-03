@@ -1,4 +1,4 @@
-import type { StateView } from '@blacksmith/shared';
+import type { StateView } from '@npc-workshop/shared';
 import Phaser from 'phaser';
 import { useEffect, useRef } from 'react';
 import { withRole } from '../roles';

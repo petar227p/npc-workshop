@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { NpcDraftSchema, NpcFileSchema, type Catalogue, type ModelVerb, type NpcArt, type NpcDraft } from '@blacksmith/shared';
+import { NpcDraftSchema, NpcFileSchema, type Catalogue, type ModelVerb, type NpcArt, type NpcDraft } from '@npc-workshop/shared';
 import * as flat from '../agents/flat';
 import { verbs } from '../engine';
 import { PLACE_NAMES } from '../village';

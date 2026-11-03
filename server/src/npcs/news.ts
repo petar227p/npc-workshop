@@ -1,4 +1,4 @@
-import { clockText, type EngineEvent, type Gift } from '@blacksmith/shared';
+import { clockText, type EngineEvent, type Gift } from '@npc-workshop/shared';
 import { inMind, involves, notableIds, recognition, type Recognition, type World } from '../engine';
 
 // Events as news: what really happened, in words an NPC (or the who-knows panel) can read. Names come from the NPC

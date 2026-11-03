@@ -1,4 +1,4 @@
-import { clockText, type Catalogue, type Contract, type FactBlock } from '@blacksmith/shared';
+import { clockText, type Catalogue, type Contract, type FactBlock } from '@npc-workshop/shared';
 import { activeJobs, availableStock, minDeliveryTicks, type World } from '../engine';
 import { labelOf, memoriesText, villageVocabulary, type Vocabulary } from './news';
 

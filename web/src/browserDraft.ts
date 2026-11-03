@@ -1,4 +1,4 @@
-import type { NpcDraft } from '@blacksmith/shared';
+import type { NpcDraft } from '@npc-workshop/shared';
 
 export const BROWSER_DRAFT_KEY = 'bs_npc_draft';
 

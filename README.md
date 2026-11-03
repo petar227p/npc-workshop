@@ -4,6 +4,7 @@
 
 **Build LLM-driven NPCs that can't break your game's rules.**
 
+[![CI](https://github.com/petar227p/npc-workshop/actions/workflows/ci.yml/badge.svg)](https://github.com/petar227p/npc-workshop/actions/workflows/ci.yml)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node 26](https://img.shields.io/badge/node-26-339933.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6.svg)
@@ -12,6 +13,8 @@
 NPC Workshop is an authoring and testing tool for game characters powered by language models. The model handles dialogue and proposes actions; a deterministic **ledger** decides what actually happens. Gold, stock, prices, timers and item stats are owned by code, never by the model.
 
 Create a character, choose its abilities and limits, and test it in an isolated session. Then export it as a portable file and run it from your own game through an HTTP API. A playable demo village, featuring Brann the blacksmith, shows the full loop: negotiate an order, accept a checked offer, and collect the finished item.
+
+![NPC Workshop home page](docs/screenshot.png)
 
 ## Contents
 
@@ -108,8 +111,9 @@ Testing a draft does not publish it to the demo village. To add an NPC to the vi
 Your game creates a world from one or more NPCs, sends what the player says and does, and renders the events that come back. The server owns the world state; each world is authenticated by its own bearer token.
 
 ```bash
-# Create a world from a downloaded NPC and talk to it interactively
-npm run game-example -- --server http://localhost:8787 --bundle "$HOME/Downloads/your_npc.npc.json" --interactive
+# Create a world from an NPC bundle and talk to it interactively
+# (use your own download, or the sample in examples/npcs/)
+npm run game-example -- --server http://localhost:8787 --bundle examples/npcs/portable_ada.npc.json --interactive
 ```
 
 ```bash
@@ -197,10 +201,9 @@ server/src/
   routes/        Village API, developer API (/api/v1) and Workshop endpoints
 web/src/         React product home, Workshop and demo; game/ contains the Phaser village
 npcs/, prompts/  NPC definitions and personas
-examples/        Backend and Skyrim integrations
+examples/        Backend and Skyrim integrations, plus a sample .npc.json bundle
 scripts/         Dev runner, demos, latency test and ledger proof
-docs/            API reference, model notes, research and verification records
-prototype/       Phaser village mock-up
+docs/            API reference, model notes and background research
 ```
 
 ## Status and limitations
@@ -212,8 +215,6 @@ NPC Workshop was built for the Meta Muse hackathon (November 2026) and is a work
 - Worlds are held in memory and lost on server restart. Editing a draft does not update running worlds.
 - The Skyrim adapter's API and ledger path is covered by automated tests; the in-game trade and save/load journey has not been verified yet.
 - Engine adapters, durable storage and a global spend budget are not yet implemented.
-
-Verification records for each milestone are in [`docs/`](docs/product-hierarchy-final-2026-10-31/README.md).
 
 ## Roadmap
 
@@ -227,4 +228,4 @@ Verification records for each milestone are in [`docs/`](docs/product-hierarchy-
 
 Released under the [MIT License](LICENSE). Copyright © 2026 Petar Penovic.
 
-Pixel art in the app and village prototype is from [Kenney](https://kenney.nl) (Tiny Town and Tiny Dungeon, CC0).
+Pixel art in the demo village is from [Kenney](https://kenney.nl) (Tiny Town and Tiny Dungeon, CC0).

@@ -9,3 +9,8 @@ logs/
 __pycache__/
 HANDOVER.md
 PLAN.md
+.impeccable/
+coverage/
+.vscode/
+.idea/
+Thumbs.db

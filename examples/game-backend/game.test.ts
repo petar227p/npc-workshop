@@ -3,12 +3,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { type ApiEvents, type ApiResult, type ApiWorldCreated, type EngineEvent, type NpcBundle } from '@blacksmith/shared';
+import { type ApiEvents, type ApiResult, type ApiWorldCreated, type EngineEvent, type NpcBundle } from '@npc-workshop/shared';
 import { createApi } from '../../server/src/routes/api';
 import { mockClient } from '../../server/src/models';
 import { connectGame, eventConsumer, main, readBundle, serverOrigin } from './game.mjs';
 
-const exportedFile = fileURLToPath(new URL('../../docs/workshop-game-integration-task-2/browser-export.npc.json', import.meta.url));
+const exportedFile = fileURLToPath(new URL('../npcs/portable_ada.npc.json', import.meta.url));
 const say = JSON.stringify({ action: 'SAY', say: 'Welcome to the village.' });
 const signal = JSON.stringify({ action: 'SIGNAL', signal: 'open_gate', say: 'Come through.' });
 const pass = (qty: number) => JSON.stringify({ action: 'OFFER', say: 'Here is a pass.', offer: { kind: 'in_stock', good: 'gate pass', qty, price: 0, remarks: '' } });

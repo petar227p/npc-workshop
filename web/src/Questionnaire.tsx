@@ -12,7 +12,7 @@ import {
   suggested,
   type Answers,
   type Step,
-} from '@blacksmith/shared/src/questions';
+} from '@npc-workshop/shared/src/questions';
 import {
   AUTO_INFO,
   buildSetup,
@@ -24,7 +24,7 @@ import {
   TELLER_INFO,
   TELLERS,
   type SetupResult,
-} from '@blacksmith/shared/src/setup';
+} from '@npc-workshop/shared/src/setup';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 // "Help me choose": a few questions, then the proposed setup to read and change before anything replaces the draft.

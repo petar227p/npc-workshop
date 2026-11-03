@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MAX_INVENTORY_BODY_BYTES, ObservedInventorySchema, type ObservedInventory } from '@blacksmith/shared';
+import { MAX_INVENTORY_BODY_BYTES, ObservedInventorySchema, type ObservedInventory } from '@npc-workshop/shared';
 import { createApi } from '../../server/src/routes/api';
 import { mockClient } from '../../server/src/models';
 import { createBridge, NativeReply } from './bridge';

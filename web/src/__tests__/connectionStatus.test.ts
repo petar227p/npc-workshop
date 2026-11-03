@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { draftKey, parseNpcBundle, type ApiConnection } from '@blacksmith/shared';
+import { draftKey, parseNpcBundle, type ApiConnection } from '@npc-workshop/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { connectionState, pollConnection, readConnection, SecureContextError, snapshotHash, VerificationError, verificationFailure } from '../connectionStatus';
 
-const parsed = parseNpcBundle(readFileSync(new URL('../../../docs/workshop-game-integration-task-2/browser-export.npc.json', import.meta.url), 'utf8'));
+const parsed = parseNpcBundle(readFileSync(new URL('../../../examples/npcs/portable_ada.npc.json', import.meta.url), 'utf8'));
 if (!parsed.ok) throw new Error('Invalid fixture');
 const npc = parsed.bundle.npc;
 const data = (): ApiConnection => ({ world_id: 'w_123', busy: false, calls_left: 150, npcs: [{ id: npc.id, name: npc.name, snapshot: 'hash', first_reply: null, last_say: null }] });

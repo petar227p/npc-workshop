@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { draftKey, NpcDraftSchema, parseNpcBundle, type ApiConnection, type ApiResult, type ApiState, type ApiWorldCreated } from '@blacksmith/shared';
+import { draftKey, NpcDraftSchema, parseNpcBundle, type ApiConnection, type ApiResult, type ApiState, type ApiWorldCreated } from '@npc-workshop/shared';
 import { describe, expect, it } from 'vitest';
 import { mockClient } from '../../models';
 import { createApi, type ApiDeps } from '../api';
 
-const fixture = parseNpcBundle(readFileSync(new URL('../../../../docs/workshop-game-integration-task-2/browser-export.npc.json', import.meta.url), 'utf8'));
+const fixture = parseNpcBundle(readFileSync(new URL('../../../../examples/npcs/portable_ada.npc.json', import.meta.url), 'utf8'));
 if (!fixture.ok) throw new Error('Invalid browser export');
 const npc = fixture.bundle.npc;
 const say = JSON.stringify({ action: 'SAY', say: 'Welcome from the real ledger.' });

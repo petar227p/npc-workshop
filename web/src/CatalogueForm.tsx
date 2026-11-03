@@ -1,4 +1,4 @@
-import type { NpcDraft } from '@blacksmith/shared';
+import type { NpcDraft } from '@npc-workshop/shared';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 // The catalogue and starting stock as a form: goods sold from stock, and made-to-order item types with the materials

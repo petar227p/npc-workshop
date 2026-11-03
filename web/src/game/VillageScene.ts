@@ -1,7 +1,7 @@
-import type { EngineEvent, StateView, TiledMap, Tile, Village } from '@blacksmith/shared';
+import type { EngineEvent, StateView, TiledMap, Tile, Village } from '@npc-workshop/shared';
 // The zod-free modules, so the schemas stay out of the bundle.
-import { PLAYER_SPRITE } from '@blacksmith/shared/src/npc-info';
-import { findPath, placeNamed, readVillage, spotsIn } from '@blacksmith/shared/src/village';
+import { PLAYER_SPRITE } from '@npc-workshop/shared/src/npc-info';
+import { findPath, placeNamed, readVillage, spotsIn } from '@npc-workshop/shared/src/village';
 import Phaser from 'phaser';
 
 // The village, drawn from the server's view. Where each NPC is comes from the server (its schedule at this tick);

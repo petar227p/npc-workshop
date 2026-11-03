@@ -1,4 +1,4 @@
-import { NpcDraftSchema } from '@blacksmith/shared';
+import { NpcDraftSchema } from '@npc-workshop/shared';
 
 // Only a vanilla base item: no generated stats, dynamic forms or load-order-dependent IDs.
 export const ITEM = { good: 'iron_dagger', plugin: 'Skyrim.esm', localId: 0x1397e, label: 'iron dagger' } as const;

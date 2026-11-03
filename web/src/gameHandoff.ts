@@ -1,6 +1,6 @@
-import type { BenchResponse, NpcDraft } from '@blacksmith/shared';
+import type { BenchResponse, NpcDraft } from '@npc-workshop/shared';
 
-export { draftKey } from '@blacksmith/shared/src/snapshot';
+export { draftKey } from '@npc-workshop/shared/src/snapshot';
 
 export type HandoffSnapshot = { npc: NpcDraft; filename: string; sourceKey: string };
 

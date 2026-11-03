@@ -1,4 +1,4 @@
-import { benchIdeas, buildSetup, describeAbilities, supportedSetups, type ControlledResponse, type NpcDraft, type PreviewResponse, type SetupSpec } from '@blacksmith/shared';
+import { benchIdeas, buildSetup, describeAbilities, supportedSetups, type ControlledResponse, type NpcDraft, type PreviewResponse, type SetupSpec } from '@npc-workshop/shared';
 import { describe, expect, it } from 'vitest';
 import { npcTurn } from '../../agents/npc';
 import { createEngine, createWorld } from '../../engine';

@@ -1,4 +1,4 @@
-import type { BenchResponse } from '@blacksmith/shared';
+import type { BenchResponse } from '@npc-workshop/shared';
 
 // A failed provider may return no attempts. Report that failure before checking for an NPC that never answers.
 export function outcomeText(t: Pick<BenchResponse, 'attempts' | 'outcome'>): string {

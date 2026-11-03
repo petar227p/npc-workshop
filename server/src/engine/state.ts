@@ -1,4 +1,4 @@
-import type { Contract, ContractStatus, EngineEvent, Item, Start } from '@blacksmith/shared';
+import type { Contract, ContractStatus, EngineEvent, Item, Start } from '@npc-workshop/shared';
 
 export type { ContractStatus, Item };
 

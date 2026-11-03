@@ -13,7 +13,7 @@ import {
   type ApiWorldCreated,
   type EngineEvent,
   type ModelChoice,
-} from '@blacksmith/shared';
+} from '@npc-workshop/shared';
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { z } from 'zod';

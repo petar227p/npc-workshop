@@ -1,4 +1,4 @@
-import { ACTION_SCHEMAS, STATS, type Action, type ActionOf, type Catalogue, type Gift, type InStockTerms, type Item, type MadeToOrder, type MadeToOrderTerms, type ScheduleEntry, type Start, type Terms } from '@blacksmith/shared';
+import { ACTION_SCHEMAS, STATS, type Action, type ActionOf, type Catalogue, type Gift, type InStockTerms, type Item, type MadeToOrder, type MadeToOrderTerms, type ScheduleEntry, type Start, type Terms } from '@npc-workshop/shared';
 import type { ZodType } from 'zod';
 import type { EventDraft } from './events';
 import { decayed, memoryOf } from './memory';

@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { MAX_REFERENCE_BYTES, type BenchResponse, type ControlledResponse, type EditorLibrary, type NpcDraft, type PreviewResponse, type SaveResponse, type SketchResponse, type StateView } from '@blacksmith/shared';
+import { MAX_REFERENCE_BYTES, type BenchResponse, type ControlledResponse, type EditorLibrary, type NpcDraft, type PreviewResponse, type SaveResponse, type SketchResponse, type StateView } from '@npc-workshop/shared';
 import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
 import { mockClient, mockImageClient, type ChatClient, type ChatRequest } from '../../models';
