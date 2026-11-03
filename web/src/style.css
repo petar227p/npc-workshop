@@ -51,7 +51,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .chat-head { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
 .chat-name { font-size: 18px; }
 .portrait { width: 48px; height: 48px; flex-shrink: 0; border-radius: 6px; background: var(--panel-2) url(/assets/dungeon/tilemap_packed.png) no-repeat; background-size: 576px 528px; background-position: -96px -336px; image-rendering: pixelated; }
-.messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
+.messages { position: relative; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
 .conversation-log { display: flex; flex-direction: column; gap: 8px; }
 .msg { padding: 7px 10px; border-radius: 8px; max-width: 85%; white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg.npc { background: var(--panel-2); align-self: flex-start; }
@@ -93,11 +93,23 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 /* Side panels */
 .gold { color: var(--accent); }
-.job { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
-.job-body { flex: 1; min-width: 0; }
-.job-row { display: flex; justify-content: space-between; gap: 8px; }
-.bar { height: 6px; background: var(--bg); border-radius: 3px; margin-top: 4px; overflow: hidden; }
-.bar div { height: 100%; background: var(--accent); transition: width .4s; }
+/* The forge: one compact row per order, each opening to its details. */
+.forge { flex: none; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--rule); }
+.forge-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.forge-head h2 { margin: 0; font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9a9a9a; }
+.forge-count { margin-left: 4px; letter-spacing: 0; text-transform: none; font-weight: 500; color: var(--muted); }
+.forge-jobs { list-style: none; margin: 0; padding: 0; max-height: 168px; overflow-y: auto; }
+.job > summary { display: grid; grid-template-columns: minmax(0, 1fr) 72px auto; align-items: center; gap: 10px; min-height: 32px; cursor: pointer; border-radius: 4px; list-style: none; }
+.job > summary::-webkit-details-marker { display: none; }
+.job > summary::before { content: '▸'; position: absolute; left: 0; color: var(--muted); font-size: 11px; }
+.job[open] > summary::before { content: '▾'; }
+.job { position: relative; padding-left: 12px; }
+.job-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.job-details { display: flex; gap: 10px; align-items: flex-start; padding: 4px 0 10px; }
+.job-details .tag { display: block; margin-top: 2px; }
+.bar { display: block; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--accent); transition: width .4s; }
+@media (prefers-reduced-motion: reduce) { .bar > span { transition: none; } }
 .stock { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
 .stock li { display: flex; justify-content: space-between; text-transform: capitalize; }
 .stock b { font-variant-numeric: tabular-nums; }
@@ -439,14 +451,13 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .village-toolbar .help-menu { margin-left: auto; }
 .village-toolbar button { min-height: 32px; }
 .stage { display: flex; flex-direction: column; min-width: 0; }
-.talk-col { display: flex; flex-direction: column; min-width: 0; background: var(--pane); border-left: 1px solid var(--rule); }
+.talk-col { position: relative; display: flex; flex-direction: column; min-width: 0; background: var(--pane); border-left: 1px solid var(--rule); }
 .game { overflow: hidden; background: #5a9e4b; }
 .game canvas { display: block; }
 .demo-page .hint { border-width: 0 0 1px 3px; border-color: var(--rule) var(--rule) var(--rule) var(--accent); border-radius: 0; background: var(--panel); padding: 8px 16px 8px 13px; }
 .demo-page .talk-col .chat-panel { padding: 12px 16px; }
-.talk-col > .error { border-radius: 0; border-width: 1px 0 0; padding: 10px 16px; }
-.demo-page .talk-col > .forge { padding: 12px 16px; border-top: 1px solid var(--rule); }
-.demo-page .forge > h2 { margin: 0 0 10px; font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9a9a9a; }
+/* Under the conversation and above the message box, so the box stays at the bottom whatever is going on. */
+.chat-panel > .error { flex: none; margin-top: 10px; }
 /* The utility bar sits on the village's bottom edge: Bag, Rumours and Inspect village, one panel open at a time. */
 .utility { min-width: 0; }
 .utility-bar { display: flex; border-bottom: 1px solid var(--rule); background: var(--panel); }
@@ -476,7 +487,9 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
   .village-col, .talk-col { min-height: 0; }
   .stage { flex: 1 1 0; min-height: 0; }
   .game { flex: 1 1 0; min-height: 240px; }
-  .demo-page .talk-col .chat-panel { flex: 1 1 0; min-height: 240px; height: auto; }
+  /* The conversation scrolls inside the panel; the forge and the message box stay under it. */
+  .demo-page .talk-col .chat-panel { flex: 1 1 0; min-height: 0; height: auto; }
+  .demo-page .talk-col .messages { min-height: 120px; }
 }
 @media (max-width: 860px) {
   .demo-page > .top .tabs { width: auto; margin-left: auto; }

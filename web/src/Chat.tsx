@@ -20,6 +20,7 @@ type Props = {
   inputRef?: RefObject<HTMLInputElement>; // the village focuses it when the player walks up to someone
   onError?: (message: string | null) => void; // where the mic's trouble is shown
   headExtra?: ReactNode; // beside the name: the village's way to this NPC's stock
+  beforeComposer?: ReactNode; // between the conversation and the message box: the village's errors and forge work
   prefill?: { text: string; n: number } | null; // a suggested line put in the box (each new n), for the player to edit or send
   onInputFocus?: () => void;
 };
@@ -30,7 +31,7 @@ const portraitStyle = (frame: number) => ({ backgroundPosition: `-${(frame % 12)
 // Display names come with the people in the view (and each seller's stock).
 export const nameOf = (view: StateView, id: string) => view.people.find((p) => p.id === id)?.name ?? view.shops.find((s) => s.id === id)?.name ?? id;
 
-export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRef, onError, headExtra, prefill, onInputFocus }: Props) {
+export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRef, onError, headExtra, beforeComposer, prefill, onInputFocus }: Props) {
   const [text, setText] = useState('');
   useEffect(() => {
     if (!prefill) return;
@@ -96,6 +97,7 @@ export function Chat({ view, talkTo, onTalkTo, pending, onSay, onAccept, inputRe
           </>
         )}
       </div>
+      {beforeComposer}
       <form className="chat-form" onSubmit={submit}>
         <input
           value={text}

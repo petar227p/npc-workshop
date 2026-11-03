@@ -64,17 +64,21 @@ function reveal(id: string) {
 }
 
 // After an action, keyboard focus stays where the player was: the button used is disabled while the village is busy
-// (which drops focus), and may be gone once it's done (Wait until ready, with the work). Back on it if it's still
-// there; if not, on the Bag button after the forge's last job (that's where the work went), else on +1 hour.
+// (which drops focus), and may be gone once it's done (an offer's Accept, Wait until ready with the last order). Back on
+// it if it's still there; if not, on the next step: after an accepted offer, Wait until ready (or the message box,
+// when it was handed over at once); after the forge's last order, the Bag button (that's where the work went); else
+// on +1 hour.
 function keepFocus(from: HTMLElement | null) {
   if (!from || from === document.body) return;
+  // Where it was, read now: once the action is done the button may be detached along with what held it.
+  const wasIn = from.closest('.contract') ? 'offer' : from.closest('.forge') ? 'forge' : null;
   setTimeout(() => {
     if (document.activeElement && document.activeElement !== document.body) return;
     if (from.isConnected && !(from as HTMLButtonElement).disabled) return from.focus();
     const visible = (el: Element | null): el is HTMLElement => el instanceof HTMLElement && el.offsetParent !== null;
-    const bag = document.getElementById('bag-button');
-    if (from.closest('.forge') && visible(bag)) return bag.focus();
-    [...document.querySelectorAll('[data-focus-home]')].find(visible)?.focus();
+    const first = (selector: string) => [...document.querySelectorAll(selector)].find(visible);
+    const next = wasIn === 'offer' ? (first('.forge-head button') ?? first('.chat-form input')) : wasIn === 'forge' ? first('#bag-button') : undefined;
+    (next ?? first('[data-focus-home]'))?.focus();
   });
 }
 
@@ -352,13 +356,18 @@ export function VillagePage() {
                 </button>
               )
             }
+            // Under the conversation, above the message box: what went wrong, and the work the conversation started.
+            beforeComposer={
+              <>
+                {error && (
+                  <div className="error" role="alert">
+                    {error}
+                  </div>
+                )}
+                <Forge view={view} disabled={busy} onSkip={(n) => run(api.tick(n))} />
+              </>
+            }
           />
-          {error && (
-            <div className="error" role="alert">
-              {error}
-            </div>
-          )}
-          <Forge view={view} disabled={busy} onSkip={(n) => run(api.tick(n))} />
         </div>
       </div>
     </div>

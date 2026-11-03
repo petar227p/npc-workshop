@@ -1,5 +1,5 @@
 import type { ContractView, EngineEvent, Gift, ItemArt, KnowerView, MadeToOrderView, StateView } from '@blacksmith/shared';
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useId, useState, type ReactNode } from 'react';
 import { Popover } from './Drawer';
 import { sourceChain } from './knowledge';
 import { Tip } from './Tip';
@@ -74,40 +74,61 @@ export function Hud({
   );
 }
 
-// Work under way, only while there is some.
+// Work under way, only while there is some: one compact row per order (name, progress, when it's ready), each opening
+// to its details. Wait until ready stays at the top of the list, in view however many orders there are.
 export function Forge({ view, disabled, onSkip }: { view: StateView; disabled: boolean; onSkip: (ticks: number) => void }) {
+  const heading = useId();
   const jobs = view.contracts.filter((c): c is MadeToOrderView => c.kind === 'made_to_order' && c.status === 'in_progress');
   if (jobs.length === 0) return null;
   const nextDue = Math.min(...jobs.map((j) => j.due_tick ?? Infinity));
   return (
-    <section className="panel forge">
-      <h2>Forge</h2>
-      {jobs.map((j) => {
-        const start = (j.due_tick ?? 0) - j.delivery_ticks;
-        const pct = Math.min(100, ((view.tick - start) / j.delivery_ticks) * 100);
-        return (
-          // The picture is usually ready long before the work is, so it shows on the anvil, not only once delivered.
-          <div key={j.contract_id} className="job">
-            <ItemPicture name={j.item_name} art={view.art[j.contract_id]} />
-            <div className="job-body">
-              <div className="job-row">
-                <span>{j.item_name}</span>
-                <span className="tag">ready {clockText(j.due_tick ?? 0)}</span>
-              </div>
-              <div className="bar">
-                <div style={{ width: `${pct}%` }} />
-              </div>
-            </div>
-          </div>
-        );
-      })}
-      <div className="actions">
+    <section className="forge" aria-labelledby={heading}>
+      <div className="forge-head">
+        <h2 id={heading}>
+          Forge <span className="forge-count">{jobs.length === 1 ? '1 order' : `${jobs.length} orders`}</span>
+        </h2>
         <Tip text="Advance village time until the next order is ready.">
-          <button onClick={() => onSkip(Math.max(1, Math.min(48, nextDue - view.tick)))} disabled={disabled}>
+          <button className="small" onClick={() => onSkip(Math.max(1, Math.min(48, nextDue - view.tick)))} disabled={disabled}>
             Wait until ready
           </button>
         </Tip>
       </div>
+      <ul className="forge-jobs">
+        {jobs.map((j) => {
+          const start = (j.due_tick ?? 0) - j.delivery_ticks;
+          const pct = Math.max(0, Math.min(100, ((view.tick - start) / j.delivery_ticks) * 100));
+          return (
+            <li key={j.contract_id}>
+              <details className="job">
+                <summary>
+                  <span className="job-name">{j.item_name}</span>
+                  <span className="bar" aria-hidden="true">
+                    <span style={{ width: `${pct}%` }} />
+                  </span>
+                  <span className="sr-only">{Math.round(pct)}% done, </span>
+                  <span className="tag">ready {clockText(j.due_tick ?? 0)}</span>
+                </summary>
+                {/* The picture is usually ready long before the work is, so it shows on the anvil, not only once delivered. */}
+                <div className="job-details">
+                  <ItemPicture name={j.item_name} art={view.art[j.contract_id]} />
+                  <div>
+                    <div className="muted">{j.description}</div>
+                    <div className="tag">
+                      dmg {j.stats.damage} · wt {j.stats.weight} · dur {j.stats.durability} · 🪙 {j.price} ·{' '}
+                      {Object.entries(j.materials_used)
+                        .map(([m, n]) => `${n} ${goodName(m)}`)
+                        .join(', ')}
+                    </div>
+                    <div className="tag">
+                      Started {clockText(start)} · {j.delivery_ticks} h of work · {j.contract_id}
+                    </div>
+                  </div>
+                </div>
+              </details>
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }
