@@ -44,7 +44,8 @@ export function GuidedSetup({ initial, taken, locked, onUse, onCancel, cancelLab
       {idea && <p><b>Try asking:</b> “{idea.normal}”</p>}
     </>}
     <div className="actions">{step < 2 ? <button type="button" disabled={step === 0 && !role} onClick={() => setStep(step + 1)}>Next</button> : <button type="button" disabled={locked || !result} onClick={() => result && onUse(result)}>Create draft and test</button>}
-      <button type="button" className="secondary" disabled={step === 0} onClick={() => setStep(step - 1)}>Back</button>
+      {/* A role picked on the starting points goes back there rather than to this setup's own role step. */}
+      <button type="button" className="secondary" disabled={step === 0} onClick={() => (initial && step === 1 ? onCancel() : setStep(step - 1))}>Back</button>
       <button type="button" className="secondary" disabled={locked} onClick={onCancel}>{cancelLabel}</button></div>
     {locked && <p className="muted small">Waiting for the test session to finish…</p>}
   </section>;

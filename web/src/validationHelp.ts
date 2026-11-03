@@ -7,9 +7,9 @@ export function validationHelp(error: string): ValidationHelp {
   if (/^name:.*at least 1 character/i.test(error)) return { message: 'Give your character a name before testing.', target: 'character', label: 'Add a name' };
   const path = error.split(':', 1)[0];
   if (/^(catalogue|start)(\.|$)/.test(path)) return { message: error, target: 'catalogue', label: 'Go to catalogue' };
-  if (/^(id|model|effort|fallbacks)(\.|$)/.test(path) || /^npc id /.test(error)) return { message: error, target: 'character-advanced', label: 'Go to character settings' };
+  if (/^(id|model|effort|fallbacks)(\.|$)/.test(path) || /^npc id /.test(error)) return { message: error, target: 'character-advanced', label: 'Go to advanced settings' };
   if (/^(name|persona)(\.|$)/.test(path)) return { message: error, target: 'character', label: 'Go to character' };
-  if (/^(schedule|location|perception_radius|triggers|cue)(\.|$)/.test(path)) return { message: error, target: 'world', label: 'Go to behaviour' };
+  if (/^(schedule|location|perception_radius|triggers|cue)(\.|$)/.test(path)) return { message: error, target: 'world', label: 'Go to world' };
   if (/^art(\.|$)/.test(path)) return { message: error, target: 'artwork', label: 'Go to item artwork' };
   if (/^sprite(\.|$)/.test(path)) return { message: error, target: 'appearance', label: 'Go to appearance' };
   if (/^(verbs|model_verbs|facts|labels|signals)(\.|$)/.test(path)) return { message: error, target: 'permissions', label: 'Go to permissions' };

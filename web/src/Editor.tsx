@@ -37,8 +37,10 @@ import { ContractCard, gaveText, speechFirst } from './Chat';
 import { ImportNpcButton } from './ImportNpcButton';
 import { GameConnection } from './GameConnection';
 import { draftKey, hasCheckedModelAction, type HandoffSnapshot } from './gameHandoff';
+import { WORKSHOP_PAGES, PROBLEM_PAGES } from './workshopPages';
 import { editorIdentity } from './editorPresentation';
-import { ConversationLog } from './ConversationLog';
+import { Help } from './Tip';
+import { ConversationLog, newLineScroll } from './ConversationLog';
 import { BROWSER_DRAFT_KEY, readDrafts, saveBrowserDraft, saveDrafts, shelveDraft, type ShelvedDraft } from './browserDraft';
 import { SiteHeader } from './SiteHeader';
 import { RoleLogo, roleLogoForDraft, ROLE_OPTIONS, type RoleOption } from './RoleLogo';
@@ -69,28 +71,6 @@ const BLANK: NpcDraft = {
   triggers: [{ kind: 'on_spoken_to' }],
   cue: "Reply to the customer's last words.",
   fallbacks: { rejected: 'Hm. Ask me again.', unavailable: "I'm busy. Come back in a moment." },
-};
-
-// Every rail entry is a page of its own, in the rail's groups. 'test' is a page only on a narrow screen, where the
-// test session doesn't sit beside the definition.
-const PAGE_GROUPS = [
-  ['Character', [
-    ['character', 'Basics', 'Name, personality, what it can do'],
-    ['appearance', 'Appearance', 'Its sprite in the village'],
-    ['artwork', 'Item artwork', 'Pictures of what it sells'],
-    ['settings', 'Advanced settings', 'Id, model, fallbacks'],
-  ]],
-  ['Abilities & rules', [
-    ['abilities', 'What it sells', 'Catalogue, prices, stock'],
-    ['world', 'Example village', 'Place, schedule, timers'],
-    ['advanced', 'Advanced', 'Permissions, facts, labels'],
-  ]],
-] as const;
-type PageEntry = (typeof PAGE_GROUPS)[number][1][number];
-
-const PROBLEM_PAGES: Record<NonNullable<ValidationHelp['target']>, string> = {
-  character: 'character', appearance: 'appearance', artwork: 'artwork', 'character-advanced': 'settings',
-  catalogue: 'abilities', abilities: 'abilities', world: 'world', permissions: 'advanced',
 };
 
 function useMedia(query: string): boolean {
@@ -233,6 +213,8 @@ export function Editor() {
   const [check, setCheck] = useState<Check | null>(null);
   const [retry, setRetry] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
+  // A switch of draft is plain to see; only screen readers are told in words, so no bar is left over the editor.
+  const [announcement, setAnnouncement] = useState('');
   // The New NPC page, at #/workshop/new so Back and refresh work. The existing editor stays mounted, hidden.
   const [starting, setStarting] = useState(() => location.hash === NEW_HASH);
   const startingNow = useRef(starting);
@@ -325,9 +307,8 @@ export function Editor() {
   // This draft's problems. While a newer edit is being checked the last ones stay, dimmed.
   const problems = check && 'result' in check && !check.result.ok ? check.result.errors : [];
   const hasArtwork = Boolean(draft && (draft.catalogue.in_stock || draft.catalogue.made_to_order || problems.some((problem) => /^art[.:]/.test(problem))));
-  const pages: PageEntry[] = PAGE_GROUPS.flatMap(([, entries]) => entries.filter(([id]) => id !== 'artwork' || hasArtwork));
-  const page = pages.some(([id]) => id === definitionSection) ? definitionSection : 'character';
-  const nextPage = pages[pages.findIndex(([id]) => id === page) + 1];
+  const page = WORKSHOP_PAGES.some(([id]) => id === definitionSection) ? definitionSection : 'character';
+  const nextPage = WORKSHOP_PAGES[WORKSHOP_PAGES.findIndex(([id]) => id === page) + 1];
   const locked = applying || benchBusy || transferBusy;
 
   // Every new starting point (a template, a blank NPC, a file from the library) comes through here. The old
@@ -366,7 +347,7 @@ export function Editor() {
     setStarted((n) => n + 1);
     setStarting(false);
     if (location.hash === NEW_HASH) history.replaceState(null, '', '#/workshop');
-    setNotice(kept && draft ? `${done} ${draft.name || 'Your previous NPC'} is in Your NPCs.` : done);
+    setAnnouncement(kept && draft ? `${done} ${draft.name || 'Your previous NPC'} is in Your NPCs.` : done);
     lastDefinition.current = 'character';
     setSection(openTest ? 'test' : 'character');
     requestAnimationFrame(() => document.getElementById(openTest ? 'test-heading' : 'character-h')?.focus());
@@ -474,8 +455,10 @@ export function Editor() {
   };
   const closeConnection = () => {
     setConnectionOpen(false);
+    // The header's actions are rebuilt when the connection page closes, so its button is a new one by then.
     requestAnimationFrame(() => {
-      returnTo.current.element?.focus({ preventScroll: true });
+      const opener = returnTo.current.element;
+      (opener?.isConnected ? opener : document.querySelector<HTMLElement>('[data-handoff-opener]'))?.focus({ preventScroll: true });
       scrollTo(0, returnTo.current.scroll);
     });
   };
@@ -554,7 +537,7 @@ export function Editor() {
     if (!target) return;
     const to = PROBLEM_PAGES[target];
     setSection(to);
-    requestAnimationFrame(() => focusSetting(fieldForError(error) ?? document.getElementById(target === 'permissions' ? 'permissions' : target === 'character' ? 'character-name' : `${to}-h`)));
+    requestAnimationFrame(() => focusSetting(fieldForError(error) ?? document.getElementById(target === 'permissions' ? 'permissions' : target === 'character' ? 'character-name' : target === 'appearance' || target === 'artwork' ? `${target}-h` : target === 'character-advanced' ? 'settings-h' : `${to}-h`)));
   };
   const problemList = status === 'invalid' && problems.length > 0 && (
     <div className="errors" role="alert">
@@ -577,13 +560,26 @@ export function Editor() {
     <>
     <SiteHeader page="workshop">
       {draft && !starting && !connectionOpen ? <div className="studio-actions">
-        <div className="workshop-status" role="status">
-          {status === 'checking' && <span className="muted">Checking settings…</span>}
-          {status === 'ok' && <span className="status-ok">✓ {tested ? 'Checked action completed' : 'Ready to test'}</span>}
-          {status === 'invalid' && <button type="button" className="text-button status-bad" onClick={() => goToProblem(validationHelp(problems[0]).target, problems[0])}>✕ {problems.length === 1 ? '1 setting' : `${problems.length} settings`} to fix</button>}
-          {status === 'error' && <button type="button" className="text-button status-bad" onClick={() => setRetry((n) => n + 1)}>Couldn’t check settings · Retry</button>}
-          {browserSaveState === 'saving' && <span className="muted"> · Saving in this browser…</span>}
-          {browserSaveState === 'saved' && <span className="muted"> · Saved in this browser</span>}
+        {/* Who is being edited, whether the server accepts its settings, and whether this browser has kept it: the
+            last two are separate, so a draft can be saved here and still need fixing, or valid and not yet saved. */}
+        <div className="workshop-identity">
+          <RoleLogo role={roleLogoForDraft(draft)} className="workshop-identity-logo" />
+          <div className="workshop-identity-text">
+            <h2 id="workshop-h" title={draft.name || 'Unnamed character'}><span className="sr-only">Now editing </span>{draft.name || 'Unnamed character'}<span className="workshop-identity-role"> · {identity?.role}</span></h2>
+            <div className="workshop-status" role="status">
+              <span className="workshop-status-part">
+                {status === 'checking' && <span className="muted">Checking settings…</span>}
+                {status === 'ok' && <span className="status-ok">✓ {tested ? 'Checked action completed' : 'Ready to test'}</span>}
+                {status === 'invalid' && <button type="button" className="text-button status-bad" onClick={() => goToProblem(validationHelp(problems[0]).target, problems[0])}>✕ {problems.length === 1 ? '1 setting' : `${problems.length} settings`} to fix</button>}
+                {status === 'error' && <button type="button" className="text-button status-bad" onClick={() => setRetry((n) => n + 1)}>Couldn’t check settings · Retry</button>}
+              </span>
+              <span className="workshop-status-part">
+                {browserSaveState === 'saving' && <span className="muted">Saving in this browser…</span>}
+                {browserSaveState === 'saved' && <span className="muted">Saved in this browser</span>}
+                {browserSaveState === 'error' && <button type="button" className="text-button status-bad" onClick={() => setStorageRetry((n) => n + 1)}>Not saved in this browser · Retry</button>}
+              </span>
+            </div>
+          </div>
         </div>
         <div className="wh-actions">
           <ImportNpcButton disabled={locked} onImport={(file) => void importNpc(file)} />
@@ -599,8 +595,8 @@ export function Editor() {
             </div>
           </details>}
           {docked || tested
-            ? <button type="button" disabled={locked || !valid} onClick={() => void openConnection()}>Use in your game</button>
-            : <button type="button" disabled={locked} onClick={test}>Test {draft.name || 'your NPC'} →</button>}
+            ? <button type="button" data-handoff-opener disabled={locked || !valid} onClick={() => void openConnection()}>Use in your game</button>
+            : <button type="button" disabled={locked} onClick={test}>Test NPC →</button>}
         </div>
       </div> : null}
     </SiteHeader>
@@ -615,6 +611,7 @@ export function Editor() {
         <button type="button" className="secondary small" onClick={() => setStorageRetry((n) => n + 1)}>Retry browser save</button>
       </div>}
 
+      <p className="sr-only" role="status">{announcement}</p>
       {notice && (
         <div className="note-box" role="status">
           {notice}
@@ -647,20 +644,11 @@ export function Editor() {
                 </ul>
                 <button type="button" className="new-npc" ref={newNpcButton} disabled={locked} aria-expanded={starting} aria-controls="starters" onClick={startNpc}>+ New NPC</button>
               </section>
-              <h2 id="workshop-h" className="rail-current">
-                <RoleLogo role={roleLogoForDraft(draft)} className="rail-current-logo" />
-                <span><small>Now editing</small>{draft.name || 'Unnamed character'}</span>
-              </h2>
               <nav className="editor-nav" aria-label="Workshop pages">
-                {PAGE_GROUPS.map(([group, entries]) => (
-                  <Fragment key={group}>
-                    <h3 className="rail-label nav-group">{group}</h3>
-                    {entries.filter(([id]) => id !== 'artwork' || hasArtwork).map(([id, label, hint]) => (
-                      <button key={id} type="button" className="secondary" aria-current={(docked || section !== 'test') && page === id ? 'page' : undefined} onClick={() => setSection(id)}>
-                        {label}<span className="nav-hint">{hint}</span>
-                      </button>
-                    ))}
-                  </Fragment>
+                {WORKSHOP_PAGES.map(([id, label, hint]) => (
+                  <button key={id} type="button" className="secondary" aria-current={(docked || section !== 'test') && page === id ? 'page' : undefined} onClick={() => setSection(id)}>
+                    {label}<span className="nav-hint">{hint}</span>
+                  </button>
                 ))}
                 {!docked && <button type="button" className="secondary nav-test" aria-current={section === 'test' ? 'page' : undefined} onClick={() => setSection('test')}>Test</button>}
               </nav>
@@ -670,7 +658,7 @@ export function Editor() {
           <section className="panel definition" aria-label="Definition" hidden={!docked && section === 'test'}>
             {problemList}
 
-            <Section active={page === 'character'} id="character" title="Basics" intro="Give your character a name and a personality.">
+            <Section active={page === 'character'} id="character" title="Character" intro="Give your character a name, a personality and a look.">
               <Field row label="Name">
                 <input id="character-name" data-field="name" value={draft.name} maxLength={40} onChange={(e) => set('name', e.target.value)} />
               </Field>
@@ -687,60 +675,11 @@ export function Editor() {
                   <button type="button" className="text-button" onClick={() => edit('abilities')}>Edit abilities</button>
                 </div>
               </div>
+              <h4 id="appearance-h" tabIndex={-1}>Appearance</h4>
+              <Field label="Character sprite" hint="How the character looks in the example village."><SpritePicker value={draft.sprite} onChange={(s) => set('sprite', s)} /></Field>
             </Section>
 
-            <Section active={page === 'appearance'} id="appearance" title="Appearance" intro="How the character looks in the example village.">
-              <Field label="Character sprite" hint="Used in the example village."><SpritePicker value={draft.sprite} onChange={(s) => set('sprite', s)} /></Field>
-            </Section>
-
-            {hasArtwork && <Section active={page === 'artwork'} id="artwork" title="Item artwork" intro="Set the art direction for pictures of items this character sells or makes.">
-              <ArtForm key={started} draft={draft} valid={valid} onChange={(art) => set('art', art)} />
-            </Section>}
-
-            <Section active={page === 'settings'} id="settings" title="Advanced settings" intro="Its id, the model that voices it, and what it says when something goes wrong.">
-              <Field label="Id" hint="its file name: lowercase, digits, _">
-                <input data-field="id" value={draft.id} maxLength={41} onChange={(e) => set('id', e.target.value)} />
-              </Field>
-              <Field label="Full persona" hint={`${draft.persona.length} / ${MAX_PERSONA_LENGTH} · sent first, as the system prompt`}>
-                <textarea data-field="persona" className="persona" value={draft.persona} maxLength={MAX_PERSONA_LENGTH} onChange={(e) => set('persona', e.target.value)} />
-              </Field>
-              <div className="row2">
-                <Field label="Voiced by" hint={MODEL_INFO[draft.model].description}>
-                  <select data-field="model" value={draft.model} onChange={(e) => set('model', e.target.value as NpcDraft['model'])}>
-                    {MODEL_CHOICES.map((m) => (
-                      <option key={m} value={m}>
-                        {MODEL_INFO[m].label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Thinking" hint={EFFORT_INFO[draft.effort].description}>
-                  <select data-field="effort" value={draft.effort} onChange={(e) => set('effort', e.target.value as NpcDraft['effort'])}>
-                    {EFFORT_CHOICES.map((m) => (
-                      <option key={m} value={m}>
-                        {EFFORT_INFO[m].label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              </div>
-              <h4>If something goes wrong</h4>
-              <div className="row2">
-                <Field label="If the ledger rejects it twice">
-                  <input data-field="fallbacks.rejected" value={draft.fallbacks.rejected} maxLength={MAX_SAY_LENGTH} onChange={(e) => set('fallbacks', { ...draft.fallbacks, rejected: e.target.value })} />
-                </Field>
-                <Field label="If the model is down">
-                  <input
-                    data-field="fallbacks.unavailable"
-                    value={draft.fallbacks.unavailable}
-                    maxLength={MAX_SAY_LENGTH}
-                    onChange={(e) => set('fallbacks', { ...draft.fallbacks, unavailable: e.target.value })}
-                  />
-                </Field>
-              </div>
-            </Section>
-
-            <Section active={page === 'abilities'} id="abilities" title="What it sells or makes" intro="Set up goods for sale or items made to order. Leave both options off for a character that only talks.">
+            <Section active={page === 'abilities'} id="abilities" title="Abilities" intro="Set up goods for sale or items made to order. Leave both options off for a character that only talks.">
               {(draft.catalogue.in_stock || draft.catalogue.made_to_order) && !draft.model_verbs.includes('OFFER') && (
                 <div className="catalogue-warning" role="alert">
                   <span className="catalogue-warning-icon" aria-hidden="true">!</span>
@@ -752,13 +691,18 @@ export function Editor() {
                 </div>
               )}
               <CatalogueForm value={draft} onChange={({ catalogue, start }) => setDraft((d) => ({ ...d, catalogue, start }))} />
+              {hasArtwork && <>
+                <h4 id="artwork-h" tabIndex={-1}>Item artwork</h4>
+                <p className="muted small">Set the art direction for pictures of items this character sells or makes.</p>
+                <ArtForm key={started} draft={draft} valid={valid} onChange={(art) => set('art', art)} />
+              </>}
               {draft.verbs.includes('SIGNAL') && <>
                 <h4 id="signals-h" tabIndex={-1}>What it can ask the game for</h4>
                 <Signals value={draft.signals} onChange={(signals) => set('signals', signals)} />
               </>}
             </Section>
 
-            <Section active={page === 'world'} id="world" title="Example village" intro="Location, schedule and perception use the bundled village map.">
+            <Section active={page === 'world'} id="world" title="World" intro="Location, schedule and perception use the bundled village map.">
               <div className="row2">
                 <Field label="Default location" hint="Place on the bundled village map when no other stop is scheduled.">
                   <PlacePicker field="location" places={places} value={draft.location} onChange={(p) => set('location', p)} />
@@ -782,7 +726,51 @@ export function Editor() {
               </Field>
             </Section>
 
-            <Section active={page === 'advanced'} id="advanced" title="Advanced" intro="Permissions, facts, labels and what the model gets.">
+            <Section active={page === 'advanced'} id="advanced" title="Advanced" intro="The character’s id and model, what it says when something goes wrong, its permissions, facts, labels and what the model gets.">
+              <h4 id="settings-h" tabIndex={-1}>Character settings</h4>
+              <Field label="Id" hint="its file name: lowercase, digits, _">
+                <input data-field="id" value={draft.id} maxLength={41} onChange={(e) => set('id', e.target.value)} />
+              </Field>
+              <Field label="Full persona" hint={`${draft.persona.length} / ${MAX_PERSONA_LENGTH} · sent first, as the system prompt; the Personality on the Character page is the part between the workshop:personality markers`}>
+                <textarea data-field="persona" className="persona" value={draft.persona} maxLength={MAX_PERSONA_LENGTH} onChange={(e) => set('persona', e.target.value)} />
+              </Field>
+              <div className="row2">
+                {/* The explanations sit behind a ? so both selects line up; a ? inside a <label> would take its clicks. */}
+                <div className="field">
+                  <span className="field-label field-label-help"><label htmlFor="draft-model">Voiced by</label> <Help about="Voiced by" text={MODEL_INFO[draft.model].description} /></span>
+                  <select id="draft-model" data-field="model" value={draft.model} onChange={(e) => set('model', e.target.value as NpcDraft['model'])}>
+                    {MODEL_CHOICES.map((m) => (
+                      <option key={m} value={m}>
+                        {MODEL_INFO[m].label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <span className="field-label field-label-help"><label htmlFor="draft-effort">Thinking</label> <Help about="Thinking" text={EFFORT_INFO[draft.effort].description} /></span>
+                  <select id="draft-effort" data-field="effort" value={draft.effort} onChange={(e) => set('effort', e.target.value as NpcDraft['effort'])}>
+                    {EFFORT_CHOICES.map((m) => (
+                      <option key={m} value={m}>
+                        {EFFORT_INFO[m].label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <h4>If something goes wrong</h4>
+              <div className="row2">
+                <Field label="If the ledger rejects it twice">
+                  <input data-field="fallbacks.rejected" value={draft.fallbacks.rejected} maxLength={MAX_SAY_LENGTH} onChange={(e) => set('fallbacks', { ...draft.fallbacks, rejected: e.target.value })} />
+                </Field>
+                <Field label="If the model is down">
+                  <input
+                    data-field="fallbacks.unavailable"
+                    value={draft.fallbacks.unavailable}
+                    maxLength={MAX_SAY_LENGTH}
+                    onChange={(e) => set('fallbacks', { ...draft.fallbacks, unavailable: e.target.value })}
+                  />
+                </Field>
+              </div>
               <h4 id="permissions" tabIndex={-1}>
                 What it may do
               </h4>
@@ -809,7 +797,7 @@ export function Editor() {
                 ))}
               </div>
               <h4>Names and labels</h4>
-              <Labels draft={draft} onChange={(labels) => set('labels', labels)} />
+              <Labels key={started} draft={draft} onChange={(labels) => set('labels', labels)} />
               <h4>What the model gets</h4>
               {ready ? (
                 <>
@@ -1092,40 +1080,75 @@ function Schedule({ places, home, value, onChange }: { places: string[]; home: s
 // What the model and players call each thing it deals in. Only needed when a name isn't a word, such as a game's own
 // item id: the NPC then says "iron sword" while the ledger, the log and the dev API keep the id. A name with no label
 // left in the box is dropped.
+const NAME_PATTERN = /^[a-z][a-z0-9_]{0,40}$/;
+
+// One row per name: the id the ledger and the game use, and the words the NPC and players see for it.
 function Labels({ draft, onChange }: { draft: NpcDraft; onChange: (labels: Record<string, string>) => void }) {
   const { start, catalogue, labels } = draft;
-  const names = [
-    ...new Set([
-      ...Object.keys(catalogue.made_to_order?.items ?? {}),
-      ...Object.keys(catalogue.made_to_order?.materials ?? {}),
-      ...Object.keys(catalogue.in_stock ?? {}),
-      ...Object.keys(start.stock),
-      ...Object.keys(labels),
-    ]),
-  ];
-  const [extra, setExtra] = useState('');
-  const put = (name: string, label: string) => {
+  const dealt = new Set([
+    ...Object.keys(catalogue.made_to_order?.items ?? {}),
+    ...Object.keys(catalogue.made_to_order?.materials ?? {}),
+    ...Object.keys(catalogue.in_stock ?? {}),
+    ...Object.keys(start.stock),
+  ]);
+  // Names added here stay listed while their label is being retyped, even when it is briefly empty.
+  const [added, setAdded] = useState<string[]>([]);
+  const names = [...new Set([...dealt, ...Object.keys(labels), ...added])];
+  const [id, setId] = useState('');
+  const [label, setLabel] = useState('');
+  const idProblem = !id ? '' : !NAME_PATTERN.test(id) ? 'Use lowercase letters, digits and _, starting with a letter.' : names.includes(id) ? 'That id is already listed.' : '';
+  const put = (name: string, value: string) => {
     const { [name]: _old, ...rest } = labels;
-    onChange(label.trim() ? { ...rest, [name]: label } : rest);
+    onChange(value.trim() ? { ...rest, [name]: value } : rest);
+  };
+  const add = (event: FormEvent) => {
+    event.preventDefault();
+    if (!id || idProblem) return;
+    put(id, label.trim() || id.replace(/_/g, ' '));
+    setAdded((list) => [...list, id]);
+    setId('');
+    setLabel('');
+    document.getElementById('label-new-id')?.focus();
+  };
+  const remove = (name: string) => {
+    put(name, '');
+    setAdded((list) => list.filter((n) => n !== name));
   };
   return (
     <div className="field">
-      <span className="field-label">
-        What it calls things <span className="muted">· only for names that aren't words, like a game's item ids; the ledger keeps the name</span>
-      </span>
-      {names.length === 0 && <span className="muted small">It deals in nothing yet.</span>}
-      {names.map((n) => (
-        <div key={n} className="inline">
-          <code className="small">{n}</code>
-          <input data-field={`labels.${n}`} value={labels[n] ?? ''} placeholder={n} maxLength={MAX_LABEL_LENGTH} onChange={(e) => put(n, e.target.value)} aria-label={`What it calls ${n}`} />
-        </div>
-      ))}
-      <div className="inline">
-        <input value={extra} placeholder="another name it may get (itm_wolf_pelt)" onChange={(e) => setExtra(e.target.value.trim())} aria-label="Another name" />
-        <button type="button" className="secondary small" disabled={!/^[a-z][a-z0-9_]{0,40}$/.test(extra) || names.includes(extra)} onClick={() => (put(extra, extra.replace(/_/g, ' ')), setExtra(''))}>
-          Add
-        </button>
-      </div>
+      <p className="muted small">
+        Only needed for ids that aren't words, like a game's item ids. The ledger and your game keep the id; the NPC and players see the label.
+      </p>
+      <table className="labels-table">
+        <thead>
+          <tr><th scope="col">Item id</th><th scope="col">Label the NPC uses</th><th scope="col"><span className="sr-only">Remove</span></th></tr>
+        </thead>
+        <tbody>
+          {names.length === 0 && <tr><td colSpan={3} className="muted small">It deals in nothing yet.</td></tr>}
+          {names.map((n) => (
+            <tr key={n}>
+              <td><code>{n}</code></td>
+              <td>
+                <input data-field={`labels.${n}`} value={labels[n] ?? ''} placeholder={n.replace(/_/g, ' ')} maxLength={MAX_LABEL_LENGTH} onChange={(e) => put(n, e.target.value)} aria-label={`Label for ${n}`} />
+              </td>
+              <td>{!dealt.has(n) && <button type="button" className="secondary small" aria-label={`Remove ${n}`} onClick={() => remove(n)}>Remove</button>}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>
+              <input id="label-new-id" form="label-add" value={id} placeholder="itm_wolf_pelt" maxLength={41} aria-label="New item id" aria-invalid={Boolean(idProblem)} aria-describedby="label-new-help" onChange={(e) => setId(e.target.value.trim())} />
+            </td>
+            <td>
+              <input form="label-add" value={label} placeholder={id ? id.replace(/_/g, ' ') : 'wolf pelt'} maxLength={MAX_LABEL_LENGTH} aria-label="Label for the new item id" onChange={(e) => setLabel(e.target.value)} />
+            </td>
+            <td><button type="submit" form="label-add" className="secondary small" disabled={!id || Boolean(idProblem)}>Add</button></td>
+          </tr>
+        </tfoot>
+      </table>
+      <form id="label-add" onSubmit={add} hidden />
+      <span id="label-new-help" className={idProblem ? 'small labels-error' : 'muted small'}>{idProblem || 'Another id it may get from your game. The label defaults to the id with spaces.'}</span>
     </div>
   );
 }
@@ -1362,7 +1385,7 @@ function Bench({ draft, valid, checking, onBusy, tested, onCheckedAction, onRese
   useEffect(() => onBusy(busy), [busy, onBusy]);
 
   useEffect(() => {
-    box.current?.scrollTo({ top: box.current.scrollHeight, behavior: 'smooth' });
+    box.current?.scrollTo({ top: box.current.scrollHeight, behavior: newLineScroll() });
   }, [view?.events.length, pending]);
 
   const timed = draft.triggers.some((t) => t.kind === 'every_hours');
@@ -1648,22 +1671,37 @@ function pretty(content: string): string {
   }
 }
 
+// The ledger's verdict on one proposal, attached under what it checked: the verdict and the proposal (and, when it is
+// rejected, the rule that refused it) stay in view; the full receipt opens beneath.
 function ActionCheck({ check }: { check: ActionExplanation }) {
-  return <section className={`action-check ${check.accepted ? 'accepted' : 'rejected'}`} aria-label={check.source}>
-    <p className="action-check-source">{check.source}</p>
-    <dl className="action-check-flow">
-      <div><dt>Proposal</dt><dd>{check.proposal}</dd></div>
-      <div><dt>Applicable rule</dt><dd>{check.rule}</dd></div>
-      <div className="action-check-verdict"><dt>Verdict</dt><dd>{check.accepted ? '✓ Accepted' : '✕ Rejected'}</dd></div>
-      <div><dt>Resulting state</dt><dd>{check.state}</dd></div>
-    </dl>
+  return <section className={`action-check ${check.accepted ? 'accepted' : 'rejected'}`} aria-label={`Ledger check: ${check.source}`}>
+    {/* An opened receipt below the fold looks like nothing happened, so it is brought into view. */}
+    <details onToggle={(e) => e.currentTarget.open && e.currentTarget.scrollIntoView({ block: 'nearest', behavior: newLineScroll() })}>
+      <summary>
+        <span className="action-check-line">{check.accepted ? '✓ Ledger accepted' : '✕ Ledger rejected'}</span>
+        <span className="action-check-proposal">{check.proposal}</span>
+        <span className="action-check-more" aria-hidden="true">Details</span>
+        {!check.accepted && <span className="action-check-reason">{check.rule}</span>}
+      </summary>
+      <div className="action-check-receipt">
+        <p className="action-check-source">{check.source}</p>
+        <dl className="action-check-flow">
+          <div><dt>Proposal</dt><dd>{check.proposal}</dd></div>
+          <div><dt>Applicable rule</dt><dd>{check.rule}</dd></div>
+          <div className="action-check-verdict"><dt>Verdict</dt><dd>{check.accepted ? '✓ Accepted' : '✕ Rejected'}</dd></div>
+          <div><dt>Resulting state</dt><dd>{check.state}</dd></div>
+        </dl>
+      </div>
+    </details>
   </section>;
 }
 
 function BenchEntry({ event: e, view, npcName, controlled }: { event: EngineEvent; view: StateView; npcName: string; controlled: boolean }) {
   switch (e.type) {
     case 'SAID':
-      return <div className={`msg ${e.actor === 'player' ? 'you' : 'npc'}`}><span className="sr-only">{e.actor === 'player' ? 'You' : npcName}: </span>{e.data.text}</div>;
+      // As in the example village: the NPC's lines carry its name, yours don't.
+      if (e.actor === 'player') return <div className="msg you"><span className="sr-only">You: </span>{e.data.text}</div>;
+      return <div className="msg npc"><span className="who">{npcName || 'Your NPC'}</span>{e.data.text}</div>;
     case 'CONTRACT_PROPOSED': {
       const c = view.contracts.find((x) => x.contract_id === e.data.contract.contract_id);
       return c ? <ContractCard c={c} gold={view.gold} disabled /> : null;
@@ -1671,6 +1709,7 @@ function BenchEntry({ event: e, view, npcName, controlled }: { event: EngineEven
     case 'EMOTED':
       return (
         <div className="msg npc emote">
+          <span className="who">{npcName || 'Your NPC'}</span>
           <i>{e.data.text}</i>
         </div>
       );

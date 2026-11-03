@@ -19,6 +19,7 @@
   --receipt: #161512;
   --receipt-line: #4a4740;
   --mono: ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace;
+  --bubble-you: #44351d; /* the player's lines, in the demo and the workshop test alike */
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -38,8 +39,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .loading { display: grid; place-items: center; min-height: 60vh; color: var(--muted); font-family: 'Pixelify Sans', monospace; }
 .app { max-width: 1180px; margin: 0 auto; padding: 16px; }
 .top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-bottom: 12px; }
-.cols { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; align-items: start; }
-.main-col, .side-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.side-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
 .muted { color: var(--muted); }
@@ -51,11 +51,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .chat-head { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
 .chat-name { font-size: 18px; }
 .portrait { width: 48px; height: 48px; flex-shrink: 0; border-radius: 6px; background: var(--panel-2) url(/assets/dungeon/tilemap_packed.png) no-repeat; background-size: 576px 528px; background-position: -96px -336px; image-rendering: pixelated; }
-.messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
+.messages { position: relative; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
 .conversation-log { display: flex; flex-direction: column; gap: 8px; }
 .msg { padding: 7px 10px; border-radius: 8px; max-width: 85%; white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg.npc { background: var(--panel-2); align-self: flex-start; }
-.msg.you { background: #44351d; align-self: flex-end; }
+.msg.you { background: var(--bubble-you); align-self: flex-end; }
 .msg.thinking { color: var(--muted); font-style: italic; }
 .msg.emote { background: none; color: var(--muted); padding-top: 2px; padding-bottom: 2px; }
 .dots::after { content: ''; animation: dots 1.2s steps(4) infinite; }
@@ -93,11 +93,23 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 /* Side panels */
 .gold { color: var(--accent); }
-.job { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
-.job-body { flex: 1; min-width: 0; }
-.job-row { display: flex; justify-content: space-between; gap: 8px; }
-.bar { height: 6px; background: var(--bg); border-radius: 3px; margin-top: 4px; overflow: hidden; }
-.bar div { height: 100%; background: var(--accent); transition: width .4s; }
+/* The forge: one compact row per order, each opening to its details. */
+.forge { flex: none; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--rule); }
+.forge-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.forge-head h2 { margin: 0; font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9a9a9a; }
+.forge-count { margin-left: 4px; letter-spacing: 0; text-transform: none; font-weight: 500; color: var(--muted); }
+.forge-jobs { list-style: none; margin: 0; padding: 0; max-height: 168px; overflow-y: auto; }
+.job > summary { display: grid; grid-template-columns: minmax(0, 1fr) 72px auto; align-items: center; gap: 10px; min-height: 32px; cursor: pointer; border-radius: 4px; list-style: none; }
+.job > summary::-webkit-details-marker { display: none; }
+.job > summary::before { content: '▸'; position: absolute; left: 0; color: var(--muted); font-size: 11px; }
+.job[open] > summary::before { content: '▾'; }
+.job { position: relative; padding-left: 12px; }
+.job-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.job-details { display: flex; gap: 10px; align-items: flex-start; padding: 4px 0 10px; }
+.job-details .tag { display: block; margin-top: 2px; }
+.bar { display: block; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--accent); transition: width .4s; }
+@media (prefers-reduced-motion: reduce) { .bar > span { transition: none; } }
 .stock { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
 .stock li { display: flex; justify-content: space-between; text-transform: capitalize; }
 .stock b { font-variant-numeric: tabular-nums; }
@@ -170,12 +182,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .menu-list a { color: var(--text); font-size: 13px; }
 .menu-list a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button.danger { background: var(--bad); color: #2b1219; }
-.panel-toggle { all: unset; box-sizing: border-box; display: flex; width: 100%; align-items: baseline; justify-content: space-between; gap: 8px; cursor: pointer; border-radius: 4px; }
-.panel-toggle::after { content: '▸'; color: var(--muted); font-size: 12px; }
-.panel-toggle[aria-expanded='true']::after { content: '▾'; }
-.panel-toggle .title { font-size: 15px; font-weight: 600; flex: 1; }
-.panel-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.inventory-body { margin-top: 10px; }
 .cue { margin-left: auto; font-size: 11px; font-weight: 600; background: var(--accent); color: #181818; border-radius: 999px; padding: 0 7px; }
 .chat-head-extra { margin-left: auto; }
 /* Names now carry roles, so a narrow chat head wraps rather than push past the screen. */
@@ -183,6 +189,7 @@ button.danger { background: var(--bad); color: #2b1219; }
 .chat-head > div:not(.portrait):not(.chat-head-extra) { min-width: 0; flex: 1 1 160px; }
 .chat-name select { max-width: 100%; }
 .drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 20; width: min(420px, 100vw); display: flex; flex-direction: column; background: var(--panel); border-left: 1px solid var(--line); box-shadow: -12px 0 32px #0009; }
+.drawer[hidden] { display: none; }
 .drawer:focus { outline: none; }
 .drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 .drawer-head h2 { margin: 0; font-size: 17px; }
@@ -283,19 +290,11 @@ button.danger { background: var(--bad); color: #2b1219; }
 /* NPC workshop */
 .workshop { display: flex; flex-direction: column; gap: 12px; }
 .workshop > .note-box { margin: 0; }
-.wh-top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
-.wh-text { flex: 1 1 220px; min-width: 0; }
-.wh-text h2 { margin-bottom: 3px; font-size: 20px; color: var(--text); overflow-wrap: anywhere; }
-.workshop-role { color: var(--muted); font-weight: 400; }
 .workshop-status { font-size: 12px; }
-.draft-storage { margin-top: 4px; max-width: 65ch; }
-.draft-storage p { margin: 4px 0; }
 .status-ok { color: var(--ok); }
 .status-bad { color: var(--bad); }
 .text-button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
 .text-button.status-bad { color: #f6c7c4; }
-.wh-text p { margin: 0; max-width: 70ch; }
-.wh-text p + p { margin-top: 8px; }
 .wh-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .workshop-intro { margin: 10px 0 0 !important; }
 .workshop-more { position: relative; }
@@ -309,9 +308,6 @@ button.danger { background: var(--bad); color: #2b1219; }
 .workshop-file-help { margin-top: 6px; }
 .workshop-file-help > summary { color: var(--muted); font-size: 12px; font-weight: 400; }
 .workshop-file-help p { margin: 8px 0 0; max-width: 85ch; }
-.status-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; }
-.status-bar .draft-name { overflow-wrap: anywhere; min-width: 0; }
-.status-bar .test { margin-left: auto; }
 .pill { display: inline-block; padding: 1px 9px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
 .pill.ok { color: var(--ok); border-color: var(--ok); }
 .pill.bad { color: #f6c7c4; border-color: var(--bad); }
@@ -337,12 +333,6 @@ input[type='radio'] { accent-color: var(--accent); width: 16px; height: 16px; }
 .advanced[open] > summary { margin-bottom: 8px; }
 .abilities { margin: 0 0 8px; padding-left: 18px; font-size: 13px; display: flex; flex-direction: column; gap: 3px; }
 .errors.stale { opacity: .6; }
-.overview { margin: 0 0 16px; padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--accent); border-radius: 8px; }
-.ov-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.ov-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 4px 16px; }
-.overview h4 { margin: 8px 0 4px; }
-.ov-next { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; }
-.ov-next > span { flex: 1 1 220px; }
 .bench-hint { margin: 8px 0 0; }
 .note.left { align-self: auto; text-align: left; margin: 0 0 8px; }
 @media (min-width: 861px) { .editor .bench-col { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; } }
@@ -359,6 +349,7 @@ input[type='radio'] { accent-color: var(--accent); width: 16px; height: 16px; }
 .field input:focus-visible, .field textarea:focus-visible, .inline select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .persona { min-height: 220px; resize: vertical; font: 12.5px/1.5 ui-monospace, Menlo, monospace; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field-label-help { display: flex; align-items: center; gap: 6px; }
 .small { font-size: 12px; }
 p.small { margin: 0 0 8px; }
 .verbs { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -366,6 +357,14 @@ p.small { margin: 0 0 8px; }
 .verbs td { padding: 7px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .verbs th:not(:first-child), .verbs td:not(:first-child) { text-align: center; width: 110px; }
 .verbs code { font-weight: 700; }
+.labels-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.labels-table th { text-align: left; font-size: 11px; color: var(--muted); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.labels-table td { padding: 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.labels-table td:first-child { width: 40%; }
+.labels-table td:last-child { width: 1%; white-space: nowrap; }
+.labels-table input { width: 100%; }
+.labels-table tfoot td { border-bottom: 0; padding-top: 10px; }
+.labels-error { color: var(--bad); }
 input[type='checkbox'] { accent-color: var(--accent); width: 16px; height: 16px; }
 .facts { display: flex; flex-direction: column; gap: 6px; }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; cursor: pointer; }
@@ -395,12 +394,10 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 @media (max-width: 520px) {
   .verbs th:not(:first-child), .verbs td:not(:first-child) { width: 64px; }
   .answers > div { grid-template-columns: 1fr; gap: 0; }
-  .status-bar .test { margin-left: 0; }
 }
 
 @media (max-width: 860px) {
   .app { padding: 12px 16px; }
-  .cols { grid-template-columns: 1fr; }
   .chat-panel { height: 70vh; }
   .editor { grid-template-columns: 1fr; }
   .row2 { grid-template-columns: 1fr; }
@@ -425,84 +422,103 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .cat-table .range > span { display: flex; align-items: center; gap: 3px; justify-content: center; }
 .definition { min-width: 0; }
 
-/* The demo: the studio shell, like the workshop. A wide screen has the village large on the left with the village
-   tools in three columns under it, and the conversation on the right (with the forge and the gear), held in view while
-   the page scrolls. Time and gold are in the bar, which stays in view too. */
+/* The demo: the studio shell, like the workshop. A wide screen fills the window under the site bar: the village on the
+   left (its toolbar with time and gold, the scene, its utility bar) and the conversation on the right (with the forge). */
 .demo-page { display: flex; flex-direction: column; min-width: 0; }
 .demo-build { display: inline-block; color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; border-radius: 3px; }
 .demo-build:hover { text-decoration-color: var(--accent); }
-.studio-actions .hud + .demo-build { padding-left: 16px; border-left: 1px solid var(--rule); border-radius: 0; }
 .demo-build:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.demo-layout { display: grid; grid-template-columns: minmax(0, 1fr) 400px; grid-template-rows: auto 1fr; grid-template-areas: 'stage talk' 'tools talk'; }
-.stage { grid-area: stage; display: flex; flex-direction: column; min-width: 0; }
-.talk-col { grid-area: talk; display: flex; flex-direction: column; min-width: 0; background: var(--pane); border-left: 1px solid var(--rule); }
-.demo-layout > .tools { grid-area: tools; min-width: 0; padding: 16px 0 32px; border-top: 1px solid var(--rule); }
+.demo-layout { display: grid; grid-template-columns: minmax(0, 1fr) 400px; }
+.village-col { display: flex; flex-direction: column; min-width: 0; }
+.village-toolbar { display: flex; align-items: center; min-height: 44px; padding: 6px 12px 6px 16px; box-sizing: border-box; background: var(--panel); border-bottom: 1px solid var(--rule); }
+.village-toolbar .hud { flex: 1; min-width: 0; }
+.village-toolbar .help-menu { margin-left: auto; }
+.village-toolbar button { min-height: 32px; }
+.stage { display: flex; flex-direction: column; min-width: 0; }
+.talk-col { position: relative; display: flex; flex-direction: column; min-width: 0; background: var(--pane); border-left: 1px solid var(--rule); }
 .game { overflow: hidden; background: #5a9e4b; }
 .game canvas { display: block; }
 .demo-page .hint { border-width: 0 0 1px 3px; border-color: var(--rule) var(--rule) var(--rule) var(--accent); border-radius: 0; background: var(--panel); padding: 8px 16px 8px 13px; }
 .demo-page .talk-col .chat-panel { padding: 12px 16px; }
-.talk-col > .error { border-radius: 0; border-width: 1px 0 0; padding: 10px 16px; }
-.demo-page .talk-col > .forge, .demo-page .talk-col > .inventory { padding: 12px 16px; border-top: 1px solid var(--rule); }
-.demo-page .forge > h2, .demo-page .inventory .panel-toggle .title { font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9a9a9a; }
-.demo-page .forge > h2 { margin: 0 0 10px; }
-.talk-col .inventory-body { max-height: 40vh; overflow-y: auto; }
-.tools .rail-label { padding: 0 16px 8px; }
-.tool > button { display: flex; flex-direction: column; align-items: stretch; gap: 1px; width: 100%; min-height: 48px; padding: 8px 16px 8px 14px; background: none; border: 0; border-left: 2px solid transparent; border-radius: 0; color: #c8c8c8; font-weight: 500; text-align: left; }
-.tool > button:hover { background: #1b1b1b; color: var(--text); }
-.tool > button[aria-expanded='true'] { color: var(--accent); font-weight: 600; }
-.tool > button[aria-expanded='true']:hover { background: none; color: var(--accent-hover); }
-.tool > button[aria-expanded='true'] .tool-hint { color: #d0d0d0; }
-/* An open tool is one block: its row and what it shows share the tint and the yellow edge, set apart from the rest. */
-.tool.open { margin: 4px 0; background: #1f1d17; border-left: 3px solid var(--accent); border-block: 1px solid #3a3426; }
-.tool.open > button { border-left: 0; padding-left: 13px; }
-.tool > button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.tool-name { display: flex; align-items: center; gap: 8px; }
-.tool-name::after { content: '▸'; margin-left: auto; color: var(--muted); font-size: 12px; }
-.tool > button[aria-expanded='true'] .tool-name::after { content: '▾'; color: var(--accent); }
-.tools .cue { margin-left: 0; }
-.tool-body { padding: 4px 16px 16px 13px; }
-.tool-body .panel { background: none; border: 0; padding: 0; border-radius: 0; }
-.tool-body .news > h2, .tool-body .ledger > h2, .tool-body .god > h2 { display: none; }
-.tool-body .god > h2 + p { margin-top: 0; }
-.tool-body .ledger { max-height: 560px; overflow-y: auto; background: inherit; }
-.tool.open .tool-body { background: inherit; }
-.tool-hint { font-size: 12px; font-weight: 400; color: var(--muted); }
+/* Under the conversation and above the message box, so the box stays at the bottom whatever is going on. */
+.chat-panel > .error { flex: none; margin-top: 10px; }
+/* The utility bar sits on the village's bottom edge: Bag, Rumours and Inspect village, one panel open at a time. */
+.utility { min-width: 0; }
+.utility-bar { display: flex; border-bottom: 1px solid var(--rule); background: var(--panel); }
+.utility-bar > button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; background: none; border: 0; border-right: 1px solid var(--rule); border-radius: 0; color: #c8c8c8; font-weight: 500; box-shadow: inset 0 -2px 0 transparent; }
+.utility-bar > button:hover { background: #1b1b1b; color: var(--text); }
+.utility-bar > button[aria-expanded='true'] { color: var(--accent); font-weight: 600; background: #1f1d17; box-shadow: inset 0 -2px 0 var(--accent); }
+.utility-bar > button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.utility-bar .cue { margin-left: 0; }
+.utility-bar > button.arrived { animation: bag-arrived 1.6s ease-out; }
+@keyframes bag-arrived { from { background: #4a3c14; color: var(--accent); } to { background: none; } }
+@media (prefers-reduced-motion: reduce) { .utility-bar > button.arrived { animation: none; } }
+.bar-count { min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--panel-2); color: var(--text); font-size: 12px; font-weight: 600; text-align: center; }
+.stage { position: relative; }
+/* The drawer slot: over the village's left side, beside the bar buttons that open it, never over the conversation.
+   It doesn't resize the game; long content scrolls inside it. */
+.drawer.slot { position: absolute; top: 0; right: auto; bottom: 0; left: 0; z-index: 5; width: min(420px, 100%); border-left: 0; border-right: 1px solid var(--line); box-shadow: 12px 0 32px #0009; }
+.drawer.slot .ledger { max-height: none; background: none; }
+.drawer.slot .god > h2 { display: none; }
+.drawer.slot .god > h2 + p { margin-top: 0; }
+.inspect-tabs { display: flex; gap: 4px; margin: -4px 0 12px; border-bottom: 1px solid var(--rule); }
+.inspect-tabs [role='tab'] { min-height: 40px; padding: 0 12px; background: none; border: 0; border-radius: 0; box-shadow: inset 0 -2px 0 transparent; color: #c8c8c8; font-weight: 500; }
+.inspect-tabs [role='tab']:hover { color: var(--text); }
+.inspect-tabs [role='tab'][aria-selected='true'] { color: var(--accent); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent); }
+.inspect-tabs [role='tab']:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 @media (min-width: 861px) {
   .demo-page > .top { position: sticky; top: 0; z-index: 15; }
-  /* The village fills most of the window; the hint and the tools' headings show under it, a scroll away. */
-  .game { height: calc(100vh - var(--top-h, 57px) - 150px); min-height: 420px; flex-shrink: 0; }
-  .talk-col { position: sticky; top: var(--top-h, 57px); align-self: start; height: calc(100vh - var(--top-h, 57px)); }
-  .demo-page .talk-col .chat-panel { flex: 1 1 0; min-height: 240px; height: auto; }
-}
-/* Room for three: the tools side by side, each opening in its own column, split by rules. */
-@media (min-width: 1100px) {
-  .demo-layout > .tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto 1fr; padding-top: 16px; }
-  .demo-layout > .tools > .rail-label { grid-column: 1 / -1; }
-  .tool { border-right: 1px solid var(--rule); }
-  .tool:last-child { border-right: 0; }
-  .tool.open { margin: 0; border-left: 0; border-block: 0; border-top: 3px solid var(--accent); }
-  .tool.open > button { padding-left: 16px; }
-  .tool.open .tool-body { padding-left: 16px; }
+  /* The two columns fill the window under the site bar; the scene takes whatever the toolbar, the hint and the
+     utility bar leave. A short window scrolls the page rather than squeezing the scene below a usable size. */
+  .demo-layout { height: calc(100dvh - var(--top-h, 57px)); min-height: 560px; }
+  .village-col, .talk-col { min-height: 0; }
+  .stage { flex: 1 1 0; min-height: 0; }
+  .game { flex: 1 1 0; min-height: 240px; }
+  /* The conversation scrolls inside the panel; the forge and the message box stay under it. */
+  .demo-page .talk-col .chat-panel { flex: 1 1 0; min-height: 0; height: auto; }
+  .demo-page .talk-col .messages { min-height: 120px; }
 }
 @media (max-width: 860px) {
   .demo-page > .top .tabs { width: auto; margin-left: auto; }
   .demo-page .studio-actions { flex-basis: 100%; justify-content: flex-start; }
-  .demo-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: 'stage' 'talk' 'tools'; }
-  .game { height: 55vh; min-height: 220px; }
+  /* The village (toolbar, scene, utility bar) stacks above the conversation. */
+  .demo-layout { grid-template-columns: minmax(0, 1fr); }
+  .utility-bar > button { flex: 1 1 0; justify-content: center; padding: 0 8px; }
+  .utility-bar > button:last-child { border-right: 0; }
+  /* Dynamic viewport units, so browser bars (and, where the browser resizes for it, the keyboard) don't hide the
+     composer or a sheet's controls. The vh lines are for browsers without them. */
+  .game { height: 45vh; height: 45dvh; min-height: 200px; }
   .talk-col { border-left: 0; border-top: 1px solid var(--rule); }
-  .demo-page .talk-col .chat-panel { height: 60vh; }
+  .demo-page .talk-col .chat-panel { height: 80vh; height: 80dvh; min-height: 320px; }
+  /* The drawer slot becomes a sheet from the bottom, modal (Drawer's `modal`): its body scrolls, its Close stays. */
+  .drawer.slot { position: fixed; top: auto; right: 0; bottom: 0; left: 0; z-index: 40; width: auto; max-height: 85vh; max-height: 85dvh; border: 0; border-top: 1px solid var(--line); border-radius: 12px 12px 0 0; box-shadow: 0 -12px 32px #0009; padding-bottom: env(safe-area-inset-bottom); }
+  .drawer.slot .drawer-body { min-height: 0; }
+  .drawer-backdrop { position: fixed; inset: 0; z-index: 39; background: #000a; }
+  .drawer-backdrop[hidden] { display: none; }
+  /* Touch targets at least 44 px. The small ? beside a label keeps its look and gets a bigger invisible hit area. */
+  .village-toolbar button:not(.tip-help), .village-toolbar .popover button, .village-toolbar .popover a,
+  .drawer-head button, .inspect-tabs [role='tab'], .chat-head select, .chat-head-extra button,
+  .chat-form input, .chat-form button, .forge-head button, .contract .actions button, .hint button,
+  .log-filters button, .drawer.slot button, .drawer.slot select, .drawer.slot input:not([type='checkbox']) { min-height: 44px; }
+  .drawer-head button, .hint-x { min-width: 44px; }
+  .hint-off, .hint-x, .village-toolbar .popover a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
+  .job > summary { min-height: 44px; }
+  .demo-page > .top .brand, .demo-page > .top .tabs a, .demo-page .demo-build { display: inline-flex; align-items: center; min-height: 44px; }
+  .demo-page .help, .demo-page .tip-help { position: relative; }
+  .demo-page .help::after, .demo-page .tip-help::after { content: ''; position: absolute; inset: -13px; }
 }
-/* A phone has the Workshop tab right beside it, and no room for both on the bar's second row. */
+/* A phone: the village toolbar packs tighter so time, gold and its four buttons fit one row. */
 @media (max-width: 640px) {
+  .village-toolbar { padding: 6px 8px 6px 12px; }
   .demo-page .hud { gap: 6px; }
   .demo-page .hud .clock, .demo-page .hud .gold { font-size: 13px; }
-  .demo-page .studio-actions button, .demo-page .studio-actions .help-menu > summary { min-height: 32px; padding: 0 9px; }
-  .demo-page .studio-actions .demo-build { display: none; }
+  .village-toolbar button { padding: 0 9px; }
 }
 
 /* Workshop: look and day */
 .sprites { display: flex; flex-wrap: wrap; gap: 4px; }
-.sprite { width: 36px; height: 36px; padding: 0; border: 2px solid transparent; border-radius: 6px; background: var(--panel-2) url(/assets/dungeon/tilemap_packed.png) no-repeat; background-size: 384px 352px; image-rendering: pixelated; }
+/* The tile fills only the 32 px inside the border; painted under it too, the border would show the edges of the neighbouring tiles. */
+.sprite { width: 36px; height: 36px; padding: 0; border: 2px solid transparent; border-radius: 6px; background: var(--panel-2) url(/assets/dungeon/tilemap_packed.png) no-repeat; background-size: 384px 352px; image-rendering: pixelated; background-clip: padding-box; }
 .sprite.on { border-color: var(--accent); }
 .field .inline { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 /* God mode */
@@ -547,11 +563,7 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 
 .workshop-editor { min-width: 0; border: 0; padding: 0; margin: 0; }
 .workshop-editor[hidden] { display: none !important; } /* the docked grid would otherwise show it on the New NPC page */
-.transfer-help { margin: 12px 0 0; max-width: 85ch; }
 .workshop-editor [hidden] { display: none !important; }
-.overview-disclosure { margin-bottom: 16px; }
-.overview-disclosure > summary { padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; }
-.overview-disclosure .overview { margin-top: 8px; }
 .editor-next { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); }
 
 .character-advanced { margin-top: 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; }
@@ -559,8 +571,6 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .character-abilities { margin: 14px 0; padding: 12px; border-radius: 6px; background: var(--panel-2); }
 .character-abilities p { margin: 4px 0 6px; }
 .character-abilities .text-button { font-size: 12px; }
-.editor-disclosure { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; }
-.editor-disclosure[open] > summary { margin-bottom: 12px; }
 .definition > .advanced { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; }
 .definition > .advanced > summary { margin-bottom: 0; color: var(--text); text-transform: none; letter-spacing: normal; }
 .definition > .advanced[open] > summary { margin-bottom: 12px; }
@@ -576,7 +586,6 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .bench-tools { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
 .bench-tools > summary, .bench-details > summary { color: var(--text); }
 .bench-tools[open] > summary, .bench-details[open] > summary { margin-bottom: 8px; }
-.bench-verdict { padding: 8px 10px; background: var(--panel-2); border-radius: 6px; font-size: 13px; }
 .action-check { flex: none; padding: 10px; border: 1px solid var(--line); border-left: 3px solid var(--ok); border-radius: 6px; background: var(--bg); font-size: 12px; overflow-wrap: anywhere; }
 .action-check.rejected { border-left-color: var(--bad); }
 .action-check-source { margin: 0 0 8px; color: var(--accent); font-size: 11px; font-weight: 600; }
@@ -594,7 +603,6 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 
 /* The handoff is a screen within Workshop; hidden forms/bench stay mounted to retain their state. */
 .workshop[hidden] { display: none !important; }
-.handoff-ready { box-shadow: 0 0 0 2px var(--ok); }
 .bench-handoff { margin-top: 14px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
 .bench-handoff.ready { border-color: var(--ok); background: var(--panel-2); }
 .bench-handoff p { margin: 0 0 10px; }
@@ -637,6 +645,17 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .studio-top .tabs { margin-left: 0; }
 .studio-actions { flex: 1 1 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 16px; min-width: 0; }
 .studio-actions .workshop-status { font-size: 13px; }
+.workshop-identity { display: flex; align-items: center; gap: 10px; flex: 1 1 240px; min-width: 0; margin-right: auto; }
+.workshop-identity-logo { width: 36px; height: 36px; flex-shrink: 0; }
+.workshop-identity-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.workshop-identity h2 { margin: 0; font: 400 19px/1.15 'Pixelify Sans', monospace; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.workshop-identity-role { font: 500 12px/1 Inter, system-ui, sans-serif; color: var(--muted); }
+.workshop-status { display: flex; flex-wrap: wrap; gap: 2px 0; }
+.workshop-status-part + .workshop-status-part::before { content: '·'; margin: 0 6px; color: var(--muted); }
+@media (max-width: 600px) {
+  .workshop-status { flex-direction: column; }
+  .workshop-status-part + .workshop-status-part::before { content: none; }
+}
 .studio-actions button { min-height: 36px; }
 .studio-actions button.secondary, .studio-actions .workshop-more > summary { background: transparent; border: 1px solid #383838; }
 .studio-actions .workshop-more > summary { display: grid; place-items: center; min-height: 36px; box-sizing: border-box; }
@@ -700,10 +719,6 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 
 /* Your NPCs: the draft being edited, the ones set aside, and a way to start another. */
 .rail-label { margin: 0; padding: 0 16px 8px; font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9a9a9a; overflow-wrap: anywhere; }
-.rail-current { display: flex; align-items: center; gap: 12px; margin: 16px 0 4px; padding: 16px; border-top: 1px solid var(--line); font: 400 22px/1.15 'Pixelify Sans', monospace; color: var(--accent); min-width: 0; }
-.rail-current > span { display: flex; flex-direction: column; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
-.rail-current small { font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9a9a9a; }
-.rail-current-logo { width: 48px; height: 48px; }
 .npc-list ul { list-style: none; margin: 0; padding: 0; }
 .npc-row { display: flex; align-items: center; min-width: 0; }
 .npc-row.current { gap: 10px; padding: 8px 16px 8px 14px; background: #1f1f1f; border-left: 2px solid var(--accent); }
@@ -713,7 +728,6 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .npc-delete:hover:not(:disabled) { color: var(--bad); }
 .role-logo { display: block; width: 64px; height: 64px; flex: none; object-fit: contain; image-rendering: pixelated; }
 .npc-role-logo { width: 40px; height: 40px; }
-.button-role-logo { display: inline-block; width: 24px; height: 24px; vertical-align: middle; margin-right: 5px; }
 .role-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; padding: 0; margin: 16px 0 24px; border: 0; min-width: 0; }
 .role-choice { position: relative; display: flex; align-items: flex-start; gap: 14px; padding: 20px 16px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
 .role-choice input { position: absolute; top: 10px; right: 10px; margin: 0; accent-color: var(--accent); }
@@ -763,11 +777,6 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .npc-text span { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .new-npc { display: block; width: calc(100% - 32px); margin: 8px 16px 20px; min-height: 36px; background: transparent; border: 1px dashed #4a4a4a; color: #d0d0d0; }
 .new-npc:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
-.nav-group { padding-top: 14px; }
-.docked .editor-nav .nav-group { padding: 16px 16px 6px; }
-.docked .editor-nav .nav-group:first-child { padding-top: 4px; }
-.workshop-editor:not(.docked) .nav-group { flex-basis: 100%; padding: 8px 0 0; }
-.workshop-editor:not(.docked) .nav-test { margin-top: 8px; }
 /* Narrow: the list is a strip above the tabs. */
 .workshop-editor:not(.docked) .npc-list { margin-bottom: 14px; }
 .workshop-editor:not(.docked) .rail-label { padding: 0 0 6px; }
@@ -797,18 +806,32 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 }
 .app-wide .character-abilities { margin: 0; border-radius: 0; background: none; }
 .app-wide .character-abilities p { margin: 6px 0 4px; }
-.app-wide .editor-disclosure, .app-wide .character-advanced, .app-wide .definition > .advanced { margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--rule); border-radius: 0; }
-.app-wide .editor-disclosure > summary, .app-wide .character-advanced > summary, .app-wide .definition > .advanced > summary { padding: 14px 0; margin: 0; font-size: 14px; }
-.app-wide .editor-disclosure[open], .app-wide .character-advanced[open], .app-wide .definition > .advanced[open] { padding-bottom: 18px; }
-.app-wide .editor-disclosure[open] > summary, .app-wide .character-advanced[open] > summary, .app-wide .definition > .advanced[open] > summary { margin: 0 0 6px; }
+.app-wide .character-advanced, .app-wide .definition > .advanced { margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--rule); border-radius: 0; }
+.app-wide .character-advanced > summary, .app-wide .definition > .advanced > summary { padding: 14px 0; margin: 0; font-size: 14px; }
+.app-wide .character-advanced[open], .app-wide .definition > .advanced[open] { padding-bottom: 18px; }
+.app-wide .character-advanced[open] > summary, .app-wide .definition > .advanced[open] > summary { margin: 0 0 6px; }
 .app-wide .editor-next { margin-top: 24px; padding-top: 0; border-top: 0; }
 .app-wide .catalogue-warning { border-radius: 0; }
 .app-wide .bench-handoff { padding: 12px 0 0; border: 0; border-top: 1px solid var(--rule); border-radius: 0; background: none; }
 .app-wide .bench-handoff.ready { border-top-color: var(--ok); }
 .app-wide .game-connection { padding: 24px 16px 48px; }
 
-/* Ledger receipts: every checked proposal reads like a line in the ledger, not another chat bubble. */
-.action-check { padding: 10px 12px; background: var(--receipt); border: 0; border-block: 1px dashed var(--receipt-line); border-radius: 0; font: 12px/1.55 var(--mono); color: #d6d3cc; }
+/* Ledger checks: a short verdict line hugging what it checked, never another chat bubble; the receipt opens beneath. */
+.action-check { margin-top: -4px; padding: 0; background: none; border: 0; border-left: 2px solid var(--ok); border-radius: 0; font: 13px/1.45 Inter, system-ui, sans-serif; color: var(--text); }
+.action-check.rejected { border-left-color: var(--bad); }
+.action-check summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 4px 10px; cursor: pointer; list-style: none; border-radius: 0 6px 6px 0; }
+.action-check summary::-webkit-details-marker { display: none; }
+.action-check summary:hover { background: #1b1b1b; }
+.action-check summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.action-check-line { font-weight: 600; color: var(--ok); white-space: nowrap; }
+.rejected .action-check-line { color: var(--bad); }
+.action-check-proposal { flex: 1 1 0; min-width: 0; color: #d4d4d4; overflow-wrap: anywhere; }
+.action-check-more { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.action-check-more::after { content: ' ▸'; }
+.action-check details[open] .action-check-more::after { content: ' ▾'; }
+.action-check-reason { flex-basis: 100%; color: #f6c7c4; font-size: 12px; overflow-wrap: anywhere; }
+.action-check-receipt { margin: 2px 0 2px 10px; padding: 8px 12px; background: var(--receipt); border-block: 1px dashed var(--receipt-line); font: 12px/1.55 var(--mono); color: #d6d3cc; }
+@media (max-width: 860px) { .action-check summary { min-height: 44px; align-content: center; } }
 .action-check-source { display: flex; flex-wrap: wrap; gap: 6px; font-family: var(--mono); letter-spacing: .02em; }
 .action-check-source::before { content: 'LEDGER ·'; color: var(--muted); }
 .action-check-flow { grid-template-columns: minmax(0, 1fr); gap: 3px; }
@@ -816,7 +839,7 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .action-check-flow > div + div { border: 0; padding: 0; }
 .action-check-flow dt { margin: 0; padding-top: 1px; font-size: 10.5px; color: #9a968c; }
 .action-check-verdict dd { font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-.bench .note.bad, .bench-verdict { align-self: stretch; padding: 8px 12px; background: var(--receipt); border-block: 1px dashed var(--receipt-line); border-radius: 0; font: 12px/1.55 var(--mono); text-align: left; }
+.bench .note.bad { align-self: stretch; padding: 4px 10px; background: none; border: 0; border-left: 2px solid var(--bad); border-radius: 0; font: 13px/1.45 Inter, system-ui, sans-serif; color: #f6c7c4; text-align: left; }
+.bench-verdict { margin: 0; padding: 4px 10px; background: none; border-left: 2px solid var(--line); border-radius: 0; font-size: 13px; color: var(--muted); }
 .attempt { font-size: 13px; }
 .attempt-head b { font-family: var(--mono); font-size: 12px; letter-spacing: .04em; }
-.app-wide .definition > .ed-section + .editor-disclosure { margin-top: 20px; border-top: 1px solid var(--rule); }

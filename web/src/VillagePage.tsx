@@ -1,11 +1,13 @@
 import type { ActionResponse, Gift, StateView } from '@blacksmith/shared';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState, type ReactNode } from 'react';
 import { api } from './api';
 import { Chat, nameOf, type Pending } from './Chat';
+import { NO_PANELS, panelsReducer, type Panel } from './demoPanels';
 import { Drawer } from './Drawer';
 import { God } from './God';
-import { Forge, Hud, Inventory, News, Stock, VillageLog } from './Side';
+import { Forge, gearCount, Hud, InventoryContent, News, Stock, VillageLog } from './Side';
 import { HelpMenu, HintBar, useHints } from './HintBar';
+import { InspectTabs } from './InspectTabs';
 import { SiteHeader } from './SiteHeader';
 import type { HintLink } from './hints';
 import { Help } from './Tip';
@@ -13,7 +15,6 @@ import { Help } from './Tip';
 // Phaser is most of the bundle, so the village loads on its own and the workshop doesn't wait for it.
 const Village = lazy(() => import('./game/Village').then((m) => ({ default: m.Village })));
 
-type Tool = 'knowledge' | 'events' | 'sandbox';
 
 // What the demo is built with, and the way back to building one: on the right of the bar, after the village controls.
 const buildLink = (
@@ -30,6 +31,7 @@ const heardKeys = (view: StateView) => new Set(view.news.flatMap((n) => n.knower
 function useArrivals(view: StateView | null) {
   const last = useRef<StateView | null>(null);
   const [gear, setGear] = useState(0); // counts up when something new is in the player's hands
+  const [unseen, setUnseen] = useState(false); // something arrived since the Bag was last opened
   const [heard, setHeard] = useState(false); // someone learned of an event secondhand since Rumours was last opened
   useEffect(() => {
     if (!view) return;
@@ -41,12 +43,30 @@ function useArrivals(view: StateView | null) {
     const items = new Set(before.items.map((i) => i.item_id));
     const more = view.items.some((i) => !items.has(i.item_id)) || Object.entries(view.goods).some(([g, n]) => n > (before.goods[g] ?? 0));
     if (more) setGear((n) => n + 1);
+    // A new game has nothing new in it yet, so the cue goes with the old world.
+    if (prev.world_id !== view.world_id) setUnseen(more);
+    else if (more) setUnseen(true);
     const known = heardKeys(before);
     const newHeard = [...heardKeys(view)].some((k) => !known.has(k));
     if (prev.world_id !== view.world_id) setHeard(newHeard);
     else if (newHeard) setHeard(true);
   }, [view]);
-  return { gear, heard, seenHeard: useCallback(() => setHeard(false), []) };
+  return { gear, unseen, heard, seenHeard: useCallback(() => setHeard(false), []), seenGear: useCallback(() => setUnseen(false), []) };
+}
+
+// Phone width, where the village stacks above the conversation and its drawers become modal sheets. The same
+// breakpoint as the stylesheet's.
+const NARROW = '(max-width: 860px)';
+function useNarrow() {
+  const [narrow, setNarrow] = useState(() => typeof matchMedia === 'function' && matchMedia(NARROW).matches);
+  useEffect(() => {
+    const m = matchMedia(NARROW);
+    const update = () => setNarrow(m.matches);
+    update();
+    m.addEventListener('change', update);
+    return () => m.removeEventListener('change', update);
+  }, []);
+  return narrow;
 }
 
 // Bring an element into view and put focus on it, with a brief highlight. A disclosure opens, and its summary takes
@@ -63,17 +83,21 @@ function reveal(id: string) {
 }
 
 // After an action, keyboard focus stays where the player was: the button used is disabled while the village is busy
-// (which drops focus), and may be gone once it's done (Wait until ready, with the work). Back on it if it's still
-// there; if not, on Your gear after the forge's last job (that's where the work went), else on +1 hour.
+// (which drops focus), and may be gone once it's done (an offer's Accept, Wait until ready with the last order). Back on
+// it if it's still there; if not, on the next step: after an accepted offer, Wait until ready (or the message box,
+// when it was handed over at once); after the forge's last order, the Bag button (that's where the work went); else
+// on +1 hour.
 function keepFocus(from: HTMLElement | null) {
   if (!from || from === document.body) return;
+  // Where it was, read now: once the action is done the button may be detached along with what held it.
+  const wasIn = from.closest('.contract') ? 'offer' : from.closest('.forge') ? 'forge' : null;
   setTimeout(() => {
     if (document.activeElement && document.activeElement !== document.body) return;
     if (from.isConnected && !(from as HTMLButtonElement).disabled) return from.focus();
     const visible = (el: Element | null): el is HTMLElement => el instanceof HTMLElement && el.offsetParent !== null;
-    const gear = document.getElementById('gear');
-    if (from.closest('.forge') && visible(gear)) return gear.focus();
-    [...document.querySelectorAll('[data-focus-home]')].find(visible)?.focus();
+    const first = (selector: string) => [...document.querySelectorAll(selector)].find(visible);
+    const next = wasIn === 'offer' ? (first('.forge-head button') ?? first('.chat-form input')) : wasIn === 'forge' ? first('#bag-button') : undefined;
+    (next ?? first('[data-focus-home]'))?.focus();
   });
 }
 
@@ -83,9 +107,8 @@ export function VillagePage() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [talkTo, setTalkTo] = useState('smith');
-  const [tools, setTools] = useState<ReadonlySet<Tool>>(new Set());
-  const [stockOpen, setStockOpen] = useState(false);
-  const [gearOpen, setGearOpen] = useState(false);
+  const [panels, panel] = useReducer(panelsReducer, NO_PANELS);
+  const narrow = useNarrow();
   const chatInput = useRef<HTMLInputElement>(null);
   const arrivals = useArrivals(view);
   // Whether the player has opened a conversation this visit (E, the picker, the message box): the first hint is how to.
@@ -113,10 +136,22 @@ export function VillagePage() {
     api.state().then(setView, (e: Error) => setError(e.message));
   }, []);
 
-  // Something arrived: unfold the gear so it shows, without taking focus from wherever the player is.
+  // Something arrived: the Bag's count goes up, its button glows briefly and says "new" until the Bag is opened, and the
+  // hint offers Show it. The chat's handover line says what it was, so nothing more is announced. The Bag doesn't open
+  // on its own: it's a drawer over the village and would take focus from wherever the player is.
+  const [glow, setGlow] = useState(false);
   useEffect(() => {
-    if (arrivals.gear) setGearOpen(true);
+    if (!arrivals.gear) return;
+    setGlow(true);
+    const timer = setTimeout(() => setGlow(false), 1600);
+    return () => clearTimeout(timer);
   }, [arrivals.gear]);
+  // Opening Rumours is reading them; opening the Bag is seeing what arrived.
+  const { seenHeard, seenGear } = arrivals;
+  useEffect(() => {
+    if (panels.open === 'rumours') seenHeard();
+    if (panels.open === 'bag') seenGear();
+  }, [panels.open, seenHeard, seenGear]);
 
   // A picture takes 10–30 s after work starts. Poll just the pictures until none is still being drawn.
   const drawing = Object.values(view?.art ?? {}).some((a) => a.status === 'rendering');
@@ -170,52 +205,38 @@ export function VillagePage() {
     }
   };
 
+  // False only when the line never reached the village (a network or server failure), so the box can offer it again;
+  // a line the ledger refused was still said.
   const say = async (text: string) => {
     setPending({ text, npc: talkTo });
-    await run(api.say(text, talkTo));
+    let reached = true;
+    await run(api.say(text, talkTo).catch((e: unknown) => { reached = false; throw e; }));
     setPending(null);
+    return reached;
   };
   // Giving opens the chat with whoever it's for: what happened (taken, or handed back) is a note in that chat only.
   const give = (to: string, gift: Gift) => {
     setTalkTo(to);
     run(api.give(to, gift));
   };
-  // The village tools fold open in the rail, each on its own, so the village and the chat stay in view beside them.
-  const openTool = (t: Tool, open: boolean) => {
-    if (t === 'knowledge' && open) arrivals.seenHeard();
-    setTools((ts) => {
-      const next = new Set(ts);
-      if (open) next.add(t);
-      else next.delete(t);
-      return next;
-    });
-  };
-  const opener = useRef<HTMLElement | null>(null);
-  const closeStock = useCallback(() => setStockOpen(false), []);
-  // What a hint's link shows, once the section it's in has rendered and settled: a task later, so the target gets
+  // What a hint's link shows, once the panel it's in has rendered and settled: a task later, so the target gets
   // focus after anything that took it while opening.
-  const [revealing, setRevealing] = useState<string | null>(null);
   useEffect(() => {
-    if (!revealing) return;
+    const target = panels.reveal;
+    if (!target) return;
     const timer = setTimeout(() => {
-      reveal(revealing);
-      setRevealing(null);
+      reveal(target);
+      panel({ type: 'revealed' });
     });
     return () => clearTimeout(timer);
-  }, [revealing]);
+  }, [panels.reveal]);
   // A hint's link: show the thing it's about. Following it is as good as reading it, so the hint goes.
   const follow = (to: HintLink, h: Parameters<typeof hints.dismiss>[0]) => {
     hints.dismiss(h);
-    if (to.kind === 'news') {
-      openTool('knowledge', true);
-      setRevealing(`know-${to.event_id}-${to.knower}`);
-    } else {
-      setGearOpen(true);
-      setRevealing(to.kind === 'item' ? `item-${to.id}` : 'gear');
-    }
+    panel({ type: 'follow', to });
   };
   // Another seller's stock, or none: the stock drawer belongs to whoever the chat is with.
-  useEffect(() => setStockOpen(false), [talkTo]);
+  useEffect(() => panel({ type: 'partner' }), [talkTo]);
 
   if (!view)
     return (
@@ -228,48 +249,129 @@ export function VillagePage() {
     );
   const busy = pending !== null || waiting;
   const seller = view.shops.some((s) => s.id === talkTo);
-  const tool = (t: Tool, name: ReactNode, hint: string, body: ReactNode) => (
-    <div className={tools.has(t) ? 'tool open' : 'tool'}>
-      <button aria-expanded={tools.has(t)} aria-controls={`tool-${t}`} onClick={() => openTool(t, !tools.has(t))}>
-        <span className="tool-name">{name}</span>
-        <span className="tool-hint">{hint}</span>
-      </button>
-      {/* Kept while folded, so a half-typed report is still there when it opens again. */}
-      <div id={`tool-${t}`} className="tool-body" hidden={!tools.has(t)}>
-        {body}
-      </div>
-    </div>
+  const gear = gearCount(view);
+  // The utility bar's buttons: one panel at a time (demoPanels).
+  const barButton = (p: Panel, label: ReactNode, className?: string) => (
+    <button
+      id={`${p}-button`}
+      className={className}
+      aria-expanded={panels.open === p}
+      aria-controls={`panel-${p}`}
+      onClick={() => panel({ type: 'toggle', panel: p })}
+    >
+      {label}
+    </button>
   );
-
+  // The panels open in one drawer slot over the village's left side, beside the buttons that open them, so the
+  // conversation stays in view and usable. On a phone the slot is a sheet from the bottom, modal. Each stays mounted while closed: the log's filter, an unsent report and
+  // the Give form keep what they had. Closing puts focus back on the panel's own button.
+  const drawer = (p: Panel, title: string, body: ReactNode) => (
+    <Drawer
+      id={`panel-${p}`}
+      className="slot"
+      title={title}
+      open={panels.open === p}
+      modal={narrow}
+      onClose={() => panel({ type: 'close', panel: p })}
+      opener={document.getElementById(`${p}-button`)}
+    >
+      {body}
+    </Drawer>
+  );
   return (
     <div className="demo-page">
-      {/* Time and gold in the bar, where the workshop keeps its draft's state: always in view, at every width. */}
+      {/* The site bar is only where you are and the way to build your own; the village's controls are on the village. */}
       <SiteHeader page="village">
-        <div className="studio-actions">
-          <Hud
-            view={view}
-            disabled={busy}
-            onSkip={(n) => run(api.tick(n))}
-            onReset={() => run(api.reset())}
-            help={<HelpMenu enabled={hints.enabled} onEnabled={hints.setEnabled} canClick />}
-          />
-          {buildLink}
-        </div>
+        <div className="studio-actions">{buildLink}</div>
       </SiteHeader>
-      {/* A wide screen: the village large on the left with the tools in three columns under it, and the conversation
-          on the right, in view while the tools scroll. A narrow one stacks them: village, conversation, tools. */}
+      {/* A wide screen fills the window: the village on the left (its toolbar, the scene, its utility bar) and the
+          conversation on the right. A narrow one stacks the village above the conversation. */}
       <div className="demo-layout">
-        <div className="stage">
-          <Suspense fallback={<div className="game" />}>
-            <Village view={view} onTalk={talk} />
-          </Suspense>
-          <HintBar
-            hint={hints.hint}
-            onDismiss={hints.dismiss}
-            onExample={(text) => setPrefill((p) => ({ text, n: (p?.n ?? 0) + 1 }))}
-            onLink={follow}
-            onTurnOff={() => hints.setEnabled(false)}
-          />
+        <div className="village-col">
+          {/* Time and gold, always in view with the village they belong to. */}
+          <div className="village-toolbar">
+            <Hud
+              view={view}
+              disabled={busy}
+              onSkip={(n) => run(api.tick(n))}
+              onReset={() => run(api.reset())}
+              help={<HelpMenu enabled={hints.enabled} onEnabled={hints.setEnabled} canClick />}
+            />
+          </div>
+          <div className="stage">
+            <Suspense fallback={<div className="game" />}>
+              <Village view={view} onTalk={talk} selected={talkTo} />
+            </Suspense>
+            <HintBar
+              hint={hints.hint}
+              onDismiss={hints.dismiss}
+              onExample={(text) => setPrefill((p) => ({ text, n: (p?.n ?? 0) + 1 }))}
+              onLink={follow}
+              onTurnOff={() => hints.setEnabled(false)}
+            />
+            {drawer('bag', 'Bag', <InventoryContent view={view} disabled={busy} onGive={give} />)}
+            {drawer(
+              'rumours',
+              'Rumours',
+              <>
+                <p className="muted small">What’s going around, and who heard it from whom.</p>
+                <News view={view} />
+              </>,
+            )}
+            {drawer(
+              'inspect',
+              'Inspect village',
+              <InspectTabs
+                tab={panels.tab}
+                onTab={(tab) => panel({ type: 'tab', tab })}
+                panels={{
+                  activity: (
+                    <>
+                      <p className="muted small">Everything that happened, and what the rules allowed.</p>
+                      <VillageLog view={view} />
+                    </>
+                  ),
+                  sandbox: <God view={view} disabled={busy} onRead={readNote} onReport={(r) => run(api.report(r))} />,
+                }}
+              />,
+            )}
+            {seller &&
+              drawer(
+                'stock',
+                `${nameOf(view, talkTo)}'s stock`,
+                <>
+                  <p className="muted small">
+                    What {nameOf(view, talkTo)} has on hand right now, not counting reserved materials{' '}
+                    <Help about="reserved materials" text="These materials are set aside for accepted orders." />
+                  </p>
+                  <Stock view={view} shop={talkTo} />
+                </>,
+              )}
+          </div>
+          <div className="utility">
+            <nav className="utility-bar" aria-label="Village tools">
+              {barButton(
+                'bag',
+                <>
+                  Bag
+                  <span className="bar-count">
+                    {gear}
+                    <span className="sr-only">{gear === 1 ? ' thing' : ' things'}</span>
+                  </span>
+                  {arrivals.unseen && panels.open !== 'bag' && <span className="cue">new</span>}
+                </>,
+                glow ? 'arrived' : undefined,
+              )}
+              {barButton(
+                'rumours',
+                <>
+                  Rumours
+                  {arrivals.heard && panels.open !== 'rumours' && <span className="cue">new</span>}
+                </>,
+              )}
+              {barButton('inspect', 'Inspect village')}
+            </nav>
+          </div>
         </div>
         <div className="talk-col">
           <Chat
@@ -286,54 +388,29 @@ export function VillagePage() {
             headExtra={
               seller && (
                 <button
+                  id="stock-button"
                   className="secondary small"
-                  aria-expanded={stockOpen}
-                  onClick={(e) => {
-                    opener.current = e.currentTarget;
-                    setStockOpen((o) => !o);
-                  }}
+                  aria-expanded={panels.open === 'stock'}
+                  aria-controls="panel-stock"
+                  onClick={() => panel({ type: 'toggle', panel: 'stock' })}
                 >
                   {nameOf(view, talkTo)}'s stock
                 </button>
               )
             }
-          />
-          {error && (
-            <div className="error" role="alert">
-              {error}
-            </div>
-          )}
-          <Forge view={view} disabled={busy} onSkip={(n) => run(api.tick(n))} />
-          <Inventory view={view} disabled={busy} onGive={give} open={gearOpen} onToggle={() => setGearOpen((o) => !o)} />
-        </div>
-          <nav className="tools" aria-labelledby="tools-label">
-            <h2 id="tools-label" className="rail-label">Village tools</h2>
-            {tool(
-              'knowledge',
+            // Under the conversation, above the message box: what went wrong, and the work the conversation started.
+            beforeComposer={
               <>
-                Rumours
-                {arrivals.heard && !tools.has('knowledge') && <span className="cue">new</span>}
-              </>,
-              'What’s going around, and who heard it from whom',
-              <News view={view} />,
-            )}
-            {tool('events', 'Village log', 'Everything that happened, and what the rules allowed', <VillageLog view={view} />)}
-            {tool(
-              'sandbox',
-              'Sandbox tools',
-              'Tell the village something happened that no action covers',
-              <God view={view} disabled={busy} onRead={readNote} onReport={(r) => run(api.report(r))} />,
-            )}
-          </nav>
-        {seller && stockOpen && (
-          <Drawer title={`${nameOf(view, talkTo)}'s stock`} onClose={closeStock} opener={opener.current}>
-            <p className="muted small">
-              What {nameOf(view, talkTo)} has on hand right now, not counting reserved materials{' '}
-              <Help about="reserved materials" text="These materials are set aside for accepted orders." />
-            </p>
-            <Stock view={view} shop={talkTo} />
-          </Drawer>
-        )}
+                {error && (
+                  <div className="error" role="alert">
+                    {error}
+                  </div>
+                )}
+                <Forge view={view} disabled={busy} onSkip={(n) => run(api.tick(n))} />
+              </>
+            }
+          />
+        </div>
       </div>
     </div>
   );
