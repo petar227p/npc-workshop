@@ -1,0 +1,16 @@
+# Keeps the host's platform-specific node_modules out of the image, and keys and logs out of its layers.
+# Keys reach the container at run time through compose.yaml's env_file.
+**/node_modules
+**/dist
+logs
+.env
+.env.*
+!.env.example
+
+.git
+.github
+.claude
+*.log
+coverage
+HANDOVER.md
+PLAN.md
