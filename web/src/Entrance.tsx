@@ -32,7 +32,7 @@ export function Entrance() {
           <div className="entrance-test">
             <p className="entrance-preview-label">Isolated test session</p>
             <p className="entrance-proposal"><span>Model proposes</span>Sell a torch for 1 gold.</p>
-            <p className="entrance-verdict"><b>× &nbsp; Code check: rejected</b><span>Price is below the configured minimum.</span></p>
+            <p className="entrance-verdict"><b>× &nbsp; Ledger check: rejected</b><span>Price is below the configured minimum.</span></p>
           </div>
         </figure>
       </section>

@@ -72,6 +72,18 @@ describe('api', () => {
     expect(r).toMatchObject({ status: 200, json: { ok: true }, setCookie: null });
   });
 
+  it('the root says what the port serves, and unknown routes answer in JSON', async () => {
+    const { app } = setup();
+    const root = await app.request('/');
+    expect(root.status).toBe(200);
+    expect(await root.json()).toMatchObject({ health: '/api/health', npcs: '/api/v1/npcs' });
+    for (const path of ['/nope', '/api/nope', '/api/v1/nope']) {
+      const r = await app.request(path);
+      expect(r.status).toBe(404);
+      expect(await r.json()).toEqual({ error: 'not found' });
+    }
+  });
+
   it('a new browser sees a fresh world, and gets an httpOnly session cookie on its first action', async () => {
     const { app } = setup();
     const b = browser(app);

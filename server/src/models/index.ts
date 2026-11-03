@@ -35,7 +35,7 @@ export function createModel(session: string, choice: ModelChoice, limits: { time
     console.warn('BASETEN_API_KEY is not set: Muse Spark Open NPCs will run on Muse Spark through the Meta Model API');
   }
   const spark = choice === 'muse_spark' || fallback;
-  const model = spark ? (env.SMITH_MODEL ?? 'muse-spark-1.3-contributor') : (env.VILLAGER_MODEL ?? 'meta-models/muse-spark-open-1026');
+  const model = spark ? (env.SMITH_MODEL ?? 'muse-spark-1.3') : (env.VILLAGER_MODEL ?? 'meta-models/muse-spark-open-1026');
   const provider = spark ? 'meta' : 'baseten';
 
   if (env.REPLAY) return { client: replayClient(readLog(env.REPLAY).filter((e) => e.provider === provider)), model };
