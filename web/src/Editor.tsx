@@ -213,6 +213,8 @@ export function Editor() {
   const [check, setCheck] = useState<Check | null>(null);
   const [retry, setRetry] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
+  // A switch of draft is plain to see; only screen readers are told in words, so no bar is left over the editor.
+  const [announcement, setAnnouncement] = useState('');
   // The New NPC page, at #/workshop/new so Back and refresh work. The existing editor stays mounted, hidden.
   const [starting, setStarting] = useState(() => location.hash === NEW_HASH);
   const startingNow = useRef(starting);
@@ -345,7 +347,7 @@ export function Editor() {
     setStarted((n) => n + 1);
     setStarting(false);
     if (location.hash === NEW_HASH) history.replaceState(null, '', '#/workshop');
-    setNotice(kept && draft ? `${done} ${draft.name || 'Your previous NPC'} is in Your NPCs.` : done);
+    setAnnouncement(kept && draft ? `${done} ${draft.name || 'Your previous NPC'} is in Your NPCs.` : done);
     lastDefinition.current = 'character';
     setSection(openTest ? 'test' : 'character');
     requestAnimationFrame(() => document.getElementById(openTest ? 'test-heading' : 'character-h')?.focus());
@@ -609,6 +611,7 @@ export function Editor() {
         <button type="button" className="secondary small" onClick={() => setStorageRetry((n) => n + 1)}>Retry browser save</button>
       </div>}
 
+      <p className="sr-only" role="status">{announcement}</p>
       {notice && (
         <div className="note-box" role="status">
           {notice}
@@ -1672,7 +1675,8 @@ function pretty(content: string): string {
 // rejected, the rule that refused it) stay in view; the full receipt opens beneath.
 function ActionCheck({ check }: { check: ActionExplanation }) {
   return <section className={`action-check ${check.accepted ? 'accepted' : 'rejected'}`} aria-label={`Ledger check: ${check.source}`}>
-    <details>
+    {/* An opened receipt below the fold looks like nothing happened, so it is brought into view. */}
+    <details onToggle={(e) => e.currentTarget.open && e.currentTarget.scrollIntoView({ block: 'nearest', behavior: newLineScroll() })}>
       <summary>
         <span className="action-check-line">{check.accepted ? '✓ Ledger accepted' : '✕ Ledger rejected'}</span>
         <span className="action-check-proposal">{check.proposal}</span>
