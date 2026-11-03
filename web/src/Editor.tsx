@@ -797,7 +797,7 @@ export function Editor() {
                 ))}
               </div>
               <h4>Names and labels</h4>
-              <Labels draft={draft} onChange={(labels) => set('labels', labels)} />
+              <Labels key={started} draft={draft} onChange={(labels) => set('labels', labels)} />
               <h4>What the model gets</h4>
               {ready ? (
                 <>

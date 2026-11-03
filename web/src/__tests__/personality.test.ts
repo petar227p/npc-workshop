@@ -34,6 +34,18 @@ describe('personality notes', () => {
     expect(edited).toContain('## Rules\n\nStay in character.');
     expect(readPersonality(writePersonality(edited, ''))).toBe('');
   });
+  it('reads and edits the "Who" bullet of a prompt with Windows line endings', () => {
+    const persona = 'You voice Brann.\r\n\r\n## Who Brann is\r\n\r\n- Gruff and proud.\r\n- Honest about trade-offs.\r\n\r\n## Rules\r\n\r\nStay in character.';
+    expect(readPersonality(persona)).toBe('Gruff and proud.');
+    const edited = writePersonality(persona, 'Kind and gentle.');
+    expect(readPersonality(edited)).toBe('Kind and gentle.');
+    expect(edited).not.toContain('Gruff and proud.');
+    expect(edited.indexOf('Kind and gentle.')).toBeLessThan(edited.indexOf('Honest about trade-offs.'));
+    expect(edited).toContain('\r\n- Honest about trade-offs.\r\n');
+    const draft = buildSetup({ role: 'merchant', name: 'Mira', personality: 'Friendly and curious' }, []).draft;
+    const marked = markSetupPersonality(draft.persona.replace(/\n/g, '\r\n'), 'Friendly and curious');
+    expect(writePersonality(marked, 'Stern')).not.toContain('Friendly and curious');
+  });
   it('puts a new personality at the top of a prompt without a "Who" section', () => {
     expect(writePersonality('Custom prompt', 'Shy')).toMatch(/^<!-- workshop:personality -->\nShy\n<!-- \/workshop:personality -->\n\nCustom prompt$/);
   });

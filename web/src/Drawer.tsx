@@ -8,6 +8,9 @@ import { useEffect, useId, useRef, type ReactNode } from 'react';
 // className: where it sits; `slot` keeps it inside the village instead of over the right of the page.
 // modal: on a phone the drawer is a sheet over most of the page, so it is modal for real: everything else is inert
 // (out of reach of Tab, taps and screen readers), the page behind doesn't scroll, and a tap on the dimmed page closes it.
+const TABBABLE =
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
+
 export function Drawer({
   title,
   onClose,
@@ -82,6 +85,19 @@ export function Drawer({
         hidden={!open}
         data-overlay
         onKeyDown={(e) => {
+          if (e.key === 'Tab' && modal) {
+            // Modal: Tab and Shift+Tab go round the drawer's own controls instead of off the end of the page.
+            const all = [...(box.current?.querySelectorAll<HTMLElement>(TABBABLE) ?? [])].filter((el) => el.getClientRects().length > 0);
+            const first = all[0];
+            const last = all[all.length - 1];
+            if (!first || !last) return;
+            const at = document.activeElement;
+            if (e.shiftKey ? at === first || at === box.current : at === last) {
+              e.preventDefault();
+              (e.shiftKey ? last : first).focus();
+            }
+            return;
+          }
           if (e.key !== 'Escape') return;
           // Not on to the village, whose Esc would blur the button focus just went back to.
           e.stopPropagation();

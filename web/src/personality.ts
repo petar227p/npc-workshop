@@ -4,15 +4,17 @@ const END = '<!-- /workshop:personality -->';
 
 // Unmarked prompts (the examples, older drafts) describe the character in the first bullet of their "## Who" section;
 // that bullet is the personality until it is first edited, when it becomes the marked part in the same place.
+// Line ends may be CRLF (a Windows checkout of the examples); the bullet's range never takes in the '\r'.
 function whoBullet(persona: string): { start: number; end: number } | null {
   const who = persona.search(/^## Who /m);
   if (who < 0) return null;
-  const list = persona.indexOf('\n\n- ', who);
-  const next = persona.indexOf('\n## ', who + 1);
-  if (list < 0 || (next >= 0 && list > next)) return null;
-  const start = list + 2;
-  const end = persona.indexOf('\n', start);
-  return { start, end: end < 0 ? persona.length : end };
+  const after = persona.slice(who);
+  const list = after.match(/\r?\n\r?\n- /);
+  const next = after.slice(1).search(/\r?\n## /);
+  if (!list || list.index === undefined || (next >= 0 && list.index > next + 1)) return null;
+  const start = who + list.index + list[0].length - 2;
+  const line = persona.slice(start).search(/\r?\n/);
+  return { start, end: line < 0 ? persona.length : start + line };
 }
 
 export function readPersonality(persona: string): string {
@@ -44,10 +46,7 @@ export function writePersonality(persona: string, value: string): string {
 export function markSetupPersonality(persona: string, value: string): string {
   const normalized = value.replace(/\s+/g, ' ').trim();
   if (!normalized) return persona;
-  const section = persona.indexOf('\n\n- ', persona.indexOf('## Who '));
-  if (section < 0) return persona;
-  const start = section + 2;
-  const line = `- ${normalized}`;
-  if (!persona.startsWith(`${line}\n`, start)) return persona;
-  return persona.slice(0, start) + writePersonality('', normalized) + persona.slice(start + line.length);
+  const bullet = whoBullet(persona);
+  if (!bullet || persona.slice(bullet.start, bullet.end) !== `- ${normalized}`) return persona;
+  return persona.slice(0, bullet.start) + writePersonality('', normalized) + persona.slice(bullet.end);
 }
