@@ -426,17 +426,20 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .cat-table .range > span { display: flex; align-items: center; gap: 3px; justify-content: center; }
 .definition { min-width: 0; }
 
-/* The demo: the studio shell, like the workshop. A wide screen has the village large on the left with the village
-   utility bar under it, and the conversation on the right (with the forge), held in view while
-   the page scrolls. Time and gold are in the bar, which stays in view too. */
+/* The demo: the studio shell, like the workshop. A wide screen fills the window under the site bar: the village on the
+   left (its toolbar with time and gold, the scene, its utility bar) and the conversation on the right (with the forge). */
 .demo-page { display: flex; flex-direction: column; min-width: 0; }
 .demo-build { display: inline-block; color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; border-radius: 3px; }
 .demo-build:hover { text-decoration-color: var(--accent); }
-.studio-actions .hud + .demo-build { padding-left: 16px; border-left: 1px solid var(--rule); border-radius: 0; }
 .demo-build:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.demo-layout { display: grid; grid-template-columns: minmax(0, 1fr) 400px; grid-template-rows: auto 1fr; grid-template-areas: 'stage talk' 'utility talk'; }
-.stage { grid-area: stage; display: flex; flex-direction: column; min-width: 0; }
-.talk-col { grid-area: talk; display: flex; flex-direction: column; min-width: 0; background: var(--pane); border-left: 1px solid var(--rule); }
+.demo-layout { display: grid; grid-template-columns: minmax(0, 1fr) 400px; }
+.village-col { display: flex; flex-direction: column; min-width: 0; }
+.village-toolbar { display: flex; align-items: center; min-height: 44px; padding: 6px 12px 6px 16px; box-sizing: border-box; background: var(--panel); border-bottom: 1px solid var(--rule); }
+.village-toolbar .hud { flex: 1; min-width: 0; }
+.village-toolbar .help-menu { margin-left: auto; }
+.village-toolbar button { min-height: 32px; }
+.stage { display: flex; flex-direction: column; min-width: 0; }
+.talk-col { display: flex; flex-direction: column; min-width: 0; background: var(--pane); border-left: 1px solid var(--rule); }
 .game { overflow: hidden; background: #5a9e4b; }
 .game canvas { display: block; }
 .demo-page .hint { border-width: 0 0 1px 3px; border-color: var(--rule) var(--rule) var(--rule) var(--accent); border-radius: 0; background: var(--panel); padding: 8px 16px 8px 13px; }
@@ -445,7 +448,7 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .demo-page .talk-col > .forge { padding: 12px 16px; border-top: 1px solid var(--rule); }
 .demo-page .forge > h2 { margin: 0 0 10px; font: 600 11px/1.4 Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9a9a9a; }
 /* The utility bar sits on the village's bottom edge: Bag, Rumours and Inspect village, one panel open at a time. */
-.utility { grid-area: utility; min-width: 0; }
+.utility { min-width: 0; }
 .utility-bar { display: flex; border-bottom: 1px solid var(--rule); background: var(--panel); }
 .utility-bar > button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; background: none; border: 0; border-right: 1px solid var(--rule); border-radius: 0; color: #c8c8c8; font-weight: 500; box-shadow: inset 0 -2px 0 transparent; }
 .utility-bar > button:hover { background: #1b1b1b; color: var(--text); }
@@ -467,28 +470,31 @@ summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .inspect-tabs [role='tab']:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 @media (min-width: 861px) {
   .demo-page > .top { position: sticky; top: 0; z-index: 15; }
-  /* The village fills most of the window, with the hint and the utility bar under it. */
-  .game { height: calc(100vh - var(--top-h, 57px) - 150px); min-height: 420px; flex-shrink: 0; }
-  .talk-col { position: sticky; top: var(--top-h, 57px); align-self: start; height: calc(100vh - var(--top-h, 57px)); }
+  /* The two columns fill the window under the site bar; the scene takes whatever the toolbar, the hint and the
+     utility bar leave. A short window scrolls the page rather than squeezing the scene below a usable size. */
+  .demo-layout { height: calc(100dvh - var(--top-h, 57px)); min-height: 560px; }
+  .village-col, .talk-col { min-height: 0; }
+  .stage { flex: 1 1 0; min-height: 0; }
+  .game { flex: 1 1 0; min-height: 240px; }
   .demo-page .talk-col .chat-panel { flex: 1 1 0; min-height: 240px; height: auto; }
 }
 @media (max-width: 860px) {
   .demo-page > .top .tabs { width: auto; margin-left: auto; }
   .demo-page .studio-actions { flex-basis: 100%; justify-content: flex-start; }
-  /* The utility bar stays on the village's edge, above the conversation. */
-  .demo-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: 'stage' 'utility' 'talk'; }
+  /* The village (toolbar, scene, utility bar) stacks above the conversation. */
+  .demo-layout { grid-template-columns: minmax(0, 1fr); }
   .utility-bar > button { flex: 1 1 0; justify-content: center; padding: 0 8px; }
   .utility-bar > button:last-child { border-right: 0; }
   .game { height: 55vh; min-height: 220px; }
   .talk-col { border-left: 0; border-top: 1px solid var(--rule); }
   .demo-page .talk-col .chat-panel { height: 60vh; }
 }
-/* A phone has the Workshop tab right beside it, and no room for both on the bar's second row. */
+/* A phone: the village toolbar packs tighter so time, gold and its four buttons fit one row. */
 @media (max-width: 640px) {
+  .village-toolbar { padding: 6px 8px 6px 12px; }
   .demo-page .hud { gap: 6px; }
   .demo-page .hud .clock, .demo-page .hud .gold { font-size: 13px; }
-  .demo-page .studio-actions button, .demo-page .studio-actions .help-menu > summary { min-height: 32px; padding: 0 9px; }
-  .demo-page .studio-actions .demo-build { display: none; }
+  .village-toolbar button { padding: 0 9px; }
 }
 
 /* Workshop: look and day */

@@ -236,71 +236,96 @@ export function VillagePage() {
   );
   return (
     <div className="demo-page">
-      {/* Time and gold in the bar, where the workshop keeps its draft's state: always in view, at every width. */}
+      {/* The site bar is only where you are and the way to build your own; the village's controls are on the village. */}
       <SiteHeader page="village">
-        <div className="studio-actions">
-          <Hud
-            view={view}
-            disabled={busy}
-            onSkip={(n) => run(api.tick(n))}
-            onReset={() => run(api.reset())}
-            help={<HelpMenu enabled={hints.enabled} onEnabled={hints.setEnabled} canClick />}
-          />
-          {buildLink}
-        </div>
+        <div className="studio-actions">{buildLink}</div>
       </SiteHeader>
-      {/* A wide screen: the village large on the left with its utility bar under it, and the conversation on the right.
-          A narrow one stacks them: village, conversation, utility bar. */}
+      {/* A wide screen fills the window: the village on the left (its toolbar, the scene, its utility bar) and the
+          conversation on the right. A narrow one stacks the village above the conversation. */}
       <div className="demo-layout">
-        <div className="stage">
-          <Suspense fallback={<div className="game" />}>
-            <Village view={view} onTalk={talk} />
-          </Suspense>
-          <HintBar
-            hint={hints.hint}
-            onDismiss={hints.dismiss}
-            onExample={(text) => setPrefill((p) => ({ text, n: (p?.n ?? 0) + 1 }))}
-            onLink={follow}
-            onTurnOff={() => hints.setEnabled(false)}
-          />
-          {drawer('bag', 'Bag', <InventoryContent view={view} disabled={busy} onGive={give} />)}
-          {drawer(
-            'rumours',
-            'Rumours',
-            <>
-              <p className="muted small">What’s going around, and who heard it from whom.</p>
-              <News view={view} />
-            </>,
-          )}
-          {drawer(
-            'inspect',
-            'Inspect village',
-            <InspectTabs
-              tab={panels.tab}
-              onTab={(tab) => panel({ type: 'tab', tab })}
-              panels={{
-                activity: (
-                  <>
-                    <p className="muted small">Everything that happened, and what the rules allowed.</p>
-                    <VillageLog view={view} />
-                  </>
-                ),
-                sandbox: <God view={view} disabled={busy} onRead={readNote} onReport={(r) => run(api.report(r))} />,
-              }}
-            />,
-          )}
-          {seller &&
-            drawer(
-              'stock',
-              `${nameOf(view, talkTo)}'s stock`,
+        <div className="village-col">
+          {/* Time and gold, always in view with the village they belong to. */}
+          <div className="village-toolbar">
+            <Hud
+              view={view}
+              disabled={busy}
+              onSkip={(n) => run(api.tick(n))}
+              onReset={() => run(api.reset())}
+              help={<HelpMenu enabled={hints.enabled} onEnabled={hints.setEnabled} canClick />}
+            />
+          </div>
+          <div className="stage">
+            <Suspense fallback={<div className="game" />}>
+              <Village view={view} onTalk={talk} />
+            </Suspense>
+            <HintBar
+              hint={hints.hint}
+              onDismiss={hints.dismiss}
+              onExample={(text) => setPrefill((p) => ({ text, n: (p?.n ?? 0) + 1 }))}
+              onLink={follow}
+              onTurnOff={() => hints.setEnabled(false)}
+            />
+            {drawer('bag', 'Bag', <InventoryContent view={view} disabled={busy} onGive={give} />)}
+            {drawer(
+              'rumours',
+              'Rumours',
               <>
-                <p className="muted small">
-                  What {nameOf(view, talkTo)} has on hand right now, not counting reserved materials{' '}
-                  <Help about="reserved materials" text="These materials are set aside for accepted orders." />
-                </p>
-                <Stock view={view} shop={talkTo} />
+                <p className="muted small">What’s going around, and who heard it from whom.</p>
+                <News view={view} />
               </>,
             )}
+            {drawer(
+              'inspect',
+              'Inspect village',
+              <InspectTabs
+                tab={panels.tab}
+                onTab={(tab) => panel({ type: 'tab', tab })}
+                panels={{
+                  activity: (
+                    <>
+                      <p className="muted small">Everything that happened, and what the rules allowed.</p>
+                      <VillageLog view={view} />
+                    </>
+                  ),
+                  sandbox: <God view={view} disabled={busy} onRead={readNote} onReport={(r) => run(api.report(r))} />,
+                }}
+              />,
+            )}
+            {seller &&
+              drawer(
+                'stock',
+                `${nameOf(view, talkTo)}'s stock`,
+                <>
+                  <p className="muted small">
+                    What {nameOf(view, talkTo)} has on hand right now, not counting reserved materials{' '}
+                    <Help about="reserved materials" text="These materials are set aside for accepted orders." />
+                  </p>
+                  <Stock view={view} shop={talkTo} />
+                </>,
+              )}
+          </div>
+          <div className="utility">
+            <nav className="utility-bar" aria-label="Village tools">
+              {barButton(
+                'bag',
+                <>
+                  Bag
+                  <span className="bar-count">
+                    {gear}
+                    <span className="sr-only">{gear === 1 ? ' thing' : ' things'}</span>
+                  </span>
+                </>,
+              )}
+              {barButton(
+                'rumours',
+                <>
+                  Rumours
+                  {arrivals.heard && panels.open !== 'rumours' && <span className="cue">new</span>}
+                </>,
+              )}
+              {barButton('inspect', 'Inspect village')}
+            </nav>
+          </div>
         </div>
         <div className="talk-col">
           <Chat
@@ -334,28 +359,6 @@ export function VillagePage() {
             </div>
           )}
           <Forge view={view} disabled={busy} onSkip={(n) => run(api.tick(n))} />
-        </div>
-        <div className="utility">
-          <nav className="utility-bar" aria-label="Village tools">
-            {barButton(
-              'bag',
-              <>
-                Bag
-                <span className="bar-count">
-                  {gear}
-                  <span className="sr-only">{gear === 1 ? ' thing' : ' things'}</span>
-                </span>
-              </>,
-            )}
-            {barButton(
-              'rumours',
-              <>
-                Rumours
-                {arrivals.heard && panels.open !== 'rumours' && <span className="cue">new</span>}
-              </>,
-            )}
-            {barButton('inspect', 'Inspect village')}
-          </nav>
         </div>
       </div>
     </div>
