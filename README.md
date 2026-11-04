@@ -63,7 +63,7 @@ A turn follows four steps:
 4. **Deliver.** Timed work is delivered by the clock, with stats copied from the accepted offer. The model never writes them.
 
 ```mermaid
-flowchart LR
+flowchart TD
     Speech["Player speech"] --> Voice["Muse Voice Transcribe"]
     Voice --> Text["Editable text"]
     Typed["Typed message"] --> Text
