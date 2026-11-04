@@ -12,7 +12,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6.svg)
 ![Meta Muse Hackathon 2026](https://img.shields.io/badge/Meta%20Muse%20Hackathon-Nov%202026-0866FF.svg)
 
-NPC Workshop is an authoring and testing tool for AI agents that play game characters. Each NPC is an agent running on Meta's Muse models. The model handles dialogue and proposes actions; a deterministic **ledger** decides what actually happens. Gold, stock, prices, timers and item stats are owned by code, never by the model.
+NPC Workshop is an authoring and testing tool for AI agents that play game characters. NPCs are agents built on Meta's Muse models: Muse Spark 1.3 and Muse Spark Open for dialogue and decisions, Muse Image for item art, and Muse Voice Transcribe for speech input. The model handles dialogue and proposes actions; a deterministic **ledger** decides what actually happens. Gold, stock, prices, timers and item stats are owned by code, never by the model.
 
 Create a character, choose its abilities and limits, and test it in an isolated session. Then export it as a portable file and run it from your own game through an HTTP API. A playable demo village, featuring Brann the blacksmith, shows the full loop: negotiate an order, accept a checked offer, and collect the finished item.
 
@@ -43,7 +43,7 @@ Create a character, choose its abilities and limits, and test it in an isolated 
 - **Portable NPCs.** Export a `.npc.json` file and create worlds from it through the developer API, from any engine that can send HTTP.
 - **Living world.** NPCs follow schedules, witness events by position, and pass on news. Knowledge inspection separates first-hand observations from second-hand reports.
 - **Signals.** NPCs can ask the game to perform actions the ledger does not model (open a gate, raise an alarm), limited to a declared list. Your game's code decides whether they happen.
-- **Generated item art and voice input.** Muse Image renders delivered items as palette-snapped pixel sprites; Muse Voice Transcribe turns spoken input into editable text.
+- **Generated item art and voice input.** Muse Image renders ordered items as palette-snapped pixel sprites; Muse Voice Transcribe turns spoken input into editable text.
 
 ## How it works
 
@@ -189,7 +189,7 @@ The full file also defines the catalogue, starting stock, model and world settin
 
 ## Multi-model pipeline
 
-One player turn can pass through three Meta model families: Muse Voice turns speech into text, Muse Spark decides what the NPC says and proposes, and Muse Image draws the item once the ledger has accepted the order. The ledger sits between the models, so a picture is only drawn from terms that passed its checks.
+One order can pass through three Meta model families: Muse Voice turns speech into text, Muse Spark decides what the NPC says and proposes, and Muse Image draws the item once the ledger has accepted the order. The ledger sits between the models, so a picture is only drawn from terms that passed its checks.
 
 | Role | Model | Model ID | Provider |
 |---|---|---|---|
@@ -205,7 +205,7 @@ Muse Spark and Muse Spark Open always reason, so the clients send a low `reasoni
 | Check | Result | Measured |
 |---|---|---|
 | Ledger proof, controlled inputs and no model | 5 of 5 cases pass | Every CI run |
-| Live attacks on six NPCs | 106 attacks, 0 unauthorized state changes | Oct 29–30, 2026 |
+| Live attacks on six of the eight village NPCs | 106 attacks, 0 unauthorized state changes | Oct 29–30, 2026 |
 | Muse Spark 1.3, Brann's quote turn, low effort | p50 3.7 s, p95 4.2 s | Oct 27, 2026, 5 calls |
 | Muse Spark Open, the same turn, low effort | p50 2.4 s, p95 6.3 s | Oct 27, 2026, 5 calls |
 | Muse Image, high reasoning strength | p50 17.2 s, p95 29.5 s | Oct 27, 2026, 5 calls |
@@ -220,7 +220,7 @@ In the live attacks the models never proposed an illegal action, so the ledger h
 | `npm test` | Run the Vitest suite (engine, API, guided setup, UI helpers) |
 | `npm run typecheck` | Typecheck shared, server, web, scripts, eval and examples |
 | `npm run ledger-proof` | Feed controlled inputs (no model) and verify the ledger refuses invalid ones unchanged |
-| `npm run exploit-suite` | Attack each village NPC with live models and check the world after every attempt (~25 minutes) |
+| `npm run exploit-suite` | Attack five village NPCs by default, or any you name with `--npcs`, using live models, and check the world after every attempt (~25 minutes) |
 | `npm run smith-demo` | Scripted live session: order, accept, delivery, then an absurd request and an injection attempt |
 | `npm run latency-test` | Time each model setup and check answers against the ledger (about 50 calls, ~6 minutes, ~$0.20) |
 | `npm run game-example -- --help` | Connect a downloaded NPC from a JavaScript backend |
