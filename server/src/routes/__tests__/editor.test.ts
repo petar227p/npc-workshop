@@ -1,3 +1,4 @@
+import { STAY_IN_WORLD } from '../../agents/npc';
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -126,7 +127,7 @@ describe('NPC editor api', () => {
       ['SAID', 'miller'],
     ]);
     expect(r.json.attempts).toEqual([expect.objectContaining({ ok: true, reason: null })]);
-    expect(client.requests[0].messages[0].content).toBe(miller.persona);
+    expect(client.requests[0].messages[0].content).toBe(`${miller.persona}\n\n${STAY_IN_WORLD}`);
     expect(client.requests[0].json_schema?.name).toBe('miller_action');
 
     const village = await send<StateView>('/api/state');
