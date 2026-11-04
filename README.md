@@ -12,7 +12,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6.svg)
 ![Meta Muse Hackathon 2026](https://img.shields.io/badge/Meta%20Muse%20Hackathon-Nov%202026-0866FF.svg)
 
-NPC Workshop is an authoring and testing tool for game characters powered by language models. The model handles dialogue and proposes actions; a deterministic **ledger** decides what actually happens. Gold, stock, prices, timers and item stats are owned by code, never by the model.
+NPC Workshop is an authoring and testing tool for AI agents that play game characters. Each NPC is an agent running on Meta's Muse models. The model handles dialogue and proposes actions; a deterministic **ledger** decides what actually happens. Gold, stock, prices, timers and item stats are owned by code, never by the model.
 
 Create a character, choose its abilities and limits, and test it in an isolated session. Then export it as a portable file and run it from your own game through an HTTP API. A playable demo village, featuring Brann the blacksmith, shows the full loop: negotiate an order, accept a checked offer, and collect the finished item.
 
@@ -26,7 +26,8 @@ Create a character, choose its abilities and limits, and test it in an isolated 
 - [Create and test an NPC](#create-and-test-an-npc)
 - [Use the NPCs from your own game](#use-the-npcs-from-your-own-game)
 - [NPC definition format](#npc-definition-format)
-- [Models](#models)
+- [Multi-model pipeline](#multi-model-pipeline)
+- [Evaluation results](#evaluation-results)
 - [Development](#development)
 - [Project structure](#project-structure)
 - [Status and limitations](#status-and-limitations)
@@ -60,6 +61,20 @@ A turn follows four steps:
 2. **Validate.** `act(world, actor, rawJson)` parses the reply, checks the actor's role and applies the verb's rule against code-owned facts such as the price floor.
 3. **Commit or reject.** Valid actions become events. Invalid ones are logged as `ACTION_REJECTED`; the model gets one retry, then the NPC falls back to a safe line.
 4. **Deliver.** Timed work is delivered by the clock, with stats copied from the accepted offer. The model never writes them.
+
+```mermaid
+flowchart LR
+    Speech["Player speech"] --> Voice["Muse Voice Transcribe"]
+    Voice --> Text["Editable text"]
+    Typed["Typed message"] --> Text
+    Text --> Model["Muse Spark 1.3 or Muse Spark Open"]
+    Model -->|"proposed action (JSON)"| Ledger{"Ledger (code)"}
+    Ledger -->|"rejected: one retry"| Model
+    Ledger -->|"rejected twice"| Fallback["Safe fallback line"]
+    Ledger -->|"valid"| Events["Event log"]
+    Events -->|"accepted order"| Image["Muse Image"]
+    Image --> Sprite["Item sprite"]
+```
 
 `npm run ledger-proof` shows this without a model or API key. It sends controlled proposals straight to the ledger (output shortened):
 
@@ -177,16 +192,30 @@ In the development file workflow, an NPC is a definition in `npcs/<id>.json` plu
 
 The full file also defines the catalogue, starting stock, model and world settings.
 
-## Models
+## Multi-model pipeline
 
-| Role | Model | Provider |
-|---|---|---|
-| Brann the blacksmith (made-to-order negotiation) | Muse Spark 1.3 | Meta Model API |
-| Mira, villagers, gossip and attackers | Muse Spark Open (`meta-models/muse-spark-open-1026`, configurable) | Baseten |
-| Item pictures | Muse Image | Meta Model API |
-| Speech to text | Muse Voice Transcribe | Meta Model API |
+One player turn can pass through three Meta model families: Muse Voice turns speech into text, Muse Spark decides what the NPC says and proposes, and Muse Image draws the item once the ledger has accepted the order. The ledger sits between the models, so a picture is only drawn from terms that passed its checks.
+
+| Role | Model | Model ID | Provider |
+|---|---|---|---|
+| Brann the blacksmith (made-to-order negotiation) | Muse Spark 1.3 | `muse-spark-1.3` | Meta Model API |
+| Mira, villagers, gossip and attackers | Muse Spark Open | `meta-models/muse-spark-open-1026` (configurable) | Baseten |
+| Item pictures | Muse Image | `muse-image-1.0` | Meta Model API |
+| Speech to text | Muse Voice Transcribe | `muse-voice-transcribe-1.0` | Meta Model API |
 
 Muse Spark and Muse Spark Open always reason, so the clients send a low `reasoning_effort` with a generous token limit. Baseten does not enforce `json_schema` for Muse Spark Open, so every reply is validated with Zod and allowed one repair retry. Measured latency and cost are documented in [`docs/api-notes.md`](docs/api-notes.md).
+
+## Evaluation results
+
+| Check | Result | Measured |
+|---|---|---|
+| Ledger proof, controlled inputs and no model | 5 of 5 cases pass | Every CI run |
+| Live attacks on six NPCs | 106 attacks, 0 unauthorized state changes | Oct 29–30, 2026 |
+| Muse Spark 1.3, Brann's quote turn, low effort | p50 3.7 s, p95 4.2 s | Oct 27, 2026, 5 calls |
+| Muse Spark Open, the same turn, low effort | p50 2.4 s, p95 6.3 s | Oct 27, 2026, 5 calls |
+| Muse Image, high reasoning strength | p50 17.2 s, p95 29.5 s | Oct 27, 2026, 5 calls |
+
+In the live attacks the models never proposed an illegal action, so the ledger had nothing to refuse. The ledger's refusals are shown by the ledger proof, which uses controlled inputs. Details and limits are in [`eval/README.md`](eval/README.md).
 
 ## Development
 
@@ -221,7 +250,8 @@ server/src/
 web/src/         React product home, Workshop and demo; game/ contains the Phaser village
 npcs/, prompts/  NPC definitions and personas
 examples/        Backend and Skyrim integrations, plus a sample .npc.json bundle
-scripts/         Dev runner, demos, latency test and ledger proof
+scripts/         Dev runner, demos and ledger proof
+eval/            Live-model latency test and exploit suite, with results
 docs/            API reference, model notes and background research
 ```
 
