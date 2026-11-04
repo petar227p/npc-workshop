@@ -34,7 +34,8 @@ Recorded November 4, 2026. The exploit suite can't see three things: an NPC that
 - **How the words were checked:** a judge model read 167 conversations against the record, after scoring 15 of 16 on planted cases with no false alarms. Its only miss was one flag on a case it otherwise got right. In the first run every flag and every line that sounded like a completed deal in a run with an empty record were also read by hand, and a plain text search for model names found the same six conversations. The search agrees with the later runs too.
 - **How independent it is:** the attacker and judge ran on `muse-spark-1.2` at minimal effort, the fastest model the keys can reach and one no NPC uses. It is still a Meta model. The hackathon Baseten key answers 403 for every model except Spark Open, so no other vendor's model could be used.
 - **A test corrected:** Garrick first scored 4/6 because the scripted customer never gave a reason when asked, and a pass didn't count as being let through. The script now gives a reason and a pass counts. Fifteen runs of each of his two cases served all 30 with the rule and all 30 without it, so the rule did not make him stricter.
-- **Setup:** seven NPCs ran on Spark Open. Brann ran on `muse-spark-1.3-contributor`, which this `.env` sets instead of the default `muse-spark-1.3`.
+- **Meta key only:** this is the setup for anyone without a Baseten key, with all eight NPCs on Spark 1.3. Fresh attacks gave the same result: 140 attacks, 0 violations, 0 false claims, 0 naming their model and no leaks. Fair customers scored 25 of 27. Both misses were Garrick asking for a traveller's name when the two-line script had no answer. With a third line giving one, he let 15 of 15 through, and the script now has that line. Spark 1.3 replies are slower too: see the latency note in [`docs/api-notes.md`](../docs/api-notes.md#rerun-2026-11-04).
+- **Setup:** in the main run, seven NPCs ran on Spark Open. Brann ran on `muse-spark-1.3-contributor`, which this `.env` sets instead of the default `muse-spark-1.3`.
 
 ### Model race
 
@@ -53,7 +54,7 @@ The 1.1 and 1.2 prices are assumed to match their 1.3 tier.
 
 ## Exploit suite results
 
-Recorded October 29–30, 2026. Each attack had the player try to get something the rules don't allow, through flattery, prompt injection and similar tricks, and the suite checked the world after every attempt. A violation is a change to gold, stock, items or contracts that no rule allows.
+Recorded November 4, 2026, with Brann on `muse-spark-1.3`, the other NPCs on Spark Open, and the stay-in-the-world rule in place. Each attack had the player try to get something the rules don't allow, through flattery, prompt injection and similar tricks, and the suite checked the world after every attempt. A violation is a change to gold, stock, items or contracts that no rule allows.
 
 | NPC | Attacks | Violations | Model tricked |
 |---|---|---|---|
@@ -62,13 +63,14 @@ Recorded October 29–30, 2026. Each attack had the player try to get something 
 | Tobin | 20 | 0 | 0 |
 | Pell | 20 | 0 | 0 |
 | Osric | 20 | 0 | 0 |
-| Garrick | 6 | 0 | 0 |
-| **Total** | **106** | **0** | **0** |
+| Garrick | 26 | 0 | 0 |
+| Edda | 20 | 0 | 0 |
+| Wren | 20 | 0 | 0 |
+| **Total** | **166** | **0** | **0** |
 
-- **What this shows:** no attack caused an unauthorized state change.
+- **What this shows:** no attack caused an unauthorized state change on any village NPC.
 - **What it doesn't show:** the ledger catching a live model. "Model tricked" is 0 because the models never proposed an illegal action. `npm run ledger-proof` covers the ledger's refusals, using controlled inputs.
-- **Coverage:** six of the eight village NPCs. Wren and Edda were not attacked.
-- **Reruns:** the first full run had model errors on three NPCs. Those NPCs were rerun, and the table uses the clean reruns.
-- **Age:** the suite has not been rerun since October 30, so these results predate later changes. Raw reports are written to `logs/`, which is not committed.
+- **Reruns:** two of Osric's attacks stopped when Baseten rate-limited the attacker. Those two were rerun, and the table uses the clean reruns.
+- **Earlier run:** October 29–30 gave 106 attacks on six NPCs, also with 0 violations. Raw reports are written to `logs/`, which is not committed.
 
 Latency results are in [`docs/api-notes.md`](../docs/api-notes.md#latency-measured-2026-10-27-npm-run-latency-test).

@@ -138,6 +138,24 @@ POST /v1/asr/transcribe   (multipart/form-data)
 
 ## Latency (measured 2026-10-27, `npm run latency-test`)
 
+### Rerun 2026-11-04
+
+The same turn and method, now with the stay-in-the-world rule in the prompt. Every answer passed the ledger.
+
+| Setup | p50 | p95 | Reasoning tokens |
+|---|---|---|---|
+| `muse-spark-1.3` (Standard) minimal | 4.1 s | 4.6 s | ~210 |
+| `muse-spark-1.3` (Standard) low | 8.2 s | 9.7 s | ~660 |
+| `muse-spark-1.3` (Standard) medium | 10.7 s | 14.4 s | ~1180 |
+| Spark Open (Baseten) low | 2.0 s | 2.9 s | ~230 |
+| Spark Open (Baseten) medium | 2.6 s | 3.9 s | ~420 |
+| Muse Image, `reasoning_strength: low` | 8.5 s | 8.5 s | |
+| Muse Image, `reasoning_strength: high` | 27.0 s | 28.6 s | |
+
+Spark 1.3 at `low` took more than twice as long as on October 27. Reasoning tokens rose only about a quarter, so most of the change isn't the prompt. The cause wasn't investigated.
+
+### First run, 2026-10-27
+
 Brann's real quote turn (persona + facts + strict schema, ~4.2k characters, a hammerhead-sword order), 5 calls per setup, one at a time, rotating through setups, no retries. With 5 samples p95 is the slowest call. Every one of the 40 chat answers was a `PROPOSE_CONTRACT` the ledger accepted.
 
 | Setup | p50 | p95 | Reasoning tokens | $/turn |
