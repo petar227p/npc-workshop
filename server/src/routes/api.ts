@@ -8,7 +8,6 @@ import { z } from 'zod';
 import { readNote } from '../agents/note';
 import type { NpcModel } from '../agents/npc';
 import { ART_FILE, artView, createStudio, type StudioLimits } from '../art';
-import { placeAt } from '../engine';
 import { answers, passTime, playerAccepts, playerGives, playerSays, playerSpeaks, worldReports } from '../game';
 import type { ImageClient } from '../models/image';
 import { readWav, type Transcriber } from '../models/voice';
@@ -178,7 +177,7 @@ export function createApi(deps: ApiDeps) {
     }
 
     const model = modelFor(s, npc.model);
-    if (!model) return c.json({ error: `${npc.name} isn't at the ${placeAt(npc, s.world.tick).replace(/_/g, ' ')} right now. Try again later.` }, 503);
+    if (!model) return c.json({ error: `${npc.name} can't answer: no model key is set on this server. Add MODEL_API_KEY to its .env and restart it.` }, 503);
 
     s.busy = { by: 'npc', name: npc.name };
     try {

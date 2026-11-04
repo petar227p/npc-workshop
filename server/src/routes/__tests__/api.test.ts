@@ -166,14 +166,13 @@ describe('api', () => {
     });
     const b = browser(app);
     const r = await b.send('/api/say', { text: 'A hammerhead sword, please.' });
-    expect(r).toMatchObject({ status: 503, json: { error: "Brann isn't at the forge right now. Try again later." } });
-    expect(JSON.stringify(r.json)).not.toMatch(/MODEL_API_KEY/); // the cause goes to the server log, not the player
+    expect(r).toMatchObject({ status: 503, json: { error: "Brann can't answer: no model key is set on this server. Add MODEL_API_KEY to its .env and restart it." } });
     expect(logged).toHaveBeenCalledWith(expect.stringMatching(/MODEL_API_KEY is not set/));
     const after = (await b.send('/api/state')).json as StateView;
     expect(after).toMatchObject({ busy: false, events: [] });
-    // The message names whoever the player was talking to, at their own place.
+    // The message names whoever the player was talking to.
     const mira = await b.send('/api/say', { text: 'Torches?', npc: 'merchant' });
-    expect(mira).toMatchObject({ status: 503, json: { error: "Mira isn't at the market right now. Try again later." } });
+    expect(mira).toMatchObject({ status: 503, json: { error: "Mira can't answer: no model key is set on this server. Add MODEL_API_KEY to its .env and restart it." } });
     logged.mockRestore();
   });
 

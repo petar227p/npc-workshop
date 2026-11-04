@@ -4,6 +4,10 @@ services:
     ports:
       - "5174:5174"
       - "8787:8787"
+    # The editor saves NPCs into these, so they stay on the host when the container goes, as with `npm run dev`.
+    volumes:
+      - ./npcs:/app/npcs
+      - ./prompts:/app/prompts
     # Keys come from .env (copy .env.example). The app also starts without them.
     env_file:
       - path: .env
