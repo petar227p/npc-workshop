@@ -4,6 +4,8 @@
 
 **Build LLM-driven NPCs that can't break your game's rules.**
 
+**[Watch the demo video](https://youtu.be/cr5qHfXWg8o)**
+
 [![CI](https://github.com/petar227p/npc-workshop/actions/workflows/ci.yml/badge.svg)](https://github.com/petar227p/npc-workshop/actions/workflows/ci.yml)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node 24+](https://img.shields.io/badge/node-24%2B-339933.svg)
