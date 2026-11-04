@@ -347,7 +347,12 @@ input[type='radio'] { accent-color: var(--accent); width: 16px; height: 16px; }
 .answers dd { margin: 0; overflow-wrap: anywhere; }
 .editor { grid-template-columns: minmax(0, 1fr) minmax(0, 460px); }
 .definition h3, .advanced > summary { margin: 0 0 4px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); }
+/* Subsections of a page: quieter than the page title (22px), but plainly a new part of the page. */
 .definition h4 { margin: 16px 0 6px; font-size: 13px; }
+.ed-section > h4 { margin: 36px 0 12px; padding-top: 20px; border-top: 1px solid var(--line); font: 700 17px/1.3 Inter, system-ui, sans-serif; color: var(--text); }
+.ed-section > h4:focus { outline: none; } /* focus moves here from links to a setting; the heading is the cue */
+.ed-section > p.small + h4 { margin-top: 12px; }
+.ed-section > h4 + p.small { margin-top: -4px; margin-bottom: 12px; }
 .ed-section + .ed-section { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
 .advanced > summary .muted { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .advanced[open] > summary { margin-bottom: 8px; }
