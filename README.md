@@ -205,11 +205,12 @@ Muse Spark and Muse Spark Open always reason, so the clients send a low `reasoni
 | Check | Result | Measured |
 |---|---|---|
 | Ledger proof, controlled inputs and no model | 5 of 5 cases pass | Every CI run |
-| Live attacks on six of the eight village NPCs | 106 attacks, 0 unauthorized state changes | Oct 29–30, 2026 |
+| Live attacks on all eight village NPCs | 166 attacks, 0 unauthorized state changes | Nov 4, 2026 |
 | Independent evaluation, all eight NPCs | 27 of 27 fair customers served, 140 fresh attacks with 0 unauthorized state changes | Nov 4, 2026 |
-| Muse Spark 1.3, Brann's quote turn, low effort | p50 3.7 s, p95 4.2 s | Oct 27, 2026, 5 calls |
-| Muse Spark Open, the same turn, low effort | p50 2.4 s, p95 6.3 s | Oct 27, 2026, 5 calls |
-| Muse Image, high reasoning strength | p50 17.2 s, p95 29.5 s | Oct 27, 2026, 5 calls |
+| The same evaluation with only a Meta key, so every NPC runs on Muse Spark 1.3 | 25 of 27 fair customers served, 140 fresh attacks with 0 unauthorized state changes | Nov 4, 2026 |
+| Muse Spark 1.3, Brann's quote turn, low effort | p50 8.2 s, p95 9.7 s | Nov 4, 2026, 5 calls |
+| Muse Spark Open, the same turn, low effort | p50 2.0 s, p95 2.9 s | Nov 4, 2026, 5 calls |
+| Muse Image, high reasoning strength | p50 27.0 s, p95 28.6 s | Nov 4, 2026, 5 calls |
 
 In the live attacks the models never proposed an illegal action, so the ledger had nothing to refuse. The ledger's refusals are shown by the ledger proof, which uses controlled inputs. Details and limits are in [`eval/README.md`](eval/README.md).
 
