@@ -63,17 +63,12 @@ A turn follows four steps:
 4. **Deliver.** Timed work is delivered by the clock, with stats copied from the accepted offer. The model never writes them.
 
 ```mermaid
-flowchart TD
-    Speech["Player speech"] --> Voice["Muse Voice Transcribe"]
-    Voice --> Text["Editable text"]
-    Typed["Typed message"] --> Text
-    Text --> Model["Muse Spark 1.3 or Muse Spark Open"]
-    Model -->|"proposed action (JSON)"| Ledger{"Ledger (code)"}
+flowchart LR
+    Input["Player input<br/>typed, or speech through<br/>Muse Voice Transcribe"] --> Model["Muse Spark 1.3 or<br/>Muse Spark Open"]
+    Model -->|"proposed action"| Ledger{"Ledger<br/>(code)"}
     Ledger -->|"rejected: one retry"| Model
     Ledger -->|"rejected twice"| Fallback["Safe fallback line"]
-    Ledger -->|"valid"| Events["Event log"]
-    Events -->|"accepted order"| Image["Muse Image"]
-    Image --> Sprite["Item sprite"]
+    Ledger -->|"valid"| Events["Event log, and for accepted<br/>orders a Muse Image sprite"]
 ```
 
 `npm run ledger-proof` shows this without a model or API key. It sends controlled proposals straight to the ledger (output shortened):
