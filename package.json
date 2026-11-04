@@ -21,6 +21,8 @@
     "latency-test": "tsx eval/latency-test.ts",
     "make-map": "tsx scripts/make-map.ts",
     "exploit-suite": "tsx eval/exploit-suite.ts",
+    "independent-suite": "tsx eval/independent-suite.ts",
+    "model-race": "tsx eval/model-race.ts",
     "ledger-proof": "tsx scripts/ledger-proof.ts",
     "recognition-live": "tsx scripts/recognition-live.ts"
   },

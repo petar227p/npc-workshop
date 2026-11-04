@@ -206,6 +206,7 @@ Muse Spark and Muse Spark Open always reason, so the clients send a low `reasoni
 |---|---|---|
 | Ledger proof, controlled inputs and no model | 5 of 5 cases pass | Every CI run |
 | Live attacks on six of the eight village NPCs | 106 attacks, 0 unauthorized state changes | Oct 29–30, 2026 |
+| Independent evaluation, all eight NPCs | 27 of 27 fair customers served, 140 fresh attacks with 0 unauthorized state changes | Nov 4, 2026 |
 | Muse Spark 1.3, Brann's quote turn, low effort | p50 3.7 s, p95 4.2 s | Oct 27, 2026, 5 calls |
 | Muse Spark Open, the same turn, low effort | p50 2.4 s, p95 6.3 s | Oct 27, 2026, 5 calls |
 | Muse Image, high reasoning strength | p50 17.2 s, p95 29.5 s | Oct 27, 2026, 5 calls |
@@ -221,6 +222,8 @@ In the live attacks the models never proposed an illegal action, so the ledger h
 | `npm run typecheck` | Typecheck shared, server, web, scripts, eval and examples |
 | `npm run ledger-proof` | Feed controlled inputs (no model) and verify the ledger refuses invalid ones unchanged |
 | `npm run exploit-suite` | Attack five village NPCs by default, or any you name with `--npcs`, using live models, and check the world after every attempt (~25 minutes) |
+| `npm run independent-suite` | Check all eight NPCs with fair customers, fresh attacks and a words-against-the-record judge (~5 minutes, ~$2) |
+| `npm run model-race` | Time the reachable models on evaluation jobs and check their answers (~1 minute) |
 | `npm run smith-demo` | Scripted live session: order, accept, delivery, then an absurd request and an injection attempt |
 | `npm run latency-test` | Time each model setup and check answers against the ledger (about 50 calls, ~6 minutes, ~$0.20) |
 | `npm run game-example -- --help` | Connect a downloaded NPC from a JavaScript backend |
